@@ -242,7 +242,7 @@ def filter_miller2022(afm, min_site_cov=100, min_var_quality=30, p1=1, p2=99, pe
 ##
 
 
-def fit_MQuad_mixtures(afm, n_top=2000, path_=None, ncores=8, minDP=10, minAD=1, with_M=False):
+def fit_MQuad_mixtures(afm, n_top=None, path_=None, ncores=8, minDP=10, minAD=1, with_M=False):
     """
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
     """

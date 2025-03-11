@@ -168,11 +168,13 @@ def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, t_prob=.75, m
     Call genotypes using simple thresholding or th MiTo binomial mixtures approachm (w/i or w/o kNN smoothing).
     """
 
-    assert 'AD' in afm.layers and 'site_coverage' in afm.layers
+    assert 'AD' in afm.layers 
+    assert 'site_coverage' in afm.layers or 'DP' in afm.layers
+    cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP' 
 
     X = afm.X.A.copy()
     AD = afm.layers['AD'].A.copy()
-    DP = afm.layers['site_coverage'].A.copy()
+    DP = afm.layers[cov_layer].A.copy()
     
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)

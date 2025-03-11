@@ -274,7 +274,7 @@ def filter_MQuad(afm, ncores=8, minDP=10, minAD=1, minCell=3, path_=None, n_top=
     scLT_system = afm.uns['scLT_system']
     pp_method = afm.uns['pp_method']
 
-    if scLT_system == 'MAESTER' and pp_method in ['mito_preprocessing', 'maegatk']:
+    if scLT_system == 'MAESTER' and pp_method in ['mito_preprocessing', 'maegatk', 'cellsnp-lite']:
         pass
     elif scLT_system == 'redeem':
         pass

@@ -298,7 +298,7 @@ def extract_kwargs(args, only_tree=False):
     # Set filtering kwargs to None (use defaults) filtering is not MiTo 
     # ONly necessary for simplify handling filtering_kwargs in the onesample.py
     # and MiTo.py pipeline script # FIX THIS
-    filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else None
+    filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
 
     return cell_filter, kwargs, filtering_kwargs, binarization_kwargs, tree_kwargs
 

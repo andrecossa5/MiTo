@@ -266,7 +266,7 @@ def fit_MQuad_mixtures(afm, n_top=25, path_=None, ncores=8, minDP=10, minAD=1, w
 ##
 
 
-def filter_MQuad(afm, ncores=8, minDP=10, minAD=1, minCell=3, path_=None, n_top=None):
+def filter_MQuad(afm, ncores=8, minDP=5, minAD=1, minCell=2, path_=None, n_top=None):
     """
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
     """

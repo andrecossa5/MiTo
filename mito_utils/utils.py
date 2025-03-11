@@ -257,11 +257,11 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter
+            cell_filter = args.cell_filter if args.cell_filter is not "None" else None
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,
-                'filtering' : args.filtering,
+                'filtering' : args.filtering if args.filtering  is not "None" else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
                 'path_dbSNP' : args.path_dbSNP, 

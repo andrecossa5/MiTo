@@ -4,7 +4,6 @@ Tools to map phenotype to lineage structures.
 
 import numpy as np
 import pandas as pd
-import cassiopeia as cs
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 
@@ -12,13 +11,13 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 ##
 
 
-def compute_clonal_fate_bias(df, state_column, clone_column, target_state):
+def compute_clonal_fate_bias(tree, state_column, clone_column, target_state):
     """
     Compute -log10(FDR) Fisher's exact test: clonal fate biases towards some target_state.
     """
 
-    n = df.shape[0]
-    clones = np.sort(df[clone_column].unique())
+    n = len(tree.leaves)
+    clones = np.sort(tree.cell_meta[clone_column].unique())
 
     target_ratio_array = np.zeros(clones.size)
     oddsratio_array = np.zeros(clones.size)
@@ -27,8 +26,8 @@ def compute_clonal_fate_bias(df, state_column, clone_column, target_state):
     # Here we go
     for i, clone in enumerate(clones):
 
-        test_clone = df[clone_column] == clone
-        test_state = df[state_column] == target_state
+        test_clone = tree.cell_meta[clone_column] == clone
+        test_state = tree.cell_meta[state_column] == target_state
 
         clone_size = test_clone.sum()
         clone_state_size = (test_clone & test_state).sum()
@@ -64,23 +63,3 @@ def compute_clonal_fate_bias(df, state_column, clone_column, target_state):
 ##
 
 
-def get_expanded_clones(tree, t=.05, min_depth=3, min_clade_size=None):
-    """
-    Get significantly expanded clades.
-    """
-    min_clade_size = (t * tree.n_cell) if min_clade_size is None else min_clade_size
-    cs.tl.compute_expansion_pvalues(
-        tree, 
-        min_clade_size=min_clade_size, 
-        min_depth=min_depth, 
-    )
-    
-    expanding_nodes = []
-    for node in tree.depth_first_traverse_nodes():
-        if tree.get_attribute(node, "expansion_pvalue") < t:
-            expanding_nodes.append(node)
-
-    return expanding_nodes
-
-
-##

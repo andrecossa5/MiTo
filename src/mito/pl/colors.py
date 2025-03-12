@@ -56,6 +56,8 @@ def create_palette(df, var, palette=None, col_list=None,
             k: _change_color(colors[k], lightness=lightness) \
             for k in colors 
         }
+    
+    colors.update({'unassigned':'lightgrey', np.nan:'lightgrey'})
      
     return colors
 

@@ -1,6 +1,9 @@
 # TO DO: prune unused utils
 
-from .metrics import normalized_mutual_info_score, custom_ARI, kbet, distance_AUPRC
+from .metrics import (
+    normalized_mutual_info_score, custom_ARI, kbet, CI, RI,
+    distance_AUPRC, NN_entropy, NN_purity, calculate_corr_distances,
+)
 from .positions import transitions, transversions, MAESTER_genes_positions
 from .stats_utils import (
     genotype_mix, get_posteriors,

@@ -1,5 +1,5 @@
 """
-_colors.py stores functions to create Cellula colors.
+_colors.py stores functions to create cusom palettes.
 """
 
 import pandas as pd

@@ -1,20 +1,21 @@
 """
-Module to create custom distance function among cell AF profiles.
+Custom distance function among cell AF profiles.
 """
 
+import logging
 import numpy as np
 import pandas as pd
 import sklearn.preprocessing as pp
 from scipy.sparse import csr_matrix
-from sklearn.metrics import pairwise_distances, recall_score, precision_score, auc
-from sklearn.metrics import jaccard_score
-from sklearn.metrics.pairwise import PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
+from sklearn.metrics.pairwise import (
+    pairwise_distances, 
+    PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
+)
 from anndata import AnnData
-from mito_utils.filters import *
-from mito_utils.preprocessing import *
-from mito_utils.utils import rescale
-from mito_utils.stats_utils import *
-from mito_utils.kNN import *
+from bbmix.models import MixtureBinomial
+from .kNN import kNN_graph
+from ..ut.utils import Timer
+from ..ut.stats_utils import genotype_mix, get_posteriors
 
 
 ##
@@ -29,11 +30,21 @@ continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 
 
 def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False):
     """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding (Kwock et al., 2022).
+    Single-cell MT-SNVs genotyping with binomial mixtures posterior 
+    probabilities thresholding (Kwock et al., 2022).
     """
+
     X = np.zeros(AD.shape)
     for idx in range(AD.shape[1]):
-        X[:,idx] = genotype_mix(AD[:,idx], DP[:,idx], t_prob=t_prob, t_vanilla=t_vanilla, min_AD=min_AD, debug=debug)
+        X[:,idx] = genotype_mix(
+            AD[:,idx], 
+            DP[:,idx], 
+            t_prob=t_prob, 
+            t_vanilla=t_vanilla, 
+            min_AD=min_AD, 
+            debug=debug
+        )
+
     return X
 
 
@@ -42,8 +53,9 @@ def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False)
 
 def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=.1, debug=False):
     """
-    Hybrid genotype calling strategy: if a mutation has prevalence (AD>=min_AD and AF>=t_vanilla) >= min_cell_prevalence,
-    use probabilistic modeling as in 'bin_mixtures'. Else, use simple tresholding as in 'vanilla' method.
+    Hybrid genotype calling strategy: if a mutation has prevalence (AD>=min_AD and AF>=t_vanilla) 
+    >= min_cell_prevalence, use probabilistic modeling as in 'bin_mixtures'. Else, use simple 
+    tresholding as in 'vanilla' method.
     """
     X = np.zeros(AD.shape)
     n_binom = 0
@@ -65,10 +77,14 @@ def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=
 ##
 
 
-def genotype_MiTo_smooth(AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prevalence=.05, k=5, gamma=.25, n_samples=100, resample=False):
+def genotype_MiTo_smooth(
+    AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prevalence=.05, k=5, 
+    gamma=.25, n_samples=100, resample=False
+    ):
     """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding (readapted from  MQuad, Kwock et al., 2022)
-    and kNN smoothing (readapted from Phylinsic, Liu et al., 2022).
+    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding
+    (readapted from  MQuad, Kwock et al., 2022) and kNN smoothing (readapted from Phylinsic, 
+    Liu et al., 2022).
     """
 
     # kNN 
@@ -281,7 +297,7 @@ def preprocess_feature_matrix(
 ##
 
 
-
+# TO FIX!!!
 def compute_distances(
     afm, distance_key='distances', metric='weighted_jaccard', precomputed=False,
     bin_method='MiTo', binarization_kwargs={}, ncores=1, rescale=True, verbose=True
@@ -333,45 +349,6 @@ def compute_distances(
     
 
 ##
-
-
-def distance_AUPRC(D, labels):
-    """
-    Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
-    Reports Area Under Precision Recall Curve.
-    """
-
-    labels = pd.Categorical(labels) 
-
-    final = {}
-    for alpha in np.linspace(0,1,10):
- 
-        p_list = []
-        gt_list = []
-
-        for i in range(D.shape[0]):
-            x = rescale(D[i,:])
-            p_list.append(np.where(x<=alpha, 1, 0))
-            c = labels.codes[i]
-            gt_list.append(np.where(labels.codes==c, 1, 0))
-
-        predicted = np.concatenate(p_list)
-        gt = np.concatenate(gt_list)
-        p = precision_score(gt, predicted)
-        r = recall_score(gt, predicted)
-
-        final[alpha] = (p, r)
-
-    df = pd.DataFrame(final).T.reset_index(drop=True)
-    df.columns = ['precision', 'recall']
-    auc_score = auc(df['recall'], df['precision'])
-
-    return auc_score
-
-
-##
-
-
 
 
 

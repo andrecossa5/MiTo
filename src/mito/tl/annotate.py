@@ -2,9 +2,16 @@
 Main MiTo class for MT-SNVs single-cell phylogenies annotation.
 """
 
-from mito_utils.utils import *
-from mito_utils.preprocessing import *
-from mito_utils.phylo import *
+import logging
+import numpy as np
+import pandas as pd
+from itertools import product
+from scipy.stats import fisher_exact
+from statsmodels.sandbox.stats.multicomp import multipletests
+from sklearn.metrics import silhouette_score
+from ..pp.distances import weighted_jaccard
+from ..tl.phylo import get_clades
+from ..ut.utils import Timer, rescale
 
 
 ##
@@ -453,7 +460,9 @@ class MiToTreeAnnotator():
 
         # Resolve over-clustering
         logging.info('Solve potential over-clustering...')
-        labels, similarities = self.resolve_ambiguous_clones(df_predict, s_treshold=merging_treshold, add_to_meta=add_to_meta)
+        labels, similarities = self.resolve_ambiguous_clones(
+            df_predict, s_treshold=merging_treshold, add_to_meta=add_to_meta
+        )
 
         return labels, similarities
     
@@ -478,7 +487,6 @@ class MiToTreeAnnotator():
         T.start()
 
         # Grid-search
-        from itertools import product
         combos = list(product(similarity_tresholds, mut_enrichment_tresholds, merging_treshold))
         logging.info(f'Start Grid Search. n hyper-parameter combinations to explore: {len(combos)}')
         print('\n')

@@ -4,23 +4,17 @@ Miscellaneous utilities.
 
 import os 
 import sys
-import re
 import time 
-import random
-import string
-import pickle
-import json
 from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
-import scanpy as sc
 
 
 ##
 
 
-path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets')
+path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
 
 
 ##
@@ -344,6 +338,32 @@ def load_mt_gene_annot():
     df = pd.read_csv(os.path.join(path_assets, 'formatted_table_wobble.csv'), index_col=0)
     df['mut'] = df['Position'].astype(str) + '_' + df['Reference'] + '>' + df['Variant']
     return df
+
+
+##
+
+
+def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
+
+    assert 1-np.array(freqs).sum() <= .05
+    assert len(freqs) == n_clones
+
+    clones_sorted = afm.obs['GBC'].value_counts().index
+    clones = clones_sorted[:n_clones].to_list()
+
+    cells = []
+    for clone, f in zip(clones, freqs):
+        afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
+        afm_clone = afm_clone[np.sum(afm_clone.layers['bin'].A>0, axis=1)>2,
+                              np.sum(afm_clone.layers['bin'].A>0, axis=0)>=2]
+        n_cells_clone = min(round(ncells*f), afm_clone.shape[0])
+        cells.extend(
+            np.random.choice(afm_clone.obs_names, n_cells_clone, replace=False).tolist()
+        )
+
+    afm_subsample = afm[cells].copy()
+    
+    return afm_subsample
 
 
 ##

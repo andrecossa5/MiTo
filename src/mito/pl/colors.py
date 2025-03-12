@@ -1,5 +1,5 @@
 """
-_colors.py stores functions to create cusom palettes.
+Stores functions to create cusom palettes.
 """
 
 import pandas as pd
@@ -89,6 +89,7 @@ def create_colors(meta, chosen=None):
 ##
 
 
+# TO FIX!!
 def assign_matching_colors(df, g1, g2, palette):
     """
     Assign colors to categories in g1 and g2, ensuring colors are unique and come from the provided palette.

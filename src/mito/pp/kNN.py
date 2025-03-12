@@ -1,16 +1,12 @@
 """
-_neighbors.py: nearest neighbors utils.
+Nearest neighbors utils.
 """
 
-from joblib import cpu_count
-import sys
 import numpy as np
-from umap.umap_ import nearest_neighbors 
-# from hnswlib import Index 
+from umap.umap_ import nearest_neighbors  
 from umap.umap_ import fuzzy_simplicial_set 
 from scipy.sparse import coo_matrix, issparse
 from scanpy.neighbors import _get_sparse_matrix_from_indices_distances_umap
-from .utils import *
 
 
 ##
@@ -23,7 +19,7 @@ def _NN(X, k=15, metric='euclidean', implementation='pyNNDescent',
     """
     # kNN search: UMAP
     if k <= 500 and implementation == 'pyNNDescent':
-        knn_indices, knn_dists, forest = nearest_neighbors(
+        knn_indices, knn_dists, _ = nearest_neighbors(
             X,
             k,
             metric=metric, 

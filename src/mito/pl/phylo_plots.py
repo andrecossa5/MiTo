@@ -4,9 +4,8 @@ Tree plotting utils.
 
 from cassiopeia.plotting.local import utilities as ut
 from cassiopeia.plotting.local import *
-from mito_utils.diagnostic_plots import sturges
-from mito_utils.colors import *
-from mito_utils.plotting_base import *
+from .colors import *
+from .plotting_base import *
 
 
 ##

@@ -1,36 +1,12 @@
 """
-Module for clustring affinity matrices derived from some cell-to-cell similarity metric defined over 
-the MT variants space.
+Tools to map phenotype to lineage structures.
 """
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
-import leidenalg
+import cassiopeia as cs
 from scipy.stats import fisher_exact
-from scipy.cluster.hierarchy import linkage, leaves_list
-from scipy.spatial.distance import squareform
 from statsmodels.sandbox.stats.multicomp import multipletests
-
-
-
-##
-
-
-def leiden_clustering(A, res=0.5):
-    """
-    Compute leiden clustering, at some resolution.
-    """
-    g = sc._utils.get_igraph_from_adjacency(A, directed=True)
-    part = leidenalg.find_partition(
-        g,
-        leidenalg.RBConfigurationVertexPartition,
-        resolution_parameter=res,
-        seed=1234
-    )
-    labels = np.array(part.membership)
-
-    return labels
 
 
 ##
@@ -88,16 +64,23 @@ def compute_clonal_fate_bias(df, state_column, clone_column, target_state):
 ##
 
 
-def fast_hclust_distance(D):
+def get_expanded_clones(tree, t=.05, min_depth=3, min_clade_size=None):
+    """
+    Get significantly expanded clades.
+    """
+    min_clade_size = (t * tree.n_cell) if min_clade_size is None else min_clade_size
+    cs.tl.compute_expansion_pvalues(
+        tree, 
+        min_clade_size=min_clade_size, 
+        min_depth=min_depth, 
+    )
     
-    D[np.isnan(D)] = 0                               
-    D[np.diag_indices(D.shape[0])] = 0
-    if D.shape[0]==D.shape[1]:
-        D = squareform(D)
-    linkage_matrix = linkage(D, method='weighted')
-    order = leaves_list(linkage_matrix)
+    expanding_nodes = []
+    for node in tree.depth_first_traverse_nodes():
+        if tree.get_attribute(node, "expansion_pvalue") < t:
+            expanding_nodes.append(node)
 
-    return order
+    return expanding_nodes
 
 
 ##

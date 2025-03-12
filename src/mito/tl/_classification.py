@@ -1,5 +1,5 @@
 """
-Supervised.py: functions for classification models training and evaluation. 
+Private: functions for supervised models training and evaluation. 
 """
 
 import numpy as np
@@ -13,7 +13,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import StratifiedShuffleSplit, RandomizedSearchCV
 from sklearn.metrics import *
-# from tune_sklearn import TuneGridSearchCV
 
 
 ##

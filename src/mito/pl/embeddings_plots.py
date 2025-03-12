@@ -1,14 +1,11 @@
 """
-_plotting.py stores plotting functions called by the pipeline itself. They all return a fig object.
-NB: we may decide to split everything in its submodule (i.e., one for preprocessing, ecc..)
+Stores plotting functions for embeddings.
 """
 
 import scanpy as sc
 import matplotlib.pyplot as plt
-plt.style.use('default')
 from .colors import *
 from .plotting_base import *
-from .utils import *
 
 
 ##
@@ -85,6 +82,7 @@ def handle_colors(df, cat, legend_params, query=None):
 ##
 
 
+# TO FIX!!
 def draw_embeddings(
     df, x='UMAP1', y='UMAP2', cat=None, cont=None, ax=None, s=None, query=None, title=None,
     cbar_kwargs={}, legend_kwargs={}, axes_kwargs={}):

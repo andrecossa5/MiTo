@@ -1,14 +1,17 @@
 """
-Module to make_afm: create a clean allelic frequency matrix as AnnData object.
+Create a clean allelic frequency matrix as AnnData object.
 """
 
+import logging
 import os
+import numpy as np
+import pandas as pd
 import warnings
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
-from .utils import *
-from .positions import *
+from ..ut.utils import Timer
+from ..ut.positions import MAESTER_genes_positions
 warnings.filterwarnings("ignore")
 
 

@@ -416,11 +416,11 @@ def compute_distances(
     elif metric=='weighted_hamming':
         # Reformat, keys as integers
         d = afm.uns['indel_priors']
-        afm.uns['indel_priors'] = { 
+        d = { 
             int(k) : { int(k_) : d[k][k_] for k_ in  d[k] } \
             for k in d
         }
-        w = transform_priors(afm.uns['indel_priors'])
+        w = transform_priors(d)
         D = weighted_hamming(X, w)
     else:
         D = pairwise_distances(X, metric=metric, n_jobs=ncores, force_all_finite=False)

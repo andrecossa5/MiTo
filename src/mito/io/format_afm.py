@@ -447,6 +447,7 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
     ) = cs.pp.convert_alleletable_to_character_matrix(
         tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
+    # Reformat, for writing keys as str
     priors_dict = { 
         str(k) : { str(k_) : priors[k][k_] for k_ in priors[k] } \
         for k in priors 

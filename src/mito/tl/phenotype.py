@@ -4,6 +4,7 @@ Tools to map phenotype to lineage structures.
 
 import numpy as np
 import pandas as pd
+from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 
@@ -63,3 +64,37 @@ def compute_clonal_fate_bias(tree, state_column, clone_column, target_state):
 ##
 
 
+def compute_scPlasticity(tree, meta_column):
+    """
+    Compute scPlasticity as in Yang et al., 2022.
+    https://www.sc-best-practices.org/trajectories/lineage_tracing.html#
+    """
+
+    # Format column of interest
+    tree.cell_meta[meta_column] = pd.Categorical(tree.cell_meta[meta_column])
+    # parsimony = score_small_parsimony(tree, meta_item=meta_column)
+
+    # compute plasticities for each node in the tree
+    for node in tree.depth_first_traverse_nodes():
+        effective_plasticity = score_small_parsimony(
+            tree, meta_item=meta_column, root=node
+        )
+        size_of_subtree = len(tree.leaves_in_subtree(node))
+        tree.set_attribute(
+            node, "effective_plasticity", effective_plasticity / size_of_subtree
+        )
+
+    tree.cell_meta["scPlasticity"] = 0
+    for leaf in tree.leaves:
+        plasticities = []
+        parent = tree.parent(leaf)
+        while True:
+            plasticities.append(tree.get_attribute(parent, "effective_plasticity"))
+            if parent == tree.root:
+                break
+            parent = tree.parent(parent)
+
+        tree.cell_meta.loc[leaf, "scPlasticity"] = np.mean(plasticities)
+
+
+##

@@ -227,6 +227,7 @@ def extract_kwargs(args, only_tree=False):
                     'min_mean_AD_in_positives' : float(d['min_mean_AD_in_positives']),
                     'min_mean_DP_in_positives' : float(d['min_mean_DP_in_positives']) 
                 }
+                filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {} 
                 binarization_kwargs = {
                     't_prob' : float(d['t_prob']), 
                     't_vanilla' : float(d['t_vanilla']),
@@ -272,6 +273,7 @@ def extract_kwargs(args, only_tree=False):
                 'min_mean_AD_in_positives' : args.min_mean_AD_in_positives,
                 'min_mean_DP_in_positives' : args.min_mean_DP_in_positives 
             }
+            filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}   
             binarization_kwargs = {
                 't_prob' : args.t_prob, 
                 't_vanilla' : args.t_vanilla,
@@ -288,11 +290,6 @@ def extract_kwargs(args, only_tree=False):
             cell_filter = None; kwargs = None; 
             filtering_kwargs = None; binarization_kwargs = None
             tree_kwargs = {'solver':args.solver, 'metric':args.metric}
-
-    # Set filtering kwargs to None (use defaults) filtering is not MiTo 
-    # ONly necessary for simplify handling filtering_kwargs in the onesample.py
-    # and MiTo.py pipeline script # FIX THIS
-    filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
 
     return cell_filter, kwargs, filtering_kwargs, binarization_kwargs, tree_kwargs
 

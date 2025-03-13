@@ -466,7 +466,7 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
         uns={
            'pp_method':pp_method, 
            'scLT_system':scLT_system, 
-           'indel_priors':priors
+           'indel_priors':dict(priors)
         }
     )
 

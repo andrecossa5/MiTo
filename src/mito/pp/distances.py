@@ -415,7 +415,8 @@ def compute_distances(
         D = weighted_jaccard(X, w)
     elif metric=='weighted_hamming':
         afm.uns['indel_priors'] = { 
-            int(k) : afm.uns['indel_priors'][k] for k in afm.uns['indel_priors'] 
+            int(k) : { int(k_) : afm.uns['indel_priors'][k][k_] for k_ in  afm.uns['indel_priors'][k] } \
+            for k in afm.uns['indel_priors'] 
         }
         w = transform_priors(afm.uns['indel_priors'])
         D = weighted_hamming(X, w)

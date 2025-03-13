@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 import warnings
+import cassiopeia as cs
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
@@ -428,14 +429,23 @@ def read_redeem(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scL
 def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='Cas9'):
     """
     Utility to assemble an AFM from Cas9 (e.g. KP tracer mice data from Yang et al., 2022) data.
+    https://www.sc-best-practices.org/trajectories/lineage_tracing.html#
     """
 
-    # Read pre-processed and encoded KP-tracer INDEL matrix
-    char_matrix = pd.read_csv(path_ch_matrix, sep='\t', index_col=0)
-    char_matrix = pd.DataFrame(
-        np.where(char_matrix!='-', char_matrix, -1).astype(np.int16),
-        index=char_matrix.index,
-        columns=char_matrix.columns   
+    # Read KP-tracer allele table
+    allele_table = pd.read_csv(path_ch_matrix, sep='\t', index_col=0)
+    # Compute priors
+    indel_priors = cs.pp.compute_empirical_indel_priors(
+        allele_table, grouping_variables=["intBC", "MetFamily"]
+    )
+    tumor_allele_table = allele_table[allele_table["Tumor"] == sample]
+    # Conver to character matrix
+    (
+        char_matrix,
+        priors,
+        state_to_indel,
+    ) = cs.pp.convert_alleletable_to_character_matrix(
+        tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
 
     # Handle cell meta, if present
@@ -453,7 +463,11 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
         X=csr_matrix(char_matrix.values), 
         obs=cell_meta, 
         var=pd.DataFrame(index=char_matrix.columns),
-        uns={'pp_method':pp_method, 'scLT_system':scLT_system}
+        uns={
+           'pp_method':pp_method, 
+           'scLT_system':scLT_system, 
+           'indel_priors':priors
+        }
     )
 
     afm.layers['bin'] = afm.X.copy()
@@ -466,7 +480,7 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
 
 def read_scwgs(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='scWGS'):
     """
-    Utility to assemble an AFM from RedeeM (Weng et al., 2024) MT-SNVs data.
+    Utility to assemble an AFM from scWGS data (Weng et al., 2024) MT-SNVs data.
     """
 
     # Read ch matrix

@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import (
 )
 from anndata import AnnData
 from bbmix.models import MixtureBinomial
+from cassiopeia.solver.solver_utilities import transform_priors
 from .kNN import kNN_graph
 from ..ut.utils import Timer
 from ..ut.stats_utils import genotype_mix, get_posteriors
@@ -21,7 +22,7 @@ from ..ut.stats_utils import genotype_mix, get_posteriors
 ##
 
 
-discrete_metrics = PAIRWISE_BOOLEAN_FUNCTIONS + ['weighted_jaccard']
+discrete_metrics = PAIRWISE_BOOLEAN_FUNCTIONS + ['weighted_jaccard', 'weighted_hamming']
 continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 'sqeuclidean']
 
 
@@ -179,7 +180,8 @@ def genotype_MiTo_smooth(
 ##
 
 
-def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, t_prob=.75, min_cell_prevalence=.1, k=5, gamma=.25, n_samples=100, resample=False):
+def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, 
+                   t_prob=.75, min_cell_prevalence=.1, k=5, gamma=.25, n_samples=100, resample=False):
     """
     Call genotypes using simple thresholding or th MiTo binomial mixtures approachm (w/i or w/o kNN smoothing).
     """
@@ -239,6 +241,79 @@ def weighted_jaccard(M, w):
 ##
 
 
+def weighted_hamming(X, weights, missing_state_indicator=-1):
+    """
+    Cassiopeia-like (but vectorized and faster) weighted hamming distance.
+    """
+
+    n, m = X.shape
+    valid = (X != missing_state_indicator)
+    
+    # Pairwise comparisons via broadcasting.
+    X1 = X[:, None, :]  # shape: (n, 1, m)
+    X2 = X[None, :, :]  # shape: (1, n, m)
+    valid_pair = valid[:, None, :] & valid[None, :, :]
+    count = valid_pair.sum(axis=2)
+    same = (X1 == X2)
+    diff_mask = valid_pair & (~same)
+    
+    # Lookups
+    lookup = []
+    for i in range(m):
+        col_weights = weights[i]
+        max_state = max(col_weights.keys())
+        table = np.zeros(max_state + 1, dtype=float)
+        for state, w in col_weights.items():
+            table[state] = w
+        lookup.append(table)
+        
+    # Build a weight matrix W of shape (n, m) using vectorized lookup.
+    W = np.empty((n, m), dtype=float)
+    for i in range(m):
+        col = X[:, i].astype(int)
+        # For missing or 0, assign 0; otherwise, look up the weight.
+        W[:, i] = np.where(
+            (col == missing_state_indicator) | (col == 0),
+            0,
+            np.take(lookup[i], col)
+        )
+        # Expand weights to pairwise matrices.
+        W1 = W[:, None, :]   # shape: (n, 1, m)
+        W2 = W[None, :, :]   # shape: (1, n, m)
+        
+        # Explicitly broadcast these arrays to full shape (n, n, m)
+        X1_full = np.broadcast_to(X1, (n, n, m))
+        W1_full = np.broadcast_to(W1, (n, n, m))
+        W2_full = np.broadcast_to(W2, (n, n, m))
+        zero_mask1 = np.broadcast_to((X1 == 0), (n, n, m))
+        zero_mask2 = np.broadcast_to((X2 == 0), (n, n, m))
+        
+        # Create masks for pairs where one sample is 0.
+        mask_one_zero = diff_mask & (zero_mask1 | zero_mask2)
+        mask_nonzero = diff_mask & ~(zero_mask1 | zero_mask2)
+        contrib = np.zeros((n, n, m), dtype=float)
+        # For pairs with one zero, use the weight from the nonzero sample.
+        contrib[mask_one_zero] = np.where(
+            X1_full[mask_one_zero] == 0,
+            W2_full[mask_one_zero],
+            W1_full[mask_one_zero]
+        )
+        # For pairs where both are nonzero, sum both weights.
+        contrib[mask_nonzero] = W1_full[mask_nonzero] + W2_full[mask_nonzero]
+    
+    # Sum contributions over features.
+    D_total = contrib.sum(axis=2)
+    
+    # Normalize by the number of valid comparisons.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        D = np.where(count != 0, D_total / count, 0)
+    
+    return D
+
+
+##
+
+
 def preprocess_feature_matrix(
     afm, distance_key='distances', precomputed=False, metric='jaccard', bin_method='MiTo', binarization_kwargs={}, verbose=True
     ):
@@ -287,6 +362,8 @@ def preprocess_feature_matrix(
                     logging.info(f'Use precomputed bin layer.')
             else:
                 raise ValueError(f'With the {scLT_system} system, provide an AFM with Cas9 INDELS character matrix in afm.layers, under the "bin" key!')
+        else:
+            raise ValueError(f'{metric} is not a valid metric! Specify for a valid metric in {discrete_metrics}')
     else:
         raise ValueError(f'{scLT_system} is not a valid scLT system. Choose one between MAESTER, scWGS, RedeeM, and Cas9.')
 
@@ -303,7 +380,7 @@ def compute_distances(
     bin_method='MiTo', binarization_kwargs={}, ncores=1, rescale=True, verbose=True
     ):
     """
-    Calculates pairwise cell--cell (or sample-) distances in some character space (e.g., MT-SNVs mutation space).
+    Calculates pairwise cell-cell (or sample-) distances in some character space (e.g., MT-SNVs mutation space).
 
     Args:
         afm (AnnData): An annotated cell x character matrix with .X slot and bin or scaled layers.
@@ -329,12 +406,16 @@ def compute_distances(
     metric = afm.uns['distance_calculations'][distance_key]['metric']
     X = afm.layers[layer].A.copy()
 
-    # Calculate distances (handle weights, if necessary)
     if verbose:
         logging.info(f'Compute distances: ncores={ncores}, metric={metric}.')
+
+    # Calculate distances (handle weights, if necessary)
     if metric=='weighted_jaccard':
         w = np.nanmedian(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
         D = weighted_jaccard(X, w)
+    elif metric=='weighted_hamming':
+        w = transform_priors(afm.uns['indel_priors'])
+        D = weighted_hamming(X, w)
     else:
         D = pairwise_distances(X, metric=metric, n_jobs=ncores, force_all_finite=False)
 

@@ -31,11 +31,8 @@ def create_palette(df, var, palette=None, col_list=None,
     """
     Create a color palette from a df, a columns, a palette or a list of colors.
     """
-    try:
-        cats = df[var].cat.categories
-    except:
-        cats = df[var].unique()
     
+    cats = df[var].unique()
     n = len(cats)
     if col_list is not None:
         cols = col_list[:n]

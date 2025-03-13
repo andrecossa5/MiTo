@@ -5,12 +5,15 @@ Main MiTo class for MT-SNVs single-cell phylogenies annotation.
 import logging
 import numpy as np
 import pandas as pd
+import cassiopeia as cs
+from tqdm import tqdm
 from itertools import product
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from sklearn.metrics import silhouette_score
+from cassiopeia.tools.fitness_estimator._lbi_jungle import LBIJungle
 from ..pp.distances import weighted_jaccard
-from ..tl.phylo import get_clades
+from ..tl.phylo import get_clades, get_internal_node_stats
 from ..ut.utils import Timer, rescale
 
 
@@ -29,14 +32,15 @@ class MiToTreeAnnotator():
         """
 
         # Slots
-        self.tree = tree.copy()
+        self.tree = tree # .copy()
         self.T = None
         self.M = None
-        self.mut_df = None
         self.solutions = None
-        self.ordered_muts = None
         self.clone_df = None
+        self.internal_nodes_df = None
         self.clonal_nodes = None
+        self.mut_df = None
+        self.ordered_muts = None
         self.S_aggregate = None
         self.params = {}
 
@@ -103,7 +107,7 @@ class MiToTreeAnnotator():
 
     ##
 
-    def resolve_ambiguous_clones(self, df_predict, s_treshold=.7, add_to_meta=False):
+    def resolve_ambiguous_clones(self, df_predict, s_treshold=.7, add_to_meta=False, verbose=False):
         """
         Final clonal resolution process. 
         Tries to merge similar clones iteratively.
@@ -123,8 +127,6 @@ class MiToTreeAnnotator():
 
         # Here we go
         while try_merge:
-
-            logging.info(f'n trials: {n_trials}')
 
             # Aggregate
             X_agg = (
@@ -157,10 +159,7 @@ class MiToTreeAnnotator():
                 .reset_index(drop=True).drop_duplicates()
             )
             if S_agg_long.shape[0] == 0:
-                logging.info('No ambiguous clones remaining!')
                 try_merge = False
-            else:
-                logging.info(f'n {S_agg_long.shape[0]} ambiguous clonal interactions found')
 
             # Attempt merging, starting from the tiniest ambiguous clone
 
@@ -179,11 +178,9 @@ class MiToTreeAnnotator():
             # Find tiniest ambiguous clone
             if try_merge:
                 ambiguous_clones = set(S_agg_long['clone1']) | set(S_agg_long['clone2'])
-                logging.info(f'n {len(ambiguous_clones)} ambiguous clones')
                 for clone in clone_df.index:
                     if clone in ambiguous_clones and not clone in remained_unresolved:
                         try_merge = True
-                        logging.info(f'Merge clone: {clone}')
                         break
                     else:
                         try_merge = False
@@ -229,16 +226,10 @@ class MiToTreeAnnotator():
                     df_predict.loc[cells_merged_clone, 'n cells'] = cells_merged_clone.size
                     df_predict.loc[cells_merged_clone, 'lca'] = new_lca
                     df_predict.loc[cells_merged_clone, 'muts'] = new_clone_muts
-                    logging.info(f'Successfully merged clone {clone} and {int_clone}')
                 else:
-                    logging.info(f'{clone} and {int_clone} cannot be merged')
                     remained_unresolved.append(clone)
 
                 n_trials += 1
-
-            else:
-
-                logging.info(f'Finished merging!')
 
         # Put final, unresolved_clones as NaNs
         df_predict.loc[df_predict['MiTo clone'].isin(remained_unresolved), 'MiTo clone'] = np.nan
@@ -254,6 +245,40 @@ class MiToTreeAnnotator():
         return df_predict['MiTo clone'], df_predict['median cell similarity']
 
     ##  
+
+    def compute_cell_fitness(self):
+        """
+        LBI method (Neher et al., 2014) from Cassiopeia.
+        """
+
+        logging.info('Estimate cell fitness scores')
+
+        model = LBIJungle(random_seed=1234)
+        model.estimate_fitness(self.tree)
+        self.tree.set_attribute(self.tree.root, 'fitness', 0)
+
+        d = {}
+        for node in self.tree.nodes:
+            d[node] = self.tree.get_attribute(node, 'fitness')
+
+        # Rescale
+        s = pd.Series(d)
+        s = (s-s.mean()) / s.std(ddof=0)
+
+        # Add cell values to tree metadata
+        self.tree.cell_meta['fitness'] = s.loc[self.tree.cell_meta.index]
+
+    ##
+
+    def compute_expansions(self):
+        """
+        Call cassiopeia.tools.compute_expansion_pvalues.
+        Compute clonal expansion pvalues as descrived in Yang, Jones et al, BioRxiv (2021).
+        """
+        logging.info('Compute expansion pvalues')
+        cs.tl.compute_expansion_pvalues(self.tree)
+
+    ## 
 
     def extract_mut_order(self, pval_tresh=.01):
         """
@@ -284,13 +309,12 @@ class MiToTreeAnnotator():
 
     ##
 
-    def infer_clones(self, similarity_percentile=85, mut_enrichment_treshold=5, merging_treshold=.7, add_to_meta=False):
+    def infer_clones(self, similarity_percentile=85, 
+                     mut_enrichment_treshold=5, merging_treshold=.7, add_to_meta=False):
         """
         A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper 
         (... et al., 2025).
         """
-
-        logging.info('Prep data for clonal inference.')
 
         # Prep lists for recursion
         tree_list = []
@@ -449,7 +473,6 @@ class MiToTreeAnnotator():
         # ============================================================================================ #
 
         # Fire recursion!
-        logging.info('Recursive tree split...')
         tree_ = self.tree.copy()
         _find_clones(tree_, tree_.root, usable_mutations)
 
@@ -459,7 +482,6 @@ class MiToTreeAnnotator():
         df_predict.loc[df_predict['muts'].isna(), 'MiTo clone'] = np.nan
 
         # Resolve over-clustering
-        logging.info('Solve potential over-clustering...')
         labels, similarities = self.resolve_ambiguous_clones(
             df_predict, s_treshold=merging_treshold, add_to_meta=add_to_meta
         )
@@ -489,19 +511,19 @@ class MiToTreeAnnotator():
         # Grid-search
         combos = list(product(similarity_tresholds, mut_enrichment_tresholds, merging_treshold))
         logging.info(f'Start Grid Search. n hyper-parameter combinations to explore: {len(combos)}')
-        print('\n')
 
         silhouettes = [] 
         unassigned = []
         n_clones = []
         similarities = []
 
-        i = 0
-        for s,m,j in combos:
-            logging.info(f'Grid Search: {i}/{len(combos)}')
-            logging.info(f'Perform clonal inference with params: similarity_percentile={s}, mut_enrichment_treshold={m}, merging_treshold={j}')
+        # Grid search
+        for i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
             labels, sim = self.infer_clones(
-                similarity_percentile=s, mut_enrichment_treshold=m, merging_treshold=j, add_to_meta=False
+                similarity_percentile=s, 
+                mut_enrichment_treshold=m, 
+                merging_treshold=j, 
+                add_to_meta=False
             )
             test = labels.isna()
             labels = labels.loc[~test]
@@ -512,8 +534,6 @@ class MiToTreeAnnotator():
             unassigned.append(test.sum()/labels.size)
             n_clones.append(labels.unique().size)
             similarities.append(sim.mean())
-            print('\n')
-            i += 1
 
         # Pick optimal combination, and perform final splitting
         self.solutions = (
@@ -538,19 +558,34 @@ class MiToTreeAnnotator():
         if ranked_solutions.shape[0]>0:
             s, m, j = combos[ranked_solutions.index[0]]
         else:
-            raise ValueError(f'None of the solution tested falls below the max_fraction_unassigned trehsold: {max_fraction_unassigned}')
+            raise ValueError(
+                f'''
+                None of the solution tested falls below the 
+                max_fraction_unassigned trehsold: {max_fraction_unassigned}
+                '''
+            )
         
         # Final round
-        logging.info(f'Hyper-params chosen: similarity_percentile={s}, mut_enrichment_treshold={m}, mut_enrichment_treshold={j}')
-        print('\n')
+        logging.info(f'Hyper-params chosen: similarity_percentile={s}, mut_enrichment_treshold={m}, merging_treshold={j}')
         _,_ = self.infer_clones(
-            similarity_percentile=s, mut_enrichment_treshold=m, merging_treshold=j, add_to_meta=True
+            similarity_percentile=s, 
+            mut_enrichment_treshold=m, 
+            merging_treshold=j, 
+            add_to_meta=True
         )
+
+        # Calculate clonal expansions
+        self.compute_expansions()
+
+        # Estimate single cell fitness
+        self.compute_cell_fitness()
 
         # Retrieve mutation order for plotting
         self.extract_mut_order()
 
-        print('\n')
+        # Retrieve internal node stats
+        self.internal_nodes_df = get_internal_node_stats(self.tree)
+
         logging.info(f'MiTo clonal inference finished. {T.stop()}')
 
 

@@ -414,6 +414,9 @@ def compute_distances(
         w = np.nanmedian(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
         D = weighted_jaccard(X, w)
     elif metric=='weighted_hamming':
+        afm.uns['indel_priors'] = { 
+            int(k) : afm.uns['indel_priors'][k] for k in afm.uns['indel_priors'] 
+        }
         w = transform_priors(afm.uns['indel_priors'])
         D = weighted_hamming(X, w)
     else:

@@ -447,7 +447,7 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
     ) = cs.pp.convert_alleletable_to_character_matrix(
         tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
-    priors_dict = {k:dict(priors[k]) for k in priors}
+    priors_dict = { str(k) : dict(priors[k]) for k in priors }
 
     # Handle cell meta, if present
     if path_meta is not None and os.path.exists(path_meta):

@@ -241,6 +241,22 @@ def weighted_jaccard(M, w):
 ##
 
 
+def _get_priors(afm, key='priors'):
+    
+    W = afm.varm[key]
+    priors = {}
+    for i in range(W.shape[0]):
+        priors[i] = {}
+        for j in range(W.shape[1]):
+            if W[i,j] != -1:
+                priors[i][j] = W[i,j]
+    
+    return priors
+
+
+##
+
+
 def weighted_hamming(X, weights, missing_state_indicator=-1):
     """
     Cassiopeia-like (but vectorized and faster) weighted hamming distance.
@@ -414,7 +430,8 @@ def compute_distances(
         w = np.nanmedian(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
         D = weighted_jaccard(X, w)
     elif metric=='weighted_hamming':
-        w = transform_priors(afm.uns['indel_priors'])
+        w = _get_priors(afm)
+        w = transform_priors(w)
         D = weighted_hamming(X, w)
     else:
         D = pairwise_distances(X, metric=metric, n_jobs=ncores, force_all_finite=False)

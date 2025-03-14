@@ -108,7 +108,15 @@ def bootstrap_bin(afm, boot_replicate='observed', boot_strategy='feature_resampl
             raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
         
         X_new = csr_matrix(X_new)
-        afm_new = AnnData(obs=afm.obs, var=afm.var.iloc[idx,:], uns=afm.uns, layers={'bin':X_new})
+        afm_new = AnnData(
+            obs=afm.obs, 
+            var=afm.var.iloc[idx,:], 
+            uns=afm.uns, 
+            layers={'bin':X_new}
+        )
+
+        if 'priors' in afm.varm:
+            afm_new.varm['priors'] = afm.varm['priors'][idx,:]
 
     else:
         afm_new = afm.copy()

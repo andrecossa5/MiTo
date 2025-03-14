@@ -426,6 +426,29 @@ def read_redeem(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scL
 ##
 
 
+def _add_priors(afm, priors, key='priors'):
+
+    n_targets = len(priors)
+    max_state_encoding = 0
+    for i in priors:
+        new_max = max(priors[i].keys())
+        if new_max>max_state_encoding:
+            max_state_encoding = new_max
+
+    W = np.zeros((n_targets, max_state_encoding+1))
+
+    for i in range(W.shape[0]):
+        W[i,:] = -1
+        d = priors[i]
+        for j in d:
+            W[i,j] = d[j]
+    
+    afm.varm[key] = W
+
+
+##
+
+
 def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='Cas9'):
     """
     Utility to assemble an AFM from Cas9 (e.g. KP tracer mice data from Yang et al., 2022) data.
@@ -443,15 +466,10 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
     (
         char_matrix,
         priors,
-        state_to_indel,
+        _,
     ) = cs.pp.convert_alleletable_to_character_matrix(
         tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
-    # Reformat, for writing keys as str
-    priors_dict = { 
-        str(k) : { str(k_) : priors[k][k_] for k_ in priors[k] } \
-        for k in priors 
-    }
 
     # Handle cell meta, if present
     if path_meta is not None and os.path.exists(path_meta):
@@ -471,10 +489,9 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
         uns={
            'pp_method':pp_method, 
            'scLT_system':scLT_system, 
-           'indel_priors':priors_dict
         }
     )
-
+    _add_priors(afm, priors)
     afm.layers['bin'] = afm.X.copy()
 
     return afm

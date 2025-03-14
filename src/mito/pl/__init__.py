@@ -11,7 +11,7 @@ from .diagnostic_plots import (
     mut_profile, plot_ncells_nAD
 )
 from .embeddings_plots import draw_embeddings, faceted_draw_embedding
-from .heatmaps_plots import heatmap_distances
+from .heatmaps_plots import heatmap_distances, heatmap_variants
 from .phylo_plots import plot_tree
 
 

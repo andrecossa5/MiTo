@@ -147,6 +147,13 @@ def add_legend(label=None, colors=None, ax=None, loc='center', artists_size=7, l
     """
     Draw a legend on axes object.
     """
+    
+    try:
+        del colors['unassigned']
+        del colors[np.nan]
+    except:
+        pass
+
     if only_top != 'all':
         colors = { k : colors[k] for i, k in enumerate(colors) if i < int(only_top) }
     title = label if label is not None else None

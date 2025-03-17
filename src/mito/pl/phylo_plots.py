@@ -4,17 +4,17 @@ Tree plotting utils.
 
 from cassiopeia.plotting.local import utilities as ut
 from cassiopeia.plotting.local import *
-from mito_utils.diagnostic_plots import sturges
-from mito_utils.colors import *
-from mito_utils.plotting_base import *
+from .colors import *
+from .plotting_base import *
 
 
 ##
 
 
-_categorical_cmaps = [ten_godisnot, 'tab10', 'set1', 'dark']
-_continuous_cmaps = ['mako', 'viridis', 'inferno', 'magma']
-_bin_character_cmap = { 1 : 'r', 0 : 'b', -1 : 'lightgrey' }
+_categorical_cmaps = [sc.pl.palettes.vega_20_scanpy, sc.pl.palettes.default_20, ten_godisnot, 'set1', 'dark']
+_continuous_cmaps = ['viridis', 'inferno', 'magma']
+_cont_character_cmap = 'mako'
+_bin_character_cmap = { 1 : 'r', 0 : 'b', -1 : 'lightgrey', np.nan : 'lightgrey' }
  
 
 ##
@@ -59,19 +59,22 @@ def _to_polar_colorstrips(L):
 
 def _place_tree_and_annotations(
     tree, 
-    features=[], 
+    features=None, 
+    characters=None,
     depth_key=None, 
     orient=90, 
     extend_branches=True, 
     angled_branches=True, 
     add_root=True, 
-    continuous_cmaps=None,
+    continuous_cmaps=None, 
+    cont_character_cmap=None,
+    categorical_cmaps=None,
     bin_character_cmap=None,
     layer='raw', 
-    categorical_cmaps=None, 
-    vmin_annot=None, vmax_annot=None, 
     colorstrip_width=None, 
-    colorstrip_spacing=None
+    colorstrip_spacing=None,
+    vmin_characters=None,
+    vmax_characters=None
     ):
     """
     Util to set tree elements.
@@ -96,37 +99,51 @@ def _place_tree_and_annotations(
     width = colorstrip_width or tight_width
     spacing = colorstrip_spacing or tight_width / 2
     colorstrips = []
-    features = features or []
+    features = features if features is not None else []
+    characters = characters if characters is not None else []
+    covariates = features + characters
     n_cat = 0
 
-    for feat in features:
+    # Here we go
+    for cov in covariates:
 
-        is_bin_layer = all(x in [1,0,-1] for x in tree.layers[layer].iloc[:,0].unique())
-        if feat in tree.cell_meta.columns:
-            x = tree.cell_meta[feat]
-        elif feat in tree.layers[layer].columns and layer in tree.layers:
-            if is_bin_layer:
-                x = tree.layers[layer][feat].astype('category')
-                if categorical_cmaps is None:
-                    categorical_cmaps = {}
-                categorical_cmaps[feat] = _bin_character_cmap if bin_character_cmap is None else bin_character_cmap
+        # Feature
+        if cov in features:
+            if cov in tree.cell_meta.columns:
+                x = tree.cell_meta[cov].copy()
             else:
-                x = tree.layers[layer][feat]
-        else:
-            raise KeyError(f'{feat} not in tree.cell_meta nor tree.layers[{layer}].')
+                raise KeyError(f'{cov} not in tree.cell_meta!')
+        
+        # Character
+        is_bin_layer = all(x in [1,0,-1] for x in tree.layers[layer].iloc[:,0].unique())
+        if cov in characters:
+            if cov in tree.layers[layer].columns:
+                if is_bin_layer:
+                    x = tree.layers[layer][cov].copy()
+                    x = x.astype('category')
+                else:
+                    x = tree.layers[layer][cov].copy()
+            else:
+                raise KeyError(f'{cov} not in tree.layers[{layer}].')
 
+        # Colorstrip specification
         if pd.api.types.is_numeric_dtype(x):
 
-            if continuous_cmaps is None:
-                continuous_cmap = _continuous_cmaps[0]
+            if cov in features:
                 vmin_annot = np.percentile(x, 25)
                 vmax_annot = np.percentile(x, 75)
-            else:
-                if feat in continuous_cmaps:
-                    continuous_cmap, vmin_annot, vmax_annot = continuous_cmaps[feat]
+                if continuous_cmaps is None:
+                    continuous_cmap = _continuous_cmaps[0]
+                elif cov in continuous_cmaps:
+                    continuous_cmap = continuous_cmaps[cov]
                 else:
-                    raise KeyError(f'{feat} not in continuous_cmaps.')
-                
+                    raise KeyError(f'{cov} not in continuous_cmaps.')
+            
+            elif cov in characters:
+                vmin_annot = vmin_characters
+                vmax_annot = vmax_characters
+                continuous_cmap = cont_character_cmap if cont_character_cmap is not None else _cont_character_cmap
+
             colorstrip, anchor_coords = create_continuous_colorstrip(
                 x.to_dict(), 
                 anchor_coords,
@@ -141,34 +158,35 @@ def _place_tree_and_annotations(
 
         elif pd.api.types.is_string_dtype(x) or x.dtype == 'category':
 
-            if categorical_cmaps is None:
-                categorical_cmap = create_palette(tree.cell_meta, feat, _categorical_cmaps[n_cat])
-            else:
-                if feat in categorical_cmaps:
-                    if isinstance(categorical_cmaps[feat], str) or isinstance(categorical_cmaps[feat], list):
-                        categorical_cmap = create_palette(tree.cell_meta, feat, categorical_cmaps[feat])
-                    elif isinstance(categorical_cmaps[feat], dict):
-                        categorical_cmap = categorical_cmaps[feat]
+            if cov in features:
+                if categorical_cmaps is None or cov not in categorical_cmaps:
+                    categorical_cmap = create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat])
+                elif cov in categorical_cmaps:
+                    _cmap = categorical_cmaps[cov]
+                    if isinstance(_cmap, str) or isinstance(_cmap, list):
+                        categorical_cmap = create_palette(tree.cell_meta, cov, _cmap)
+                    elif isinstance(_cmap, dict):
+                        categorical_cmap = _cmap
                     else:
-                        raise ValueError(f'''Adjust categorical_cmaps. {feat}: 
+                        raise ValueError(f'''Adjust categorical_cmaps. {cov}: 
                                          categorical_cmaps is nor a str, a list or a dict...''')
-                else:
-                    raise KeyError(f'{feat} not present in meta. Adjust categorical_cmaps and meta params...')
             
+            elif cov in characters:
+                categorical_cmap = bin_character_cmap if bin_character_cmap is not None else _bin_character_cmap
+        
             if not all([ cat in categorical_cmap.keys() for cat in x.unique() ]):
 
-                cats = x.unique().copy()
+                cats = x.unique()
                 missing_cats = cats[[ cat not in categorical_cmap.keys() for cat in cats ]]
-                print(f'Missing cats in cmap for meta feat {feat}: {missing_cats}. Adding new colors...')
+                logging.info(f'Missing cats in cmap for meta feat {cov}: {missing_cats}. Adding new colors...')
 
                 for i,missing in enumerate(missing_cats):
-                    categorical_cmap[missing] = _categorical_cmaps[0][i]
+                    categorical_cmap[missing] = sc.pl.palettes.godsnot_102[i]
 
+            categorical_cmap.update({'unassigned':'lightgrey', np.nan:'lightgrey'})
             assert(all([ cat in categorical_cmap.keys() for cat in x.unique() ]))
 
-            x[x.isna()] = 'unassigned'
-            categorical_cmap.update({'unassigned':'grey'})
-
+            # Place
             boxes, anchor_coords = ut.place_colorstrip(
                 anchor_coords, width, tight_height, spacing, loc
             )
@@ -181,7 +199,7 @@ def _place_tree_and_annotations(
             n_cat += 1
 
         else:
-            raise ValueError(f'{feat} in meta has {x.dtype} dtype. Check meta...')
+            raise ValueError(f'{cov} has {x.dtype} dtype. Check meta and layers...')
         
         colorstrips.append(colorstrip)
 
@@ -192,7 +210,7 @@ def _place_tree_and_annotations(
         colorstrips = _to_polar_colorstrips(colorstrips) 
     
     # Add feature names as colorstrips labels
-    colorstrips = [ (c,name) for c,name in zip(colorstrips, features) ]
+    colorstrips = [ (c,name) for c,name in zip(colorstrips, covariates) ]
     
     return node_coords, branch_coords, colorstrips
 
@@ -241,12 +259,17 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
 
 
 def plot_tree(
-    tree, ax=None, depth_key=None, orient=90, extend_branches=True, angled_branches=True, add_root=False, 
-    features=None, categorical_cmaps=None, continuous_cmaps=None, bin_character_cmap=None, layer='raw', 
-    colorstrip_spacing=.25, colorstrip_width=1.5, feature_labels=True, feature_label_size=10, feature_label_offset=2,
+    tree, ax=None, depth_key=None, orient=90, 
+    extend_branches=True, angled_branches=True, add_root=False, 
+    features=None, categorical_cmaps=None, continuous_cmaps=None, 
+    characters=None, cont_character_cmap='mako', bin_character_cmap=None, layer='raw', 
+    vmin_characters=0, vmax_characters=.05,
+    colorstrip_spacing=.25, colorstrip_width=1.5, 
+    labels=True, label_size=10, label_offset=2,
     meta_branches=None, cov_branches=None, cmap_branches='Spectral_r',
     cov_leaves=None, cmap_leaves='tab20', 
-    feature_internal_nodes=None, cmap_internal_nodes=('Spectral_r', .2, .8),
+    feature_internal_nodes=None, cmap_internal_nodes='Spectral_r', 
+    vmin_internal_nodes=.2, vmax_internal_nodes=.8,
     internal_node_labels=False, internal_node_subset=None, internal_node_label_size=7, show_internal=False, 
     leaves_labels=False, leaf_label_size=5, 
     colorstrip_kwargs={}, leaf_kwargs={}, internal_node_kwargs={}, branch_kwargs={}, 
@@ -268,17 +291,21 @@ def plot_tree(
     ) = _place_tree_and_annotations(
         tree, 
         features=features, 
+        characters=characters,
         depth_key=depth_key, 
         orient=orient, 
         extend_branches=extend_branches, 
         angled_branches=angled_branches, 
         add_root=add_root, 
         continuous_cmaps=continuous_cmaps, 
+        cont_character_cmap=cont_character_cmap,
+        categorical_cmaps=categorical_cmaps,
         bin_character_cmap=bin_character_cmap,
-        layer=layer,
-        categorical_cmaps=categorical_cmaps, 
+        layer=layer, 
         colorstrip_width=colorstrip_width, 
-        colorstrip_spacing=colorstrip_spacing
+        colorstrip_spacing=colorstrip_spacing,
+        vmin_characters=vmin_characters,
+        vmax_characters=vmax_characters
     )
 
     ##
@@ -310,14 +337,14 @@ def plot_tree(
             ax.fill(xs, ys, **_dict)
             y_positions.extend(ys)
             x_positions.extend(xs)
-        if orient == 'down' and feature_labels:
+        if orient == 'down' and labels:
             y_min = min(y_positions)
             y_max = max(y_positions)
             y_mid = (y_min + y_max) / 2
             x_min = min(x_positions)
-            x_offset = feature_label_offset
+            x_offset = label_offset
             ax.text(
-                x_min - x_offset, y_mid, feat, ha='right', va='center', fontsize=feature_label_size
+                x_min - x_offset, y_mid, feat, ha='right', va='center', fontsize=label_size
             )
      
     ##
@@ -371,11 +398,10 @@ def plot_tree(
     if feature_internal_nodes is not None:
         s = pd.Series({ node : tree.get_attribute(node, feature_internal_nodes) for node in internal_nodes })
         s.loc[lambda x: x.isna()] = 0 # Set missing values to 0
-        cmap_internal_nodes, vmin_annot, vmax_annot = cmap_internal_nodes
         colors = _set_colors(
             internal_nodes, meta=s.to_frame(feature_internal_nodes), cov=feature_internal_nodes, 
             cmap=cmap_internal_nodes, kwargs=_internal_node_kwargs,
-            vmin=vmin_annot, vmax=vmax_annot
+            vmin=vmin_internal_nodes, vmax=vmax_internal_nodes
         )
     # else:
     #     if feature_internal_nodes is None and internal_node_subset is not None:

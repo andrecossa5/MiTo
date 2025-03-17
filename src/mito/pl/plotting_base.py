@@ -147,6 +147,13 @@ def add_legend(label=None, colors=None, ax=None, loc='center', artists_size=7, l
     """
     Draw a legend on axes object.
     """
+    
+    try:
+        del colors['unassigned']
+        del colors[np.nan]
+    except:
+        pass
+
     if only_top != 'all':
         colors = { k : colors[k] for i, k in enumerate(colors) if i < int(only_top) }
     title = label if label is not None else None
@@ -550,7 +557,7 @@ def violin(df, x, y, by=None, c=None, a=1, l=None, ax=None, with_stats=False, or
 def plot_heatmap(df, palette='mako', ax=None, title=None, x_names=True, y_names=True, 
     x_names_size=7, y_names_size=7, xlabel=None, ylabel=None, annot=False, annot_size=5, 
     label=None, shrink=1.0, cb=True, vmin=None, vmax=None, rank_diagonal=False, 
-    outside_linewidth=1, linewidths=0.2, linecolor='black'):
+    outside_linewidth=1, linewidths=0, linecolor='black'):
     """
     Simple heatmap.
     """

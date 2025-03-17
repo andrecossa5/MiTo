@@ -1,7 +1,8 @@
 """
-Dimensionality reduction utils to compress (pre-filtered) AFMs.
+Dimensionality reduction utils to reduce a (pre-filtered) AFMs.
 """
 
+import logging
 import numpy as np
 from scipy.linalg import eigh
 from sklearn.decomposition import PCA
@@ -137,14 +138,18 @@ def reduce_dimensions(
     if method == 'PCA':
         X = _get_X(afm, layer)
         afm.obsm['X_pca'] = find_pca(X, n_pcs=n_comps, random_state=seed)
+
     elif method == 'UMAP':
         X = _get_X(afm, layer)
         D = _get_D(afm, distance_key, **kwargs)
         _, _, conn = kNN_graph(D=D, k=k, from_distances=True)
         afm.obsm['X_umap'] = _umap_from_X_conn(X, conn, ncomps=n_comps, metric=metric, seed=seed)
+
     elif method == 'diffmap':
         D = _get_D(afm, distance_key, **kwargs)
         P_prime, _,_,_, D_left = find_diffusion_matrix(D)
         afm.obsm['X_diffmap'] = find_diffusion_map(P_prime, D_left, n_eign=n_comps)
+
+    return
 
 

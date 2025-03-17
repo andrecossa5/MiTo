@@ -4,23 +4,17 @@ Miscellaneous utilities.
 
 import os 
 import sys
-import re
 import time 
-import random
-import string
-import pickle
-import json
 from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
-import scanpy as sc
 
 
 ##
 
 
-path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets')
+path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
 
 
 ##
@@ -233,6 +227,7 @@ def extract_kwargs(args, only_tree=False):
                     'min_mean_AD_in_positives' : float(d['min_mean_AD_in_positives']),
                     'min_mean_DP_in_positives' : float(d['min_mean_DP_in_positives']) 
                 }
+                filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {} 
                 binarization_kwargs = {
                     't_prob' : float(d['t_prob']), 
                     't_vanilla' : float(d['t_vanilla']),
@@ -257,11 +252,11 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter
+            cell_filter = args.cell_filter if args.cell_filter != "None" else None
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,
-                'filtering' : args.filtering,
+                'filtering' : args.filtering if args.filtering != "None" else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
                 'path_dbSNP' : args.path_dbSNP, 
@@ -278,6 +273,7 @@ def extract_kwargs(args, only_tree=False):
                 'min_mean_AD_in_positives' : args.min_mean_AD_in_positives,
                 'min_mean_DP_in_positives' : args.min_mean_DP_in_positives 
             }
+            filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}   
             binarization_kwargs = {
                 't_prob' : args.t_prob, 
                 't_vanilla' : args.t_vanilla,
@@ -339,6 +335,32 @@ def load_mt_gene_annot():
     df = pd.read_csv(os.path.join(path_assets, 'formatted_table_wobble.csv'), index_col=0)
     df['mut'] = df['Position'].astype(str) + '_' + df['Reference'] + '>' + df['Variant']
     return df
+
+
+##
+
+
+def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
+
+    assert 1-np.array(freqs).sum() <= .05
+    assert len(freqs) == n_clones
+
+    clones_sorted = afm.obs['GBC'].value_counts().index
+    clones = clones_sorted[:n_clones].to_list()
+
+    cells = []
+    for clone, f in zip(clones, freqs):
+        afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
+        afm_clone = afm_clone[np.sum(afm_clone.layers['bin'].A>0, axis=1)>2,
+                              np.sum(afm_clone.layers['bin'].A>0, axis=0)>=2]
+        n_cells_clone = min(round(ncells*f), afm_clone.shape[0])
+        cells.extend(
+            np.random.choice(afm_clone.obs_names, n_cells_clone, replace=False).tolist()
+        )
+
+    afm_subsample = afm[cells].copy()
+    
+    return afm_subsample
 
 
 ##

@@ -1,5 +1,5 @@
 """
-Module to preprocess AFMs: reformat original AFM; filter variants/cells.
+All filters: variants/cells.
 """
 
 import logging
@@ -8,8 +8,8 @@ import pandas as pd
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
-from mito_utils.distances import *
-from mito_utils.make_afm import mask_mt_sites
+from .distances import *
+from ..io.format_afm import mask_mt_sites
 
 
 ##
@@ -23,6 +23,8 @@ filtering_options = [
     'MQuad', 
     'MiTo',
     'GT_enriched'
+
+    # DEPRECATED
     # 'ludwig2019', 
     # 'velten2021', 
     # 'seurat', 
@@ -242,13 +244,13 @@ def filter_miller2022(afm, min_site_cov=100, min_var_quality=30, p1=1, p2=99, pe
 ##
 
 
-def fit_MQuad_mixtures(afm, n_top=25, path_=None, ncores=8, minDP=10, minAD=1, with_M=False):
+def fit_MQuad_mixtures(afm, n_top=None, path_=None, ncores=8, minDP=10, minAD=1, with_M=False):
     """
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
     """
 
     if n_top is not None:    
-        afm = filter_CV(afm, n_top=1000) # Prefilter again, if still too much MT-SNVs
+        afm = filter_CV(afm, n_top=n_top) # Prefilter again, if still too much MT-SNVs
 
     # Fit models
     M = Mquad(AD=afm.layers['AD'].T, DP=afm.layers['DP'].T)
@@ -266,7 +268,7 @@ def fit_MQuad_mixtures(afm, n_top=25, path_=None, ncores=8, minDP=10, minAD=1, w
 ##
 
 
-def filter_MQuad(afm, ncores=8, minDP=10, minAD=1, minCell=3, path_=None, n_top=None):
+def filter_MQuad(afm, ncores=8, minDP=5, minAD=1, minCell=2, path_=None, n_top=None):
     """
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
     """
@@ -274,7 +276,7 @@ def filter_MQuad(afm, ncores=8, minDP=10, minAD=1, minCell=3, path_=None, n_top=
     scLT_system = afm.uns['scLT_system']
     pp_method = afm.uns['pp_method']
 
-    if scLT_system == 'MAESTER' and pp_method in ['mito_preprocessing', 'maegatk']:
+    if scLT_system == 'MAESTER' and pp_method in ['mito_preprocessing', 'maegatk', 'cellsnp-lite']:
         pass
     elif scLT_system == 'redeem':
         pass

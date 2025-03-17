@@ -1,26 +1,28 @@
 """
-Module to create custom distance function among cell AF profiles.
+Custom distance function among cell AF profiles.
 """
 
+import logging
 import numpy as np
 import pandas as pd
 import sklearn.preprocessing as pp
 from scipy.sparse import csr_matrix
-from sklearn.metrics import pairwise_distances, recall_score, precision_score, auc
-from sklearn.metrics import jaccard_score
-from sklearn.metrics.pairwise import PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
+from sklearn.metrics.pairwise import (
+    pairwise_distances, 
+    PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
+)
 from anndata import AnnData
-from mito_utils.filters import *
-from mito_utils.preprocessing import *
-from mito_utils.utils import rescale
-from mito_utils.stats_utils import *
-from mito_utils.kNN import *
+from bbmix.models import MixtureBinomial
+from cassiopeia.solver.solver_utilities import transform_priors
+from .kNN import kNN_graph
+from ..ut.utils import Timer
+from ..ut.stats_utils import genotype_mix, get_posteriors
 
 
 ##
 
 
-discrete_metrics = PAIRWISE_BOOLEAN_FUNCTIONS + ['weighted_jaccard']
+discrete_metrics = PAIRWISE_BOOLEAN_FUNCTIONS + ['weighted_jaccard', 'weighted_hamming']
 continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 'sqeuclidean']
 
 
@@ -29,11 +31,21 @@ continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 
 
 def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False):
     """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding (Kwock et al., 2022).
+    Single-cell MT-SNVs genotyping with binomial mixtures posterior 
+    probabilities thresholding (Kwock et al., 2022).
     """
+
     X = np.zeros(AD.shape)
     for idx in range(AD.shape[1]):
-        X[:,idx] = genotype_mix(AD[:,idx], DP[:,idx], t_prob=t_prob, t_vanilla=t_vanilla, min_AD=min_AD, debug=debug)
+        X[:,idx] = genotype_mix(
+            AD[:,idx], 
+            DP[:,idx], 
+            t_prob=t_prob, 
+            t_vanilla=t_vanilla, 
+            min_AD=min_AD, 
+            debug=debug
+        )
+
     return X
 
 
@@ -42,8 +54,9 @@ def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False)
 
 def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=.1, debug=False):
     """
-    Hybrid genotype calling strategy: if a mutation has prevalence (AD>=min_AD and AF>=t_vanilla) >= min_cell_prevalence,
-    use probabilistic modeling as in 'bin_mixtures'. Else, use simple tresholding as in 'vanilla' method.
+    Hybrid genotype calling strategy: if a mutation has prevalence (AD>=min_AD and AF>=t_vanilla) 
+    >= min_cell_prevalence, use probabilistic modeling as in 'bin_mixtures'. Else, use simple 
+    tresholding as in 'vanilla' method.
     """
     X = np.zeros(AD.shape)
     n_binom = 0
@@ -65,10 +78,14 @@ def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=
 ##
 
 
-def genotype_MiTo_smooth(AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prevalence=.05, k=5, gamma=.25, n_samples=100, resample=False):
+def genotype_MiTo_smooth(
+    AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prevalence=.05, k=5, 
+    gamma=.25, n_samples=100, resample=False
+    ):
     """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding (readapted from  MQuad, Kwock et al., 2022)
-    and kNN smoothing (readapted from Phylinsic, Liu et al., 2022).
+    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding
+    (readapted from  MQuad, Kwock et al., 2022) and kNN smoothing (readapted from Phylinsic, 
+    Liu et al., 2022).
     """
 
     # kNN 
@@ -94,13 +111,10 @@ def genotype_MiTo_smooth(AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prev
                 layers={'AD':csr_matrix(AD_sample), 'site_coverage':csr_matrix(DP)},
                 uns={'scLT_system':'MAESTER'}
             )
-            w = np.nanmedian(np.where(afm_.X.A>0, afm_.X.A, np.nan), axis=0)
             compute_distances(
                 afm_, 
-                metric='jaccard', 
                 bin_method='vanilla', 
                 binarization_kwargs={'min_AD':1, 't_vanilla':0}, # Loose genotyping.
-                weights=w,
                 verbose=False
             )
             L.append(afm_.obsp['distances'].A)
@@ -119,14 +133,11 @@ def genotype_MiTo_smooth(AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prev
             layers={'AD':csr_matrix(AD), 'site_coverage':csr_matrix(DP)},
             uns={'scLT_system':'MAESTER'}
         )
-        w = np.nanmean(np.where(afm_.X.A>0, afm_.X.A, np.nan), axis=0)
         compute_distances(
             afm_, 
-            metric='jaccard', 
             bin_method='MiTo', 
             binarization_kwargs={'min_AD':min_AD, 't_vanilla':t_vanilla, 't_prob':t_prob, 'min_cell_prevalence':min_cell_prevalence},
             verbose=True,
-            weights=w
         )
         logging.info(f'Compute kNN graph for smoothing')
         index, _, _ = kNN_graph(D=afm_.obsp['distances'].A, k=k, from_distances=True)
@@ -169,16 +180,19 @@ def genotype_MiTo_smooth(AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prev
 ##
 
 
-def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, t_prob=.75, min_cell_prevalence=.1, k=5, gamma=.25, n_samples=100, resample=False):
+def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, 
+                   t_prob=.75, min_cell_prevalence=.1, k=5, gamma=.25, n_samples=100, resample=False):
     """
     Call genotypes using simple thresholding or th MiTo binomial mixtures approachm (w/i or w/o kNN smoothing).
     """
 
-    assert 'AD' in afm.layers and 'site_coverage' in afm.layers
+    assert 'AD' in afm.layers 
+    assert 'site_coverage' in afm.layers or 'DP' in afm.layers
+    cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP' 
 
     X = afm.X.A.copy()
     AD = afm.layers['AD'].A.copy()
-    DP = afm.layers['site_coverage'].A.copy()
+    DP = afm.layers[cov_layer].A.copy()
     
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)
@@ -221,6 +235,95 @@ def weighted_jaccard(M, w):
     S = np.where(denom != 0, a / denom, 0.0)
     D = 1.0 - S
 
+    return D
+
+
+##
+
+
+def _get_priors(afm, key='priors'):
+    
+    W = afm.varm[key]
+    priors = {}
+    for i in range(W.shape[0]):
+        priors[i] = {}
+        for j in range(W.shape[1]):
+            if W[i,j] != -1:
+                priors[i][j] = W[i,j]
+    
+    return priors
+
+
+##
+
+
+def weighted_hamming(X, weights, missing_state_indicator=-1):
+    """
+    Cassiopeia-like (but vectorized and faster) weighted hamming distance.
+    """
+
+    n, m = X.shape
+    valid = (X != missing_state_indicator)
+    
+    # Pairwise comparisons via broadcasting.
+    X1 = X[:, None, :]  # shape: (n, 1, m)
+    X2 = X[None, :, :]  # shape: (1, n, m)
+    valid_pair = valid[:, None, :] & valid[None, :, :]
+    count = valid_pair.sum(axis=2)
+    same = (X1 == X2)
+    diff_mask = valid_pair & (~same)
+    
+    # Lookups
+    lookup = []
+    for i in range(m):
+        col_weights = weights[i]
+        max_state = max(col_weights.keys())
+        table = np.zeros(max_state + 1, dtype=float)
+        for state, w in col_weights.items():
+            table[state] = w
+        lookup.append(table)
+        
+    # Build a weight matrix W of shape (n, m) using vectorized lookup.
+    W = np.empty((n, m), dtype=float)
+    for i in range(m):
+        col = X[:, i].astype(int)
+        # For missing or 0, assign 0; otherwise, look up the weight.
+        W[:, i] = np.where(
+            (col == missing_state_indicator) | (col == 0),
+            0,
+            np.take(lookup[i], col)
+        )
+        # Expand weights to pairwise matrices.
+        W1 = W[:, None, :]   # shape: (n, 1, m)
+        W2 = W[None, :, :]   # shape: (1, n, m)
+        
+        # Explicitly broadcast these arrays to full shape (n, n, m)
+        X1_full = np.broadcast_to(X1, (n, n, m))
+        W1_full = np.broadcast_to(W1, (n, n, m))
+        W2_full = np.broadcast_to(W2, (n, n, m))
+        zero_mask1 = np.broadcast_to((X1 == 0), (n, n, m))
+        zero_mask2 = np.broadcast_to((X2 == 0), (n, n, m))
+        
+        # Create masks for pairs where one sample is 0.
+        mask_one_zero = diff_mask & (zero_mask1 | zero_mask2)
+        mask_nonzero = diff_mask & ~(zero_mask1 | zero_mask2)
+        contrib = np.zeros((n, n, m), dtype=float)
+        # For pairs with one zero, use the weight from the nonzero sample.
+        contrib[mask_one_zero] = np.where(
+            X1_full[mask_one_zero] == 0,
+            W2_full[mask_one_zero],
+            W1_full[mask_one_zero]
+        )
+        # For pairs where both are nonzero, sum both weights.
+        contrib[mask_nonzero] = W1_full[mask_nonzero] + W2_full[mask_nonzero]
+    
+    # Sum contributions over features.
+    D_total = contrib.sum(axis=2)
+    
+    # Normalize by the number of valid comparisons.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        D = np.where(count != 0, D_total / count, 0)
+    
     return D
 
 
@@ -275,6 +378,8 @@ def preprocess_feature_matrix(
                     logging.info(f'Use precomputed bin layer.')
             else:
                 raise ValueError(f'With the {scLT_system} system, provide an AFM with Cas9 INDELS character matrix in afm.layers, under the "bin" key!')
+        else:
+            raise ValueError(f'{metric} is not a valid metric! Specify for a valid metric in {discrete_metrics}')
     else:
         raise ValueError(f'{scLT_system} is not a valid scLT system. Choose one between MAESTER, scWGS, RedeeM, and Cas9.')
 
@@ -285,13 +390,13 @@ def preprocess_feature_matrix(
 ##
 
 
-
+# TO FIX!!!
 def compute_distances(
     afm, distance_key='distances', metric='weighted_jaccard', precomputed=False,
     bin_method='MiTo', binarization_kwargs={}, ncores=1, rescale=True, verbose=True
     ):
     """
-    Calculates pairwise cell--cell (or sample-) distances in some character space (e.g., MT-SNVs mutation space).
+    Calculates pairwise cell-cell (or sample-) distances in some character space (e.g., MT-SNVs mutation space).
 
     Args:
         afm (AnnData): An annotated cell x character matrix with .X slot and bin or scaled layers.
@@ -317,12 +422,17 @@ def compute_distances(
     metric = afm.uns['distance_calculations'][distance_key]['metric']
     X = afm.layers[layer].A.copy()
 
-    # Calculate distances (handle weights, if necessary)
     if verbose:
         logging.info(f'Compute distances: ncores={ncores}, metric={metric}.')
+
+    # Calculate distances (handle weights, if necessary)
     if metric=='weighted_jaccard':
         w = np.nanmedian(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
         D = weighted_jaccard(X, w)
+    elif metric=='weighted_hamming':
+        w = _get_priors(afm)
+        w = transform_priors(w)
+        D = weighted_hamming(X, w)
     else:
         D = pairwise_distances(X, metric=metric, n_jobs=ncores, force_all_finite=False)
 
@@ -337,45 +447,6 @@ def compute_distances(
     
 
 ##
-
-
-def distance_AUPRC(D, labels):
-    """
-    Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
-    Reports Area Under Precision Recall Curve.
-    """
-
-    labels = pd.Categorical(labels) 
-
-    final = {}
-    for alpha in np.linspace(0,1,10):
- 
-        p_list = []
-        gt_list = []
-
-        for i in range(D.shape[0]):
-            x = rescale(D[i,:])
-            p_list.append(np.where(x<=alpha, 1, 0))
-            c = labels.codes[i]
-            gt_list.append(np.where(labels.codes==c, 1, 0))
-
-        predicted = np.concatenate(p_list)
-        gt = np.concatenate(gt_list)
-        p = precision_score(gt, predicted)
-        r = recall_score(gt, predicted)
-
-        final[alpha] = (p, r)
-
-    df = pd.DataFrame(final).T.reset_index(drop=True)
-    df.columns = ['precision', 'recall']
-    auc_score = auc(df['recall'], df['precision'])
-
-    return auc_score
-
-
-##
-
-
 
 
 

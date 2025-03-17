@@ -108,49 +108,20 @@ def bootstrap_bin(afm, boot_replicate='observed', boot_strategy='feature_resampl
             raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
         
         X_new = csr_matrix(X_new)
-        afm_new = AnnData(obs=afm.obs, var=afm.var.iloc[idx,:], uns=afm.uns, layers={'bin':X_new})
+        afm_new = AnnData(
+            obs=afm.obs, 
+            var=afm.var.iloc[idx,:], 
+            uns=afm.uns, 
+            layers={'bin':X_new}
+        )
+
+        if 'priors' in afm.varm:
+            afm_new.varm['priors'] = afm.varm['priors'][idx,:]
 
     else:
         afm_new = afm.copy()
 
     return afm_new
-
-
-##
-
-
-####### DEPRECATED code
-
-
-# def bootstrap_allele_counts(ad, dp, frac=.8):
-#     """
-#     Bootstrapping of ad and dp count tables. ad --> alternative counts
-#     dp --> coverage at that site. NB: AD and DP are assumed in shape cells x variants. 
-#     Both sparse matrices and dense arrays can be passed.
-#     """
-# 
-#     ad = ad if not issparse(ad) else ad.A
-#     dp = dp if not issparse(dp) else dp.A
-#     new_ad = np.zeros(ad.shape)
-#     new_dp = np.zeros(ad.shape)
-# 
-#     for j in range(ad.shape[1]): # Iterate on variants
-# 
-#         alt_counts = ad[:,j]
-#         ref_counts = dp[:,j] - ad[:,j]
-# 
-#         for i in range(ad.shape[0]): # Iterate on cells
-# 
-#             observed_alleles = np.concatenate([
-#                 np.ones(alt_counts[i]), 
-#                 np.zeros(ref_counts[i])
-#             ])
-#             n = round(observed_alleles.size*frac)
-#             new_alt_counts = np.random.choice(observed_alleles, n, replace=True).sum() 
-#             new_dp[i,j] = n
-#             new_ad[i,j] = new_alt_counts
-# 
-#     return new_ad, new_dp, np.arange(ad.shape[1])
 
 
 ##

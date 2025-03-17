@@ -1,5 +1,5 @@
 """
-_colors.py stores functions to create Cellula colors.
+Stores functions to create cusom palettes.
 """
 
 import pandas as pd
@@ -31,11 +31,8 @@ def create_palette(df, var, palette=None, col_list=None,
     """
     Create a color palette from a df, a columns, a palette or a list of colors.
     """
-    try:
-        cats = df[var].cat.categories
-    except:
-        cats = df[var].unique()
     
+    cats = df[var].unique()
     n = len(cats)
     if col_list is not None:
         cols = col_list[:n]
@@ -56,6 +53,8 @@ def create_palette(df, var, palette=None, col_list=None,
             k: _change_color(colors[k], lightness=lightness) \
             for k in colors 
         }
+    
+    colors.update({'unassigned':'lightgrey', np.nan:'lightgrey'})
      
     return colors
 
@@ -89,6 +88,7 @@ def create_colors(meta, chosen=None):
 ##
 
 
+# TO FIX!!
 def assign_matching_colors(df, g1, g2, palette):
     """
     Assign colors to categories in g1 and g2, ensuring colors are unique and come from the provided palette.

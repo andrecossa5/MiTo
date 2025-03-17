@@ -5,6 +5,16 @@ MT-genome feature annotation.
 import numpy as np
 import pandas as pd
 
+
+##
+
+
+patterns = [ 'A>C', 'T>G', 'A>T', 'A>G', 'G>A', 'C>G', 'C>A', 'T>A', 'G>C', 'G>T', 'N>T', 'C>T', 'T>C' ]
+
+transitions = [pattern for pattern in patterns if pattern in ['A>G', 'G>A', 'C>T', 'T>C']]
+
+transversions = [pattern for pattern in patterns if pattern not in transitions and 'N' not in pattern]
+
 all_mt_genes_positions = [
     ["MT-ND1", 3307, 4262], ["MT-ND2", 4470, 5511], ["MT-CO1", 5904, 7445],
     ["MT-CO2", 7586, 8269], ["MT-ATP8", 8366, 8572], ["MT-ATP6", 8527, 9207],
@@ -41,5 +51,6 @@ MAESTER_genes_positions = [
 
 df_ = pd.DataFrame(MAESTER_genes_positions)
 n_target_sites_maester = np.sum(df_[2]-df_[1])
+
 
 ##

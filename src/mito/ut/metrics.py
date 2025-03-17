@@ -1,5 +1,5 @@
 """
-Moduele for kBET metric (Buttner et al., 2018). See Cellula.
+Metrics.
 """
 
 from joblib import cpu_count, parallel_backend, Parallel, delayed
@@ -7,8 +7,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 from scipy.special import binom
-from sklearn.metrics import normalized_mutual_info_score
-
+from sklearn.metrics import (
+    normalized_mutual_info_score, recall_score, precision_score, auc
+)
+from networkx import shortest_path_length
+from scipy.stats import pearsonr
+from sklearn.metrics.pairwise import pairwise_distances
+from .utils import rescale
 
 
 ##
@@ -177,6 +182,136 @@ def custom_ARI(g1, g2):
     max_index = 0.5 * (ai_sum + bi_sum)
 
     return (index - expected_index) / (max_index - expected_index)
+
+
+##
+
+
+def distance_AUPRC(D, labels):
+    """
+    Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
+    Reports Area Under Precision Recall Curve.
+    """
+
+    labels = pd.Categorical(labels) 
+
+    final = {}
+    for alpha in np.linspace(0,1,10):
+ 
+        p_list = []
+        gt_list = []
+
+        for i in range(D.shape[0]):
+            x = rescale(D[i,:])
+            p_list.append(np.where(x<=alpha, 1, 0))
+            c = labels.codes[i]
+            gt_list.append(np.where(labels.codes==c, 1, 0))
+
+        predicted = np.concatenate(p_list)
+        gt = np.concatenate(gt_list)
+        p = precision_score(gt, predicted)
+        r = recall_score(gt, predicted)
+
+        final[alpha] = (p, r)
+
+    df = pd.DataFrame(final).T.reset_index(drop=True)
+    df.columns = ['precision', 'recall']
+    auc_score = auc(df['recall'], df['precision'])
+
+    return auc_score
+
+
+##
+
+
+def calculate_corr_distances(tree):
+    """
+    Calculate correlation between tree and character matrix cell-cell distances. 
+    """
+
+    if tree.get_dissimilarity_map() is not None:
+        D = tree.get_dissimilarity_map()
+        D = D.loc[tree.leaves, tree.leaves] # In case root is there...
+    else:
+        raise ValueError('No precomputed character distance. Add one...')
+    
+    L = []
+    undirected = tree.get_tree_topology().to_undirected()
+    for node in tree.leaves:
+        d = shortest_path_length(undirected, source=node)
+        L.append(d)
+    D_phylo = pd.DataFrame(L, index=tree.leaves).loc[tree.leaves, tree.leaves]
+    assert (D_phylo.index == D.index).all()
+
+    scale = lambda x: (x-x.mean())/x.std()
+    x = scale(D.values.flatten())
+    y = scale(D_phylo.values.flatten())
+    corr, p = pearsonr(x, y)
+    
+    return corr, p
+
+
+##
+
+
+def _compatibility_metric(x, y):
+    """
+    Custom metric to calculate the compatibility between two characters.
+    Returns the fraction of compatible leaf pairs.
+    """
+    return np.sum((x == x[:, None]) == (y == y[:, None])) / len(x) ** 2
+
+##
+
+
+def char_compatibility(tree):
+    """
+    Compute a matrix of pairwise-compatibility scores between characters.
+    """
+    return pairwise_distances(
+        tree.character_matrix.T, 
+        metric=lambda x, y: _compatibility_metric(x, y), 
+        force_all_finite=False
+    )
+
+
+##
+
+
+def CI(tree):
+    """
+    Calculate the Consistency Index (CI) of tree characters.
+    """
+    tree.reconstruct_ancestral_characters()
+    observed_changes = np.zeros(tree.n_character)
+    for parent, child in tree.depth_first_traverse_edges():
+        p_states = np.array(tree.get_character_states(parent))
+        c_states = np.array(tree.get_character_states(child))
+        changes = (p_states != c_states).astype(int)
+        observed_changes += changes
+
+    return 1 / observed_changes # Assumes both characters are present (1,0)
+
+
+##
+
+
+def RI(tree):
+    """
+    Calculate the Consistency Index (RI) of tree characters.
+    """
+    tree.reconstruct_ancestral_characters()
+    observed_changes = np.zeros(tree.n_character)
+    for parent, child in tree.depth_first_traverse_edges():
+        p_states = np.array(tree.get_character_states(parent))
+        c_states = np.array(tree.get_character_states(child))
+        changes = (p_states != c_states).astype(int)
+        observed_changes += changes
+
+    # Calculate the maximum number of changes (G)
+    max_changes = len(tree.nodes)-1  # If every node had a unique state
+
+    return (max_changes-observed_changes) / (max_changes-1)
 
 
 ##

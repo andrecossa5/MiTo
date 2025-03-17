@@ -246,7 +246,7 @@ def calculate_corr_distances(tree):
     scale = lambda x: (x-x.mean())/x.std()
     x = scale(D.values.flatten())
     y = scale(D_phylo.values.flatten())
-    corr, p = pearsonr(x[test], y[test])
+    corr, p = pearsonr(x, y)
     
     return corr, p
 

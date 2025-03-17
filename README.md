@@ -1,7 +1,6 @@
-# mito_utils
+# MiTo
 
-Utilities for MiTo.
-This package is still under active development. To use functions and modules perform the following steps:
+The MiTo package is still under active development, and is proximal to the first release. To use it, perform the following:
 
 1. Install mamba package manager (https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)
 2. Choose one of the following environment recipes:
@@ -39,5 +38,6 @@ mamba develop .
 6. Fire a python terminal and verify successfull installation of all packages.
 
 ```python
-from mito_utils import *
+import mito as mt
 ```
+

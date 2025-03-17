@@ -1,5 +1,5 @@
 """
-Module to preprocess AFMs: reformat original AFM; filter variants/cells.
+All filters: variants/cells.
 """
 
 import logging
@@ -8,8 +8,8 @@ import pandas as pd
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
-from mito_utils.distances import *
-from mito_utils.make_afm import mask_mt_sites
+from .distances import *
+from ..io.format_afm import mask_mt_sites
 
 
 ##
@@ -23,6 +23,8 @@ filtering_options = [
     'MQuad', 
     'MiTo',
     'GT_enriched'
+
+    # DEPRECATED
     # 'ludwig2019', 
     # 'velten2021', 
     # 'seurat', 

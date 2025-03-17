@@ -1,24 +1,13 @@
 """
-Module to create and process AFMs.
+Pre-process AFMs.
 """
 
-import scanpy as sc
 from igraph import Graph
-from mito_utils.filters import *
-from mito_utils.make_afm import *
-from mito_utils.distances import *
-from mito_utils.kNN import *
-from mito_utils.phylo import *
-
-
-##
-
-
-##------------------------------------------------------------------------------------------------------##
-patterns = [ 'A>C', 'T>G', 'A>T', 'A>G', 'G>A', 'C>G', 'C>A', 'T>A', 'G>C', 'G>T', 'N>T', 'C>T', 'T>C' ]
-transitions = [pattern for pattern in patterns if pattern in ['A>G', 'G>A', 'C>T', 'T>C']]
-transversions = [pattern for pattern in patterns if pattern not in transitions and 'N' not in pattern]
-##------------------------------------------------------------------------------------------------------##
+from .filters import *
+from .distances import call_genotypes, compute_distances
+from .kNN import *
+from ..ut.positions import transitions, transversions
+from ..tl.phylo import build_tree, AFM_to_seqs
 
 
 ##

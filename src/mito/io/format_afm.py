@@ -1,14 +1,18 @@
 """
-Module to make_afm: create a clean allelic frequency matrix as AnnData object.
+Create a clean allelic frequency matrix as AnnData object.
 """
 
+import logging
 import os
+import numpy as np
+import pandas as pd
 import warnings
+import cassiopeia as cs
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
-from .utils import *
-from .positions import *
+from ..ut.utils import Timer
+from ..ut.positions import MAESTER_genes_positions
 warnings.filterwarnings("ignore")
 
 
@@ -422,17 +426,49 @@ def read_redeem(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scL
 ##
 
 
+def _add_priors(afm, priors, key='priors'):
+
+    n_targets = len(priors)
+    max_state_encoding = 0
+    for i in priors:
+        new_max = max(priors[i].keys())
+        if new_max>max_state_encoding:
+            max_state_encoding = new_max
+
+    W = np.zeros((n_targets, max_state_encoding+1))
+
+    for i in range(W.shape[0]):
+        W[i,:] = -1
+        d = priors[i]
+        for j in d:
+            W[i,j] = d[j]
+    
+    afm.varm[key] = W
+
+
+##
+
+
 def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='Cas9'):
     """
     Utility to assemble an AFM from Cas9 (e.g. KP tracer mice data from Yang et al., 2022) data.
+    https://www.sc-best-practices.org/trajectories/lineage_tracing.html#
     """
 
-    # Read pre-processed and encoded KP-tracer INDEL matrix
-    char_matrix = pd.read_csv(path_ch_matrix, sep='\t', index_col=0)
-    char_matrix = pd.DataFrame(
-        np.where(char_matrix!='-', char_matrix, -1).astype(np.int16),
-        index=char_matrix.index,
-        columns=char_matrix.columns   
+    # Read KP-tracer allele table
+    allele_table = pd.read_csv(path_ch_matrix, sep='\t', index_col=0)
+    # Compute priors
+    indel_priors = cs.pp.compute_empirical_indel_priors(
+        allele_table, grouping_variables=["intBC", "MetFamily"]
+    )
+    tumor_allele_table = allele_table[allele_table["Tumor"] == sample]
+    # Conver to character matrix
+    (
+        char_matrix,
+        priors,
+        _,
+    ) = cs.pp.convert_alleletable_to_character_matrix(
+        tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
 
     # Handle cell meta, if present
@@ -450,9 +486,12 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
         X=csr_matrix(char_matrix.values), 
         obs=cell_meta, 
         var=pd.DataFrame(index=char_matrix.columns),
-        uns={'pp_method':pp_method, 'scLT_system':scLT_system}
+        uns={
+           'pp_method':pp_method, 
+           'scLT_system':scLT_system, 
+        }
     )
-
+    _add_priors(afm, priors)
     afm.layers['bin'] = afm.X.copy()
 
     return afm
@@ -463,7 +502,7 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
 
 def read_scwgs(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='scWGS'):
     """
-    Utility to assemble an AFM from RedeeM (Weng et al., 2024) MT-SNVs data.
+    Utility to assemble an AFM from scWGS data (Weng et al., 2024) MT-SNVs data.
     """
 
     # Read ch matrix

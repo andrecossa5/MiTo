@@ -22,7 +22,6 @@ dependencies:
   - pip:
       - cvxpy==1.3
       - Biopython==1.71
-      - PyYAML==3.12
       - bokeh==0.12.15
       - ete3==3.1.1
       - ngs-tools==1.5.6
@@ -30,6 +29,7 @@ dependencies:
       - pyseq-align==1.0.2
       - itolapi
       - hits
+      - PyYAML
       - parameterized
       - circlify
       - plotting_utils==0.1.2

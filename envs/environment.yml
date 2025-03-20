@@ -1,40 +1,36 @@
-name: MI_TO
+name: mito
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - anndata=0.8.0
-  - jax=0.3.16
-  - jaxlib=0.3.15
-  - joblib=1.2.0
-  - leidenalg=0.8.10
-  - lightgbm=3.3.3
-  - matplotlib=3.5.3
-  - numba=0.55.2
-  - numpy=1.22.4
-  - pynndescent=0.5.7
   - python=3.10.6
-  - pip
-  - conda-build
-  - scanpy=1.9.1
-  - scikit-image=0.19.3
-  - scikit-learn=1.1.2
+  - numpy=1.22.4
   - scipy=1.9.0
+  - pandas==1.5.3
+  - anndata=0.8.0
+  - networkx=2.8.6
+  - python-igraph=0.9.11
+  - leidenalg=0.8
+  - matplotlib=3.5.3
+  - seaborn=0.11.2
+  - scanpy=1.9.1
+  - scikit-learn=1.1.2
   - yaml=0.2.5
+  - pysam
+  - conda-build
+  - pip
   - pip:
-      - bbmix==0.2.1
-      - biopython==1.76
-      - cython==0.29.32
-      - ete3==3.1.2
-      - gseapy==1.1.3
-      - igraph==0.9.11
-      - louvain==0.7.1
-      - pandas==1.5.3
-      - plotting-utils==0.1.2
-      - pysam==0.20.0
-      - python-igraph==0.9.11
-      - shap==0.41.0
-      - pyro-ppl
-      - umap-learn==0.5.6
+      - cvxpy==1.3
+      - Biopython==1.71
+      - PyYAML==3.12
+      - bokeh==0.12.15
+      - ete3==3.1.1
+      - ngs-tools==1.5.6
+      - plotly==5.0.0
+      - pyseq-align==1.0.2
+      - itolapi
+      - hits
+      - parameterized
       - circlify
+      - plotting_utils==0.1.2
+      - mquad==0.1.8

@@ -1,5 +1,5 @@
 # Temp files
-.DS_Store
+*/.DS_Store
 *~
 buck-out/
 

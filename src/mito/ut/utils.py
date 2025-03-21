@@ -9,12 +9,29 @@ from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
-from ..pp.filters import filtering_options as _var_filters
+
 
 
 ##
 
+
 _cell_filters = ['filter1', 'filter2']
+_var_filters = [
+    'baseline',
+    'CV',
+    'miller2022', 
+    'weng2024',
+    'MQuad', 
+    'MiTo',
+    'GT_enriched'
+    # DEPRECATED
+    # 'ludwig2019', 
+    # 'velten2021', 
+    # 'seurat', 
+    # 'MQuad_optimized',
+    # 'density',
+    # 'GT_stringent'
+]
 path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
 
 

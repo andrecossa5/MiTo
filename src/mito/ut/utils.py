@@ -9,11 +9,12 @@ from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
+from ..pp.filters import filtering_options as _var_filters
 
 
 ##
 
-
+_cell_filters = ['filter1', 'filter2']
 path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
 
 
@@ -215,7 +216,9 @@ def extract_kwargs(args, only_tree=False):
                     'min_n_var' : min_n_var,
                     'path_dbSNP' : args.path_dbSNP, 
                     'path_REDIdb' : args.path_REDIdb,
-                    'ncores' : args.ncores
+                    'ncores' : args.ncores,
+                    'spatial_metrics' : args.spatial_metrics,
+                    'filter_moransI' : args.filter_moransI
                 }
                 filtering_kwargs = {
                     'min_cov' : int(d['min_cov']),
@@ -252,16 +255,18 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter if args.cell_filter != "None" else None
+            cell_filter = args.cell_filter if args.cell_filter != _cell_filters else None
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,
-                'filtering' : args.filtering if args.filtering != "None" else None,
+                'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
                 'path_dbSNP' : args.path_dbSNP, 
                 'path_REDIdb' : args.path_REDIdb,
-                'ncores' : args.ncores
+                'ncores' : args.ncores,
+                'spatial_metrics' : args.spatial_metrics,
+                'filter_moransI' : args.filter_moransI
             }
             filtering_kwargs = {
                 'min_cov' : args.min_cov,

@@ -168,7 +168,7 @@ def compute_connectivity_metrics(X):
 ##
 
 
-def compute_metrics_filtered(afm, spatial_metrics=True, ncores=1, k=10, tree_kwargs={}):
+def compute_metrics_filtered(afm, spatial_metrics=True, tree_kwargs={}):
     """
     Compute additional metrics on selected MT-SNVs feature space.
     """
@@ -237,9 +237,10 @@ def compute_metrics_filtered(afm, spatial_metrics=True, ncores=1, k=10, tree_kwa
 
 def filter_afm(
     afm, lineage_column=None, min_cell_number=0, cells=None,
-    filtering='MiTo', filtering_kwargs={}, max_AD_counts=2, variants=None, min_n_var=1,
-    fit_mixtures=False, only_positive_deltaBIC=False, path_dbSNP=None, path_REDIdb=None, 
-    compute_enrichment=False, bin_method='MiTo', binarization_kwargs={}, metric='weighted_jaccard',
+    filtering='MiTo', filter_moransI=True, filtering_kwargs={}, 
+    max_AD_counts=2, variants=None, min_n_var=1, fit_mixtures=False, only_positive_deltaBIC=False, 
+    path_dbSNP=None, path_REDIdb=None, compute_enrichment=False, 
+    bin_method='MiTo', binarization_kwargs={}, metric='weighted_jaccard',
     ncores=8, spatial_metrics=False, tree_kwargs={}, return_tree=False
     ):
     """
@@ -303,11 +304,13 @@ def filter_afm(
             - Max number of lineages the MT-SNV can be enriched for ('n_enriched_groups' : 2) 
             - Binarization strategy ('bin_method' : 'MiTo')
             - **kwargs for bianrization ('binarization_kwargs' : {})
-
+    
+    filter_moransI : bool, optional
+        Remove MT-SNVs not spatially autocorrelated. Default is True.
     filtering_kwargs : dict, optional
         Keyword arguments for the selected filtering method. Default is `{}`.
     max_AD_counts : int, optional
-        Site/variant filter. The minimum number of consensus UMIs supporting the MT-SNV ALT allele required for at least one cell across the dataset. Default is `1` (i.e., no filter).
+        Site/variant filter. The minimum number of consensus UMIs supporting the MT-SNV ALT allele required for at least one cell across the dataset. Default is `2` (i.e., no filter).
     af_confident_detection : float, optional
         Cell filter. The minimum AF threshold at which at least one of the filtered MT-SNVs needs to be detected in a cell to retain the cell in the final dataset. It may be passed as a key-value pair in `filtering_kwargs`. Default is `0.01`.
     variants : list, optional
@@ -362,7 +365,7 @@ def filter_afm(
     logging.info(f'Original afm: n cells={afm.shape[0]}, n features={afm.shape[1]}.')
     
     # Cells from <lineage_column> with at least min_cell_number cells, if necessary
-    if min_cell_number>0 and lineage_column is not None:
+    if min_cell_number>0 and lineage_column not in [None, 'null']:
         afm = filter_cell_clones(afm, column=lineage_column, min_cell_number=min_cell_number)
         annotate_vars(afm, overwrite=True)
        
@@ -406,7 +409,7 @@ def filter_afm(
 
     # Filter common SNVs and possible RNA-edits
     n_dbSNP = np.nan
-    if path_dbSNP is not None:
+    if path_dbSNP not in [None, 'null']:
         if os.path.exists(path_dbSNP):
             common = pd.read_csv(path_dbSNP, index_col=0, sep='\t')
             common = common['pos'].astype('str') + '_' + common['REF'] + '>' + common['ALT'].map(lambda x: x.split('|')[0])
@@ -418,7 +421,7 @@ def filter_afm(
 
     # Filter possible RNA-edits  
     n_REDIdb = np.nan     
-    if path_REDIdb is not None:
+    if path_REDIdb not in [None, 'null']:
         if os.path.exists(path_REDIdb):
             edits = pd.read_csv(path_REDIdb, index_col=0, sep='\t')
             edits = edits.query('nSamples>100')
@@ -447,7 +450,8 @@ def filter_afm(
 
     # Compute cell-cell distances and filter variants significantly auto-correlated.
     compute_distances(afm, precomputed=True, metric=metric, ncores=ncores)
-    afm = filter_variant_moransI(afm)
+    if filter_moransI:
+        afm = filter_variant_moransI(afm)
     logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics).')
     
     # Final fixes

@@ -477,8 +477,7 @@ def filter_afm(
     tree = compute_metrics_filtered(
         afm, 
         spatial_metrics=spatial_metrics, 
-        tree_kwargs=tree_kwargs,
-        ncores=ncores
+        tree_kwargs=tree_kwargs
     )
 
     # Add params to .uns

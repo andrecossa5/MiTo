@@ -192,11 +192,15 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     path_T = os.path.join(path_ch_matrix, 'T.txt.gz')
     path_G = os.path.join(path_ch_matrix, 'G.txt.gz')
     path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')
-    path_refAllele = os.path.join(path_ch_matrix, 'refAllele.txt')
-    ref_allele = pd.read_csv(path_refAllele, header=None)
-    ref = { pos:ref for pos,ref in zip(ref_allele[0], ref_allele[1]) }
+    path_refAllele = os.path.join(path_ch_matrix, 'chrM.fa')
 
-    L = []
+    # Get ref dictionary
+    with open(path_refAllele, 'r') as f:
+        L = f.readlines()
+    seq = ''.join([ x.strip() for x in L[1:] ])
+    ref = { pos+1:ref for pos,ref in enumerate(seq) }
+
+    # Here we go
     for base, path_base in zip(['A', 'C', 'T', 'G'], [path_A, path_C, path_T, path_G]):
 
         logging.info(f'Process table: {base}')

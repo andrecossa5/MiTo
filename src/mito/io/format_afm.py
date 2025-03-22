@@ -196,8 +196,8 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     # Get ref dictionary
     assert 'chrM.fa' in os.listdir()
     with open('chrM.fa', 'r') as f:
-        L = f.readlines()
-    seq = ''.join([ x.strip() for x in L[1:] ])
+        _ = f.readlines()
+    seq = ''.join([ x.strip() for x in _[1:] ])
     ref = { pos+1:ref for pos,ref in enumerate(seq) }
 
     # Here we go

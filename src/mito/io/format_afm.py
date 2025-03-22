@@ -201,6 +201,7 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     ref = { pos+1:ref for pos,ref in enumerate(seq) }
 
     # Here we go
+    L = []
     for base, path_base in zip(['A', 'C', 'T', 'G'], [path_A, path_C, path_T, path_G]):
 
         logging.info(f'Process table: {base}')

@@ -249,7 +249,7 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     logging.info(f'Unique variant basecalls: {long.shape[0]}')
  
     # Filter basecalls of annotated cells only (i.e., we have cell metadata)
-    if path_meta is not None:
+    if path_meta not in [None,'null']:
         logging.info(f'Filter for annotated cells (i.e., sample CBs in cell_meta)')
         cell_meta = pd.read_csv(path_meta, index_col=0)
         cells = list(set(cell_meta.index) & set(long['cell'].unique()))

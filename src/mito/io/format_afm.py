@@ -191,11 +191,11 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     path_C = os.path.join(path_ch_matrix, 'C.txt.gz')
     path_T = os.path.join(path_ch_matrix, 'T.txt.gz')
     path_G = os.path.join(path_ch_matrix, 'G.txt.gz')
-    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')
-    path_refAllele = os.path.join(path_ch_matrix, '../chrM.fa')
+    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')              
 
     # Get ref dictionary
-    with open(path_refAllele, 'r') as f:
+    assert 'chrM.fa' in os.listdir()
+    with open('chrM.fa', 'r') as f:
         L = f.readlines()
     seq = ''.join([ x.strip() for x in L[1:] ])
     ref = { pos+1:ref for pos,ref in enumerate(seq) }

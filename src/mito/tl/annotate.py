@@ -508,7 +508,12 @@ class MiToTreeAnnotator():
         T = Timer()
         T.start()
 
-        # Grid-search
+        # Get tree topology and mutation_enrichment tables
+        if self.T is None or self.M is None: 
+            self.get_T()
+            self.get_M()
+
+        # Define combos
         combos = list(product(similarity_tresholds, mut_enrichment_tresholds, merging_treshold))
         logging.info(f'Start Grid Search. n hyper-parameter combinations to explore: {len(combos)}')
 
@@ -519,21 +524,24 @@ class MiToTreeAnnotator():
 
         # Grid search
         for i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
-            labels, sim = self.infer_clones(
-                similarity_percentile=s, 
-                mut_enrichment_treshold=m, 
-                merging_treshold=j, 
-                add_to_meta=False
-            )
-            test = labels.isna()
-            labels = labels.loc[~test]
-            D = self.tree.get_dissimilarity_map().loc[labels.index,labels.index]
-            assert (D.index == labels.index).all()
-            sil = silhouette_score(X=D.values, labels=labels.values, metric='precomputed') if labels.unique().size>2 else 0
-            silhouettes.append(sil)
-            unassigned.append(test.sum()/labels.size)
-            n_clones.append(labels.unique().size)
-            similarities.append(sim.mean())
+            try:
+                labels, sim = self.infer_clones(
+                    similarity_percentile=s, 
+                    mut_enrichment_treshold=m, 
+                    merging_treshold=j, 
+                    add_to_meta=False
+                )
+                test = labels.isna()
+                labels = labels.loc[~test]
+                D = self.tree.get_dissimilarity_map().loc[labels.index,labels.index]
+                assert (D.index == labels.index).all()
+                sil = silhouette_score(X=D.values, labels=labels.values, metric='precomputed') if labels.unique().size>2 else 0
+                silhouettes.append(sil)
+                unassigned.append(test.sum()/labels.size)
+                n_clones.append(labels.unique().size)
+                similarities.append(sim.mean())
+            except:
+                pass
 
         # Pick optimal combination, and perform final splitting
         self.solutions = (
@@ -561,7 +569,7 @@ class MiToTreeAnnotator():
             raise ValueError(
                 f'''
                 None of the solution tested falls below the 
-                max_fraction_unassigned trehsold: {max_fraction_unassigned}
+                max_fraction_unassigned treshold: {max_fraction_unassigned}
                 '''
             )
         

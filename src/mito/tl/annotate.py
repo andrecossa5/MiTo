@@ -541,6 +541,7 @@ class MiToTreeAnnotator():
                 n_clones.append(labels.unique().size)
                 similarities.append(sim.mean())
             except:
+                # Some error with this hyper-parameter combo
                 pass
 
         # Pick optimal combination, and perform final splitting

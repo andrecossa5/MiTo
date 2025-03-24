@@ -2,7 +2,7 @@
 This is the first release of `MiTo`: robust inference of mitochondrial clones and phylogenies.
 
 ## Documentation
-See ... for a comprehensive description of key functionalitites, main APIs, and tutorials.
+A comprehensive documentation of key functionalitites, APIs, and tutorials is a work in progress.
 
 ## Installation
 1. Install mamba (or conda) package manager (https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)
@@ -13,7 +13,7 @@ mamba env create -f ./envs/environment.yml -n <your conda env name>
 ```
 
 3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: all has been 
-already installed in the environment. Sometimes pip messes with cassipeia dependencies trying to re-install them).
+already installed in the environment).
 
 ```bash
 mamba activate <your conda env name>
@@ -23,7 +23,7 @@ pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd100
 4. Install `MiTo`:
 
 ```bash
-pip install mito==0.0.1
+pip install mito-utils==0.0.1
 ```
 
 5. Verify successfull installation:

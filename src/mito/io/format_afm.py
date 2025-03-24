@@ -61,7 +61,7 @@ def read_from_AD_DP(
     """
 
     table = pd.read_csv(path_ch_matrix, index_col=0)
-    if path_meta is not None:
+    if path_meta not in ['null',None]:
         cell_meta = pd.read_csv(path_meta, index_col=0)
     if sample is not None:
         table['cell'] = table['cell'].map(lambda x: f'{x}_{sample}')
@@ -69,7 +69,7 @@ def read_from_AD_DP(
     AD = table.pivot(index=cell_col, columns='MUT', values='AD').fillna(0)
     DP = table.pivot(index=cell_col, columns='MUT', values='DP').fillna(0)
     
-    if path_meta is not None and os.path.exists(path_meta):
+    if path_meta not in ['null',None] and os.path.exists(path_meta):
         cells = list(set(cell_meta.index) & set(DP.index))
         AD = AD.loc[cells].copy()
         DP = DP.loc[cells].copy()

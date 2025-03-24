@@ -61,7 +61,12 @@ def jackknife_allele_tables(afm, layer='AD'):
 ##
 
 
-def bootstrap_MiTo(afm, boot_replicate='observed', boot_strategy='feature_resampling', frac_char_resampling=.8):
+def bootstrap_MiTo(
+    afm: AnnData, 
+    boot_replicate: str = 'observed', 
+    boot_strategy: str ='feature_resampling', 
+    frac_char_resampling: float = .8
+    ) -> AnnData:
     """
     Bootstrap MAESTER/RedeeM Allele Frequency matrices.
     """
@@ -93,7 +98,12 @@ def bootstrap_MiTo(afm, boot_replicate='observed', boot_strategy='feature_resamp
 ##
 
 
-def bootstrap_bin(afm, boot_replicate='observed', boot_strategy='feature_resampling', frac_char_resampling=.8):
+def bootstrap_bin(
+    afm: AnnData, 
+    boot_replicate: str = 'observed', 
+    boot_strategy: str ='feature_resampling', 
+    frac_char_resampling: float = .8
+    ) -> AnnData:
     """
     Bootstrap scWGS/Cas9 AFMs.
     """

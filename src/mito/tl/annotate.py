@@ -8,6 +8,8 @@ import pandas as pd
 import cassiopeia as cs
 from tqdm import tqdm
 from itertools import product
+from typing import Iterable, Tuple, Dict, Any
+from cassiopeia.data import CassiopeiaTree
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from sklearn.metrics import silhouette_score
@@ -26,7 +28,7 @@ class MiToTreeAnnotator():
     MT-SNVs-based phylogeny.
     """
 
-    def __init__(self, tree):
+    def __init__(self, tree: CassiopeiaTree):
         """
         Initialize class slots from input CassiopeiaTree.
         """
@@ -46,7 +48,7 @@ class MiToTreeAnnotator():
 
     ##
 
-    def get_T(self, with_root=True):
+    def get_T(self, with_root: bool = True):
         """
         Compute the "cell assignment" matrix, T.
         T is a cell x clade (internal node) binary matrix mapping each cell i to every clade j.
@@ -61,7 +63,7 @@ class MiToTreeAnnotator():
 
     ##
 
-    def get_M(self, alpha=0.05):
+    def get_M(self, alpha: float = 0.05):
         """
         Compute the "mutation enrichment" matrix, M.
         M is a mut x clade matrix storing for each mutation i and clade j the enrichment 
@@ -107,17 +109,23 @@ class MiToTreeAnnotator():
 
     ##
 
-    def resolve_ambiguous_clones(self, df_predict, s_treshold=.7, add_to_meta=False, verbose=False):
+    def resolve_ambiguous_clones(
+        self, 
+        df_predict: pd.DataFrame, 
+        s_treshold: float = .7, 
+        add_to_meta: bool = False, 
+        verbose: float = False
+        ) -> Tuple[pd.Series,pd.Series]:
         """
         Final clonal resolution process. 
-        Tries to merge similar clones iteratively.
-        First, the (raw) AF matrix is aggregated at the clonal level using MiTo clones.
-        Then, clone-clone similarities are comuputed using (1-) weighted jaccard distances
-        among these aggregated MT-SNVs clonal profiles. At each round, the tiniest "ambiguous"
-        clone is selected for merging with its smallest "interacting clone". If the merge is 
-        successfull, the clonal assignment table is updated and the process go through other 
-        merging rounds, until no ambiguous clones remain. Unresolved clones (if any) are 
-        annotated as NaNs in the final MiTo clone column which is appended to self.tree.cell_meta.
+        Tries to merge similar clones, iteratively. First, the (raw) AF matrix is aggregated 
+        at the clonal level using MiTo clones. Then, clone-clone similarities are computed using
+        (1-) weighted jaccard distances among these aggregated MT-SNVs clonal profiles. 
+        At each round, the tiniest "ambiguous" clone is selected for merging with its smallest 
+        "interacting clone". If the merge is successfull, the clonal assignment table is updated
+        and the process go through other merging rounds, until no ambiguous clones remain. Unresolved
+        clones (if any) are annotated as NaNs in the final MiTo clone column which is appended to 
+        `self.tree.cell_meta`.
         """
 
         self.params['merging_treshold'] = s_treshold
@@ -280,7 +288,7 @@ class MiToTreeAnnotator():
 
     ## 
 
-    def extract_mut_order(self, pval_tresh=.01):
+    def extract_mut_order(self, pval_tresh: float = .01):
         """
         Extract diagonal-order of MT-SNVs using mutation assignments, to create a ordered list of
         MT-SNVs for plotting.
@@ -309,8 +317,13 @@ class MiToTreeAnnotator():
 
     ##
 
-    def infer_clones(self, similarity_percentile=85, 
-                     mut_enrichment_treshold=5, merging_treshold=.7, add_to_meta=False):
+    def infer_clones(
+        self, 
+        similarity_percentile: float = 85, 
+        mut_enrichment_treshold: int = 5, 
+        merging_treshold: float = .7, 
+        add_to_meta: bool = False
+        ) -> Tuple[pd.Series,pd.Series]:
         """
         A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper 
         (... et al., 2025).
@@ -492,16 +505,16 @@ class MiToTreeAnnotator():
 
     def clonal_inference(
         self, 
-        similarity_tresholds=[ 85, 90, 95, 99 ],
-        mut_enrichment_tresholds=[ 3, 5, 10 ],
-        merging_treshold=[ .25, .5, .75 ],
-        max_fraction_unassigned=.05,
-        weight_silhouette=.3,
-        weight_n_clones=.4,
-        weight_similarity=.3
+        similarity_tresholds: Iterable[int] = [ 85, 90, 95, 99 ],
+        mut_enrichment_tresholds: Iterable[int] = [ 3, 5, 10 ],
+        merging_treshold: Iterable[float] = [ .25, .5, .75 ],
+        max_fraction_unassigned: float = .05,
+        weight_silhouette: float =.3,
+        weight_n_clones: float =.4,
+        weight_similarity: float =.3
         ):
         """
-        Optimize tresholds for self.infer_clones and pick clonal labels with
+        Optimize tresholds for `self.infer_clones` and pick clonal labels with
         best silhouette scores across the attempted splits.
         """
 

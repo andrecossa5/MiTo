@@ -1,5 +1,3 @@
-# TO DO: compute_clonal_fate_bias
-
 from .phenotype import compute_clonal_fate_bias, compute_scPlasticity
 from .annotate import MiToTreeAnnotator
 from .bootstrap import bootstrap_bin, bootstrap_MiTo

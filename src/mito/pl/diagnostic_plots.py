@@ -1,11 +1,17 @@
 """
-Utils and plotting functions to visualize and inspect SNVs from a MAESTER experiment and maegatk output.
+Utils and plotting functions to visualize and inspect SNVs from a MAESTER 
+experiment and maegatk/mito_preprocessing output.
 """
 
 import numpy as np
+import pandas as pd
 import scanpy as sc
+import matplotlib
+import matplotlib.pyplot as plt
+from typing import Dict, Iterable, Tuple, List, Any
+from anndata import AnnData
 from matplotlib.ticker import FixedLocator, FuncFormatter
-from .plotting_base import *
+from .plotting_base import format_ax, add_legend, bar
 from ..ut.utils import load_mut_spectrum_ref
 from ..ut.positions import MAESTER_genes_positions
 from ..pp.filters import mask_mt_sites
@@ -15,11 +21,13 @@ from ..pp.preprocessing import annotate_vars
 ## 
 
 
-# Current diagnosti plots
-def vars_AF_spectrum(afm, ax=None, color='b', **kwargs):
+def vars_AF_spectrum(
+    afm: AnnData, ax: matplotlib.axes.Axes = None, color: str = 'b', **kwargs
+    ) ->  matplotlib.axes.Axes:
     """
-    Ranked AF distributions (VG-like).
+    Ranked AF distributions (as in Miller et al., 2022).
     """
+
     X = afm.X.A
     for i in range(X.shape[1]):
         x = X[:,i]
@@ -34,10 +42,16 @@ def vars_AF_spectrum(afm, ax=None, color='b', **kwargs):
 ##
 
 
-def plot_ncells_nAD(afm, ax=None, title=None, xticks=None, yticks=None, s=5, c='k', alpha=.7, **kwargs):
+def plot_ncells_nAD(
+    afm: AnnData, ax: matplotlib.axes.Axes = None, 
+    title: str = None, xticks: Iterable[Any] = None, 
+    yticks: str = None, s: float = 5, c: Any = 'k', alpha: float = .7, 
+    **kwargs
+    ) ->  matplotlib.axes.Axes:
     """
-    Plots similar to Weng et al., 2024, followed by the two commentaries from Lareau and Weng.
-    n+ cells vs n 
+    Plots similar to the one in Weng et al., 2024, followed by the two commentaries
+    from Lareau and Weng, 2024. For each variant, plot the n of positive cells (x-axis)
+    vs mean number of AD in positive cells (y-axis).
     """
 
     annotate_vars(afm, overwrite=True)
@@ -62,9 +76,11 @@ def plot_ncells_nAD(afm, ax=None, title=None, xticks=None, yticks=None, s=5, c='
 ##
 
 
-def mut_profile(mut_list, figsize=(6,3)):
+def mut_profile(
+    mut_list: Iterable[str], figsize: Tuple[float,float] = (6,3)
+    ) ->  matplotlib.figure.Figure:
     """
-    MutationProfile_bulk (Weng et al., 2024).
+    Re-implementation of MutationProfile_bulk, from Weng et al., 2024).
     """
 
     ref_df = load_mut_spectrum_ref()
@@ -106,11 +122,16 @@ def mut_profile(mut_list, figsize=(6,3)):
 ##
 
 
-def MT_coverage_polar(df, var_subset=None, ax=None, n_xticks=6, xticks_size=7, 
-                    yticks_size=2, xlabel_size=6, ylabel_size=9, kwargs_main={}, kwargs_subset={},):
-    
+def MT_coverage_polar(
+    df: pd.DataFrame, 
+    var_subset: Iterable[str] = None, 
+    ax: matplotlib.axes.Axes = None, 
+    n_xticks: int = 6, xticks_size: float = 7, yticks_size: float = 2,
+    xlabel_size: float = 6, ylabel_size: float = 9, 
+    kwargs_main: Dict[str,Any] = {}, kwargs_subset: Dict[str,Any] = {}
+    ) ->  matplotlib.axes.Axes:
     """
-    Plot coverage and muts across postions.
+    Plot coverage and muts across MT-genome positions.
     """
     
     kwargs_main_ = {'c':'#494444', 'linestyle':'-', 'linewidth':.7}
@@ -154,17 +175,28 @@ def MT_coverage_polar(df, var_subset=None, ax=None, n_xticks=6, xticks_size=7,
 ##
 
 
-def MT_coverage_by_gene_polar(cov, sample=None, subset=None, ax=None):
+def MT_coverage_by_gene_polar(
+    cov: pd.DataFrame, 
+    sample: str = None, 
+    subset: Iterable[str] = None, 
+    ax: matplotlib.axes.Axes = None
+    ) ->  matplotlib.axes.Axes:
     """
-    MT coverage, with annotated genes, in polar coordinates.
+    Plot coverage and muts across MT-genome positions, with annotated genes.
     """
     
     if subset is not None:
         cov = cov.query('cell in @subset')
     cov['pos'] = pd.Categorical(cov['pos'], categories=range(1,16569+1))
     cov = cov.pivot_table(index='cell', columns='pos', values='n', dropna=False, fill_value=0)
-
-    df_mt = pd.DataFrame(MAESTER_genes_positions, columns=['gene', 'start', 'end']).set_index('gene').sort_values('start')
+    df_mt = (
+        pd.DataFrame(
+            MAESTER_genes_positions, 
+            columns=['gene', 'start', 'end']
+        )
+        .set_index('gene')
+        .sort_values('start')   
+    )
 
     x = cov.mean(axis=0)
     median_target = cov.loc[:,mask_mt_sites(cov.columns)].median(axis=0).median()

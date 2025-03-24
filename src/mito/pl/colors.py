@@ -7,8 +7,30 @@ import scanpy as sc
 import seaborn as sns
 import colorsys
 import matplotlib.colors
+from typing import Dict, Iterable, Any
 from scipy.optimize import linear_sum_assignment
 import numpy as np
+
+
+##
+
+
+# Custom palette
+ten_godisnot = [
+    
+    '#001E09', 
+    '#885578',
+    '#FF913F', 
+    '#1CE6FF', 
+    '#549E79', 
+    '#C9E850', #'#00FECF', 
+    '#EEC3FF', 
+    '#FFEF00',#'#0000A6', 
+    '#D157A0', 
+    '#922329'
+    
+]
+ten_godisnot = [ matplotlib.colors.hex2color(x) for x in ten_godisnot ]
 
 
 ##
@@ -26,10 +48,23 @@ def _change_color(color, saturation=0.5, lightness=0.5):
 ##
 
 
-def create_palette(df, var, palette=None, col_list=None, 
-                saturation=None, lightness=None):
+def create_palette(
+    df: pd.DataFrame, var: str, palette: str=None, saturation: float=None, 
+    col_list: Iterable[str|Any] = None, lightness: float=None
+    ) -> Dict[str,str] :
     """
-    Create a color palette from a df, a columns, a palette or a list of colors.
+    Create a color palette from a pd.DataFrame, a column, a palette or a list of colors.
+
+    Args:
+        df (pd.DataFrame): DataFrame storing "var" categories.
+        var (str): Column in df to search for categories.
+        palette (str, optional. Default: None): Color palette from seaborn.
+        col_list(Iterable[str|Any], optional. Default: None): Color list. Must be values recognized by matplotlib.
+        saturation (float, optional. Default: None): Saturation value.
+        lightness (float, optional. Default: None): Lightness value.
+    
+    Returns:
+        colors (Dict[str,str]): a dictionary of key:value mappings between input categories and colors
     """
     
     cats = df[var].unique()
@@ -62,47 +97,25 @@ def create_palette(df, var, palette=None, col_list=None,
 ##
 
 
-def create_colors(meta, chosen=None):
-    """
-    Create Cellula 'base' colors: samples, seq run, and optionally leiden categorical covariates.
-    """
-
-    # Create a custom dict of colors
-    colors = {
-        'sample' : create_palette(meta, 'sample', palette='tab20'),
-        'seq_run' : create_palette(meta, 'seq_run', palette='tab20')
-    }
-    
-    # Add cluster colors, if needed
-    n = len(meta[chosen].cat.categories)
-    if chosen is not None:
-        if n <= 20:
-            c = sc.pl.palettes.default_20[:n]
-        else:
-            c = sc.pl.palettes.default_102[:n]
-        colors[chosen] = { cluster : color for cluster, color in zip(meta[chosen].cat.categories, c)}
-
-    return colors
-
-
-##
-
-
 # TO FIX!!
-def assign_matching_colors(df, g1, g2, palette):
+def assign_matching_colors(
+    df: pd.DataFrame, g1: str, g2: str, palette: str
+    ) -> Dict[str,Any]:
     """
-    Assign colors to categories in g1 and g2, ensuring colors are unique and come from the provided palette.
+    Assign colors to categories in g1 and g2, ensuring colors are unique 
+    and come from the provided palette.
 
-    Parameters:
-    - df: DataFrame with at least two categorical columns, g1 and g2.
-    - g1: The column name for the first categorical variable.
-    - g2: The column name for the second categorical variable.
-    - palette: List of colors to assign to categories.
+    Args:
+        df (pd.DataFrame): DataFrame with at least two categorical columns, g1 and g2.
+        g1 (str): The column name for the first categorical variable.
+        g2 (str): The column name for the second categorical variable.
+        palette (str): List of colors to assign to categories.
 
     Returns:
-    - g1_colors: Dictionary mapping categories in g1 to colors.
-    - g2_colors: Dictionary mapping categories in g2 to colors.
+        g1 (Dict[str,str]): a dictionary of key:value mappings between g1 input categories and matched colors  
+        g2 (Dict[str,str]): a dictionary of key:value mappings between g2 input categories and matched colors    
     """
+
     # Convert categories to strings
     df[g1] = df[g1].astype(str)
     df[g2] = df[g2].astype(str)
@@ -154,23 +167,3 @@ def assign_matching_colors(df, g1, g2, palette):
     
         
 ##
-
-        
-# Palettes
-ten_godisnot = [
-    
-    '#001E09', 
-    '#885578',
-    '#FF913F', 
-    '#1CE6FF', 
-    '#549E79', 
-    '#C9E850', #'#00FECF', 
-    '#EEC3FF', 
-    '#FFEF00',#'#0000A6', 
-    '#D157A0', 
-    '#922329'
-    
-]
-
-ten_godisnot = [ matplotlib.colors.hex2color(x) for x in ten_godisnot ]
-

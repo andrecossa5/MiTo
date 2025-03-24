@@ -4,6 +4,7 @@ Dimensionality reduction utils to reduce a (pre-filtered) AFMs.
 
 import logging
 import numpy as np
+from typing import Dict, Any
 from scipy.linalg import eigh
 from sklearn.decomposition import PCA
 from umap.umap_ import simplicial_set_embedding, find_ab_params
@@ -113,24 +114,32 @@ def _get_D(afm, distance_key, **kwargs):
 
 
 def reduce_dimensions(
-    afm, layer='bin', distance_key='distances', seed=1234, method='UMAP', k=15, 
-    n_comps=2, ncores=8, metric='weighted_jaccard', bin_method='MiTo', binarization_kwargs={}
+    afm: AnnData, 
+    layer: str = 'bin',
+    distance_key: str = 'distances', 
+    seed: int = 1234, 
+    method: str = 'UMAP', 
+    k: int = 10, 
+    n_comps: int = 2, 
+    ncores: int = 8,
+    metric: str = 'weighted_jaccard', 
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}
     ):
     """
-    Reduce dimension of input Allelic Frequency Matrix.
+    Dimensionality reduction for an Allele Frequency Matrix.
     
     Args:
-        afm (_type_): _description_
-        layer (str, optional): _description_. Defaults to 'bin'.
-        distance_key (str, optional): _description_. Defaults to 'distances'.
-        seed (int, optional): _description_. Defaults to 1234.
-        method (str, optional): _description_. Defaults to 'UMAP'.
-        k (int, optional): _description_. Defaults to 15.
-        n_comps (int, optional): _description_. Defaults to 30.
-        metric (str, optional): _description_. Defaults to 'cosine'.
-        bin_method (str, optional): _description_. Defaults to 'vanilla'.
-        scale (bool, optional): _description_. Defaults to True.
-        binarization_kwargs (dict, optional): _description_. Defaults to {}.
+        afm (AnnData): Allele Frequency Matrix.
+        layer (str, optional, Default: 'bin'): layer to use.
+        distance_key (str, optional. Default: 'distances'): afm.obsp key to append distances.
+        seed (int, optional. Default: 1234): random seed.
+        method (str, optional. Default: 'UMAP'): dimensionality reduction method.
+        k (int, optional. Defaults: k=10): n of neighbors to use for kNN search.
+        n_comps (int, optional. Default: 2): number of dimension of the output embedding. Defaults to 2.
+        metric (str, optional. Default to 'weightde_jaccard'): dissimilarity metric to use.
+        bin_method (str, optional. Default to 'MiTo'): genotyping method.
+        binarization_kwargs (Dict[str,Any], optional. Default: {}): kwargs for binarization.
     """
 
     kwargs = dict(metric=metric, bin_method=bin_method, ncores=ncores, binarization_kwargs=binarization_kwargs)

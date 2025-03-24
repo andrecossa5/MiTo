@@ -4,6 +4,8 @@ Tools to map phenotype to lineage structures.
 
 import numpy as np
 import pandas as pd
+from typing import Any
+from cassiopeia.data import CassiopeiaTree
 from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
@@ -12,7 +14,12 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 ##
 
 
-def compute_clonal_fate_bias(tree, state_column, clone_column, target_state):
+def compute_clonal_fate_bias(
+    tree: CassiopeiaTree, 
+    state_column: str, 
+    clone_column: str, 
+    target_state: str|Any
+    ) -> pd.DataFrame:
     """
     Compute -log10(FDR) Fisher's exact test: clonal fate biases towards some target_state.
     """
@@ -64,7 +71,7 @@ def compute_clonal_fate_bias(tree, state_column, clone_column, target_state):
 ##
 
 
-def compute_scPlasticity(tree, meta_column):
+def compute_scPlasticity(tree: CassiopeiaTree, meta_column: str):
     """
     Compute scPlasticity as in Yang et al., 2022.
     https://www.sc-best-practices.org/trajectories/lineage_tracing.html#

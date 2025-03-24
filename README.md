@@ -1,5 +1,5 @@
 # MiTo
-MiTo: robust inference of mitochondrial clones and phylogenies.
+This is the first release of `MiTo`: robust inference of mitochondrial clones and phylogenies.
 
 ## Documentation
 See ... for a comprehensive description of key functionalitites, main APIs, and tutorials.

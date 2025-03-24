@@ -1,10 +1,8 @@
-# TO DO: All functions: typing.
+# TO DO: assign_matching_colors
 
 from .colors import create_palette, assign_matching_colors, ten_godisnot
 from .plotting_base import (
-    # bar, box, bb_plot, violin, scatter, stem_plot, strip, add_cbar, hist,,
-    add_cbar, format_ax, add_legend, 
-    #add_wilcox, plot_heatmap, rank_plot, packed_circle_plot
+    add_cbar, format_ax, add_legend, set_rcParams
 )
 from .diagnostic_plots import (
     vars_AF_spectrum, MT_coverage_by_gene_polar, MT_coverage_polar, 

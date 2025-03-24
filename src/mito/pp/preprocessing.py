@@ -3,6 +3,7 @@ Pre-process AFMs.
 """
 
 from igraph import Graph
+from typing import Dict, Tuple, Iterable, Any
 from .filters import *
 from .distances import call_genotypes, compute_distances
 from .kNN import *
@@ -26,16 +27,21 @@ def nans_as_zeros(afm):
 ##
 
 
-
-def filter_cells(afm, cell_subset=None, cell_filter='filter1', nmads=5, 
-                mean_cov_all=20, median_cov_target=25, min_perc_covered_sites=.75):
+def filter_cells(
+    afm: AnnData, 
+    cell_subset: Iterable[str] = None, 
+    cell_filter: str = 'filter1', 
+    nmads: int = 5, 
+    mean_cov_all: float = 20, 
+    median_cov_target: int = 25, 
+    min_perc_covered_sites: float = .75
+    ) -> AnnData:
     """
-
-    Filter cells from MAESTER and RedeeM Allele Frequency Matrix (afm).
+    Filter cells from MAESTER/RedeeM Allele Frequency Matrix.
 
     Args:
-        afm (str): AnnData object prepared with mito_utils.make_afm.make_afm() function.
-        cell_subset (list-like, optional): desired subset of cells ro retain.
+        afm (str): Allele Frequency Matrix.
+        cell_subset (Iterable[str], optional. Default: None): subset of cells to retain.
         cell_filter (str, optional): cell filtering strategy.
             1. **'filter1'**: Filter cells based on mean MT-genome coverage (all sites).
             2. **'filter2'**: Filter cells based on median target MT-sites coverage and min % of target sites covered (MAESTER only).
@@ -45,7 +51,7 @@ def filter_cells(afm, cell_subset=None, cell_filter='filter1', nmads=5,
         min_perc_covered_sites (float, optional): minimum fraction of MT target sites covered (only for MAESTER data). Defaults to .75.
 
     Returns:
-        AnnData: Cell-filtered afm
+        AnnData: Filetered Allele Frequency Matrix
     """
 
     if cell_subset is not None: 
@@ -236,118 +242,63 @@ def compute_metrics_filtered(afm, spatial_metrics=True, tree_kwargs={}):
 
 
 def filter_afm(
-    afm, lineage_column=None, min_cell_number=0, cells=None,
-    filtering='MiTo', filter_moransI=True, filtering_kwargs={}, 
-    max_AD_counts=2, variants=None, min_n_var=1, fit_mixtures=False, only_positive_deltaBIC=False, 
-    path_dbSNP=None, path_REDIdb=None, compute_enrichment=False, 
-    bin_method='MiTo', binarization_kwargs={}, metric='weighted_jaccard',
-    ncores=8, spatial_metrics=False, tree_kwargs={}, return_tree=False
+    afm: AnnData, 
+    lineage_column: str = None, 
+    min_cell_number: int = 0, 
+    cells: Iterable[str] = None,
+    filtering: str = 'MiTo', 
+    filtering_kwargs: Dict[str,Any] = {}, 
+    filter_moransI: bool = True, 
+    max_AD_counts: int = 2, 
+    variants: Iterable[str] = None, 
+    min_n_var: int = 1, 
+    fit_mixtures: bool = False, 
+    only_positive_deltaBIC: bool = False, 
+    path_dbSNP: str = None, 
+    path_REDIdb: str = None, 
+    compute_enrichment: bool = False, 
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}, 
+    metric: str = 'weighted_jaccard',
+    ncores: int = 8, 
+    spatial_metrics: bool = False, 
+    tree_kwargs: Dict[str,Any] = {}, 
+    return_tree: bool = False
     ):
     """
-    
     Filter an Allele Frequency Matrix for downstream analysis.
-    This function implements different strategies to subset the detected cells and MT-SNVs to those that exhibit
-    optimal properties for single-cell lineage tracing (scLT). The user can tune filtering method defaults via the `filtering_kwargs` argument. 
-    Pre-computed sets of cells and variants can be selected without relying on any specific method (the function ensures integrity of the AFM `AnnData` object after subsetting).
+    This function implements different strategies to subset the detected cells and MT-SNVs
+    to those that exhibit optimal properties for single-cell lineage tracing (scLT). The user
+    can tune filtering method defaults via the `filtering_kwargs` argument. Pre-computed sets
+    of cells and variants can be selected without relying on any specific method (the function
+    ensures integrity of the AFM `AnnData` object after subsetting).
 
-    Parameters
-    ----------
-    afm : AnnData
-        The AFM to subset. AnnData object with slots as for mito_utils.make_afm.make_afm() preprocessing.
-    lineage_column : str, optional
-        Categorical label used with `min_cell_number` and `compute_enrichment` arguments. Cells from lineages with fewer than `min_cell_number` cells are discarded. Default is `None`.
-    min_cell_number : int, optional
-        Cell filter. Minimum number of cells required for a certain lineage to be included in the final data. Default is `0`.
-    cells : list, optional
-        Pre-computed list of cells to subset. Default is `None`.
-    filtering : str, optional
-        Filtering method to use. Default is `'MiTo'`.
-
-        The following filtering strategies are implemented (tunable filtering kwargs that can be passed with the `filtering_kwargs` argument are highlighted as `{"kwarg": default_value}`):
-
-        1. **'baseline'**: Baseline filter to retain only MT-SNV candidates showing minimal conditions to not be considered technical artifacts or sequencing errors. Filters MT-SNVs with:
-            - Position in MT-gene bodies (`only_genes`: `True`)
-            - Mean site coverage ≥ 5 (`min_site_cov`: `5`)
-            - Mean MT-SNV consensus UMI base sequencing quality ≥ 30 (`min_var_quality`: `30`)
-            - Number of positive cells ≥ 2 (`min_n_positive`: `2`)
-            This filter is applied before every other one to exclude "definitely garbage" MT-SNV candidates.
-
-        2. **'CV'**: Filters the top `n_top` MT-SNVs by Coefficient of Variation (CV). (`n_top`: `100`)
-
-        3. **'miller2022'**: Filter adapted from Miller et al., 2022. Filters MT-SNVs with:
-            - Mean site coverage ≥ 100 (`min_site_cov`: `100`)
-            - Mean MT-SNV consensus UMI base sequencing quality ≥ 30 (`min_var_quality`: `30`)
-            - 1st percentile AF value ≤ 0.01 (`perc_1`: `0.01`)
-            - 99th percentile AF value ≥ 0.1 (`perc_99`: `0.1`)
-
-        4. **'weng2024'**: Filter adapted from Weng et al., 2024 MAESTER data analysis. Filters MT-SNVs with:
-            - Mean site coverage ≥ 5 (`min_site_cov`: `5`)
-            - Mean MT-SNV consensus UMI base sequencing quality ≥ 30 (`min_var_quality`: `30`)
-            - Fraction of negative cells (i.e., 0 ALT UMIs) ≥ 0.9 (`min_frac_negative`: `0.9`)
-            - Number of positive cells ≥ 2 (`min_n_positive`: `2`)
-            - Enough prevalence of minimal detection (`low_confidence_af`: `0.1`, `min_prevalence_low_confidence_af`: `0.1`)
-            - Enough evidence of high-AF detection events (`high_confidence_af`: `0.5`, `min_cells_high_confidence_af`: `2`)
-
-        5. **'MQuad'**: Filter from Kwock et al., 2022.
-
-        6. **'MiTo'**: Default filter, integrating aspects of 'miller2022' and 'weng2024'. Filters MT-SNVs with:
-            - Mean MT-SNV consensus UMI base sequencing quality ≥ 30 (`min_var_quality`: `30`)
-            - Fraction of negative cells >= 0.2 (`min_frac_negative`: `0.2`)
-            - Number of positive cells ≥ 2 (`min_n_positive`: `2`)
-            - Enough evidence of high-AF detection events (`af_confident_detection`: `0.01`, `min_n_confidently_detected`: `2`)
-            - Enough variant allele-supporting molecules across +cells (`min_mean_AD_in_positives` : `1.5`)
-            - Enough coverage across +cells (`min_mean_DP_in_positives` : `25`)
-
-        7. **'GT_enriched'**: Filter with availabe lineage cell annotations (i.e., Ground Truth lentiviral clones.). The AF matrix is binarized, and each variant-lineage enrichment is tested. If a variant is significantly enriched in less than `n_enriched_groups` lineages (assumed independent), is retained.
-            - afm.obs column for lineage annotation ('lineage_column': None)
-            - FDR threshold for Fisher's Exact test ('fdr_treshold' : .1) 
-            - Max number of lineages the MT-SNV can be enriched for ('n_enriched_groups' : 2) 
-            - Binarization strategy ('bin_method' : 'MiTo')
-            - **kwargs for bianrization ('binarization_kwargs' : {})
-    
-    filter_moransI : bool, optional
-        Remove MT-SNVs not spatially autocorrelated. Default is True.
-    filtering_kwargs : dict, optional
-        Keyword arguments for the selected filtering method. Default is `{}`.
-    max_AD_counts : int, optional
-        Site/variant filter. The minimum number of consensus UMIs supporting the MT-SNV ALT allele required for at least one cell across the dataset. Default is `2` (i.e., no filter).
-    af_confident_detection : float, optional
-        Cell filter. The minimum AF threshold at which at least one of the filtered MT-SNVs needs to be detected in a cell to retain the cell in the final dataset. It may be passed as a key-value pair in `filtering_kwargs`. Default is `0.01`.
-    variants : list, optional
-        Pre-computed list of variants to subset. Default is `None`.
-    min_n_var : int, optional
-        N of MT-SNVs variants for a cell to be included in the downstream analysis.
-    spatial_metrics : bool, optional
-        If `True`, compute a list of "spatial" metrics for retained MT-SNVs, including [details missing]. Default is `False`.
-    tree_kwargs : dict, optional
-        Tree building keyword arguments that can be passed to `mito_utils.phylo.build_tree` when `spatial_metrics=True`. Default is `{}`.
-    fit_mixtures : bool, optional
-        If `True`, fit MQuad (Kwock et al., 2022) binomial mixtures and calculate each variant's (passing baseline filters) delta BIC. Default is `False`.
-    only_positive_deltaBIC : bool, optional
-        Site/variant filter. Irrespective of the filtering strategy, retain only variants with positive delta BIC (estimated with MQuad). Default is `False`.  
-    ncores: int, optional
-        n cores to use for distance computations and fit_MQuad mixtures, if necessary. Default: 8
-    path_dbSNP : str, optional
-        Path to a `.txt` tab-separated file with MT-SNVs "COMMON" variants from the dbSNP database. Required fields: `'pos'`, `'ALT'`, `'REF'`. All of these variants will be discarded from the final dataset. Can be found at `<path_main from zenodo folder>/data/MI_TO_bench/miscellanea`. Default is `None`.
-    path_REDIdb : str, optional
-        Path to a `.txt` tab-separated file with common MT-RNA edits from the REDIdb database. Required fields: `'Position'`, `'Ref'`, `'Ed'`, `'nSamples'`. All of these RNA-editing sites will be discarded from the final dataset. Can be found at `<path_main from zenodo folder>/data/MI_TO_bench/miscellanea`. Default is `None`.
-    compute_enrichment : bool, optional
-        If `True`, compute MT-SNV enrichment in individual lineages from `lineage_column`. Default is `False`.
-    bin_method : str, oprional 
-        Binarization strategy used for i) compute the final dataset statistics (i.e., mutation number, connectivity ecc) and ii) lineage enrichment. Default is `MiTo`
-    binarization_kwargs : dict, optional
-        Binarization strategy **kwargs (see mito_utils.distances.call_genotypes). Default is `{}`
-    return_tree : bool, optional
-        Whether to return the tree usen in spatial metrics.
-    k : int, optional
-        k for kNN search. Default: 10
-    metric : str, optional
-        Distance metric for cell-cell similarity computations. Default: jaccard
+    Args
+        afm (AnnData): Allele Frequency Matrix.
+        lineage_column (str, optional. Default: None): lineage column of interest.
+        min_cell_number (int, optional. Default: 0): minimum number of cells required for groups in afm.obs[`lineage_column`]
+        cells (Iterable[str], optional. Default: None): pre-defined list of cells.
+        filtering (str, optional. Default: 'MiTo'): MT-SNVs filtering strategy. See mito.pp.filters for available strategies and parameters.
+        filtering_kwargs (Dict[str,Any], optional. Default: {}): **kwargs for the selected `filtering` method.
+        filter_moransI (bool, optional. Default: True): remove MT-SNVs that are not spatially auto-correlated.
+        max_AD_counts (int, optional. Default: 2): retain MT-SNV if at least one cell has `max_AD_counts` alternative allele counts. 
+        variants (Iterable[str], optional. Default: None): pre-defined list of variants.
+        min_n_var (int, optional. Default: 1): retain cells with at least `min_n_var` MT-SNVs.
+        fit_mixtures (bool, optional. Default: False): fit MQuad (Kwock et al., 2022) binomial mixtures.
+        only_positive_deltaBIC (bool, optional. Default: False): retain only MT-SNVs with positive deltaBIC (from MQuad)
+        path_dbSNP (str, optional. Default: None): path to tab-separated file with "COMMON" MT-SNVs (dbSNP database). See tutorial.
+        path_REDIdb (str, optional. Default: None): path to tab-separated file with common MT-RNA edits (REDIdb database). See tutorial.
+        compute_enrichment (bool, optional. Default: True): compute MT-SNVs enrichment in `lineage_column`
+        bin_method (str, optional. Default: 'MiTo'): genotyping method.
+        binarization_kwargs (Dict[str,Any], optional. Default: {}). genotyping **kwargs.
+        metric (str, optional. Default: 'weighted_jaccard'): distance metric.
+        ncores (int, optional. Default: 1): n cores to use for distance computations and fit_MQuad mixtures, if necessary.
+        spatial_metrics (bool, optional. Default: False): compute "spatial" connectivity metrics for filtered MT-SNVs.
+        tree_kwargs (Dict[str,Any], optional. Default: {}). tree inference (i.e., `mito.tl.build_tree`) **kwargs.
+        return_tree (bool, optional. Default: False): return CassiopeiaTree, if `spatial_metrics` == True
 
     Returns
-    -------
-    afm_filtered : AnnData
-        Filtered Allelic Frequency Matrix.
+        afm (AnnData): Filtered Allelic Frequency Matrix.
     """
 
     logging.info('Compute general dataset metrics...')
@@ -477,8 +428,7 @@ def filter_afm(
     tree = compute_metrics_filtered(
         afm, 
         spatial_metrics=spatial_metrics, 
-        tree_kwargs=tree_kwargs,
-        ncores=ncores
+        tree_kwargs=tree_kwargs
     )
 
     # Add params to .uns

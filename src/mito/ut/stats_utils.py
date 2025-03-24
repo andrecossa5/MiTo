@@ -188,7 +188,14 @@ def get_posteriors(ad, dp):
 ##
 
 
-def genotype_mix(ad, dp, t_prob=.7, t_vanilla=0, debug=False, min_AD=1):
+def genotype_mix(
+    ad: np.array, 
+    dp: np.array, 
+    t_prob: float = .7, 
+    t_vanilla: float = 0, 
+    debug: bool = False, 
+    min_AD: int = 1
+    ) -> np.array:
     """
     Derive a discrete genotype (1:'MUT', 0:'WT') for each cell, given the 
     AD and DP counts of one of its candidate mitochondrial variants.

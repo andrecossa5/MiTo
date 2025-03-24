@@ -39,7 +39,10 @@ def mask_mt_sites(site_list):
 ##
 
 
-def read_from_AD_DP(path_ch_matrix, path_meta=None, sample=None, pp_method=None, cell_col='cell', scLT_system='MAESTER'):
+def read_from_AD_DP(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, cell_col: str ='cell', scLT_system: str = 'MAESTER'
+    ) -> AnnData :
     """
     Create AFM as as AnnData object from a path_ch_matrix folder with AD, DP tables. AD and DP columns must have:
     1) <cell_col> column; 2) <char> column; 3) AD/DP columns, respectively.
@@ -57,8 +60,8 @@ def read_from_AD_DP(path_ch_matrix, path_meta=None, sample=None, pp_method=None,
 
     """
 
-    table = pd.read_csv(os.path.join(path_ch_matrix, 'allele_table.csv.gz'), index_col=0)
-    if path_meta is not None:
+    table = pd.read_csv(path_ch_matrix, index_col=0)
+    if path_meta not in ['null',None]:
         cell_meta = pd.read_csv(path_meta, index_col=0)
     if sample is not None:
         table['cell'] = table['cell'].map(lambda x: f'{x}_{sample}')
@@ -66,7 +69,7 @@ def read_from_AD_DP(path_ch_matrix, path_meta=None, sample=None, pp_method=None,
     AD = table.pivot(index=cell_col, columns='MUT', values='AD').fillna(0)
     DP = table.pivot(index=cell_col, columns='MUT', values='DP').fillna(0)
     
-    if path_meta is not None and os.path.exists(path_meta):
+    if path_meta not in ['null',None] and os.path.exists(path_meta):
         cells = list(set(cell_meta.index) & set(DP.index))
         AD = AD.loc[cells].copy()
         DP = DP.loc[cells].copy()
@@ -95,7 +98,11 @@ def read_from_AD_DP(path_ch_matrix, path_meta=None, sample=None, pp_method=None,
 ##
 
 
-def read_from_cellsnp(path_ch_matrix, path_meta=None, sample=None, pp_method='cellsnp-lite', scLT_system='MAESTER'):
+def read_from_cellsnp(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None,  scLT_system: str = 'MAESTER'
+    ) -> AnnData :
+
     """
     Create AFM as as AnnData object from cellsnp output tables. The path_ch_matrix folder must contain the four default output from cellsnp-lite:
     * 1: 'cellSNP.tag.AD.mtx.gz'
@@ -105,10 +112,10 @@ def read_from_cellsnp(path_ch_matrix, path_meta=None, sample=None, pp_method='ce
     N.B. cell_meta index must be in {CB}_{sample} format.
     """
 
-    path_AD = os.path.join(path_ch_matrix, 'cellSNP.tag.AD.mtx.gz')
-    path_DP = os.path.join(path_ch_matrix, 'cellSNP.tag.DP.mtx.gz')
-    path_vcf = os.path.join(path_ch_matrix, 'cellSNP.base.vcf.gz')
-    path_cells = os.path.join(path_ch_matrix, 'cellSNP.samples.tsv.gz')
+    path_AD = os.path.join(path_ch_matrix, 'cellSNP.tag.AD.mtx')
+    path_DP = os.path.join(path_ch_matrix, 'cellSNP.tag.DP.mtx')
+    path_vcf = os.path.join(path_ch_matrix, 'cellSNP.base.vcf')
+    path_cells = os.path.join(path_ch_matrix, 'cellSNP.samples.tsv')
 
     if sample is not None:
         cells = [ f'{x}_{sample}' for x in pd.read_csv(path_cells, header=None)[0].to_list() ]
@@ -171,13 +178,18 @@ def sparse_from_long(df, covariate, nrow, ncol, cell_order):
 ##
 
 
-def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mito_preprocessing', scLT_system='MAESTER'):
+def read_from_scmito(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, scLT_system: str = 'MAESTER'
+    ) -> AnnData :
+    
     """
     Create AFM as as AnnData object from cellsnp output tables. 
     The path_ch_matrix folder must contain the default output from mito_preprocessing/maegatk:
     * 1: 'A|C|T|G.txt.gz'
     * 2: 'coverage.txt.gz'
     * 3. 'refAllele.txt'
+
     Additional outputs from mito_preprocessing can be used for separate analyses.
     N.B. cell_meta index must be in {CB}_{sample} format. mito_preprocessing and maegatk CBs are
     plain, not in {CB}_{sample} format.
@@ -191,11 +203,16 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     path_C = os.path.join(path_ch_matrix, 'C.txt.gz')
     path_T = os.path.join(path_ch_matrix, 'T.txt.gz')
     path_G = os.path.join(path_ch_matrix, 'G.txt.gz')
-    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')
-    path_refAllele = os.path.join(path_ch_matrix, 'refAllele.txt')
-    ref_allele = pd.read_csv(path_refAllele, header=None)
-    ref = { pos:ref for pos,ref in zip(ref_allele[0], ref_allele[1]) }
+    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')              
 
+    # Get ref dictionary
+    assert 'chrM.fa' in os.listdir()
+    with open('chrM.fa', 'r') as f:
+        _ = f.readlines()
+    seq = ''.join([ x.strip() for x in _[1:] ])
+    ref = { pos+1:ref for pos,ref in enumerate(seq) }
+
+    # Here we go
     L = []
     for base, path_base in zip(['A', 'C', 'T', 'G'], [path_A, path_C, path_T, path_G]):
 
@@ -244,7 +261,7 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
     logging.info(f'Unique variant basecalls: {long.shape[0]}')
  
     # Filter basecalls of annotated cells only (i.e., we have cell metadata)
-    if path_meta is not None:
+    if path_meta not in [None,'null']:
         logging.info(f'Filter for annotated cells (i.e., sample CBs in cell_meta)')
         cell_meta = pd.read_csv(path_meta, index_col=0)
         cells = list(set(cell_meta.index) & set(long['cell'].unique()))
@@ -338,7 +355,10 @@ def read_from_scmito(path_ch_matrix, path_meta=None, sample=None, pp_method='mit
 ##
 
 
-def read_redeem(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='RedeeM'):
+def read_redeem(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, scLT_system: str = 'RedeeM'
+    ) -> AnnData :
     """
     Utility to assemble an AFM from RedeeM (Weng et al., 2024) MT-SNVs data.
     """
@@ -449,7 +469,10 @@ def _add_priors(afm, priors, key='priors'):
 ##
 
 
-def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='Cas9'):
+def read_cas9(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, scLT_system: str = 'Cas9'
+    ) -> AnnData :
     """
     Utility to assemble an AFM from Cas9 (e.g. KP tracer mice data from Yang et al., 2022) data.
     https://www.sc-best-practices.org/trajectories/lineage_tracing.html#
@@ -500,7 +523,10 @@ def read_cas9(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_
 ##
 
 
-def read_scwgs(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT_system='scWGS'):
+def read_scwgs(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, scLT_system: str = 'scWGS'
+    ) -> AnnData :
     """
     Utility to assemble an AFM from scWGS data (Weng et al., 2024) MT-SNVs data.
     """
@@ -534,16 +560,23 @@ def read_scwgs(path_ch_matrix, path_meta=None, sample=None, pp_method=None, scLT
 ##
 
 
-def make_afm(path_ch_matrix, path_meta=None, sample=None, pp_method='maegatk', scLT_system='MAESTER'):
+def make_afm(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = 'maegatk', scLT_system: str = 'MAESTER'
+    ) -> AnnData :
     """
-    Creates an annotated Allele Frequency Matrix from different scLT_system and pre-processing pipelines outputs.
+    Creates an annotated Allele Frequency Matrix from different 
+    scLT_system and pre-processing pipelines outputs.
 
     Args:
         path_ch_matrix (str): Path to folder with necessary data for provided scLT_system.
-        path_meta (str): Path to .csv file with cell meta-data.
-        sample (str, optional): Sample name to append at preprocessed CBs. Default: None.
-        pp_method (str, optional): Preprocessing method (MAESTER data only). Available options: mito_preprocessing, maegatk, cellsnp-lite, freebayes, samtools. Defaults: 'maegatk'.
-        scLT_system (str, optional): scLT system (i.e., marker) used for tracing. Available options: MAESTER, RedeeM, Cas9, scWGS. Default: 'MAESTER'
+        path_meta (str, optional. Default: None): Path to .csv file with cell meta-data.
+        sample (str, optional. Default: None): Sample name to append at preprocessed CBs.
+        pp_method (str, optional. Default: 'maegatk'): Preprocessing method (MAESTER data only). Available options: mito_preprocessing, maegatk, cellsnp-lite, freebayes, samtools.
+        scLT_system (str, optional. Default: 'MAESTER'): scLT system (i.e., marker) used for tracing. Available options: MAESTER, RedeeM, Cas9, scWGS.
+    
+    Returns:
+        afm (AnnData): the assembled Allele Frequency Matrix (AFM)
     """
 
     if os.path.exists(path_ch_matrix):
@@ -558,7 +591,14 @@ def make_afm(path_ch_matrix, path_meta=None, sample=None, pp_method='maegatk', s
             logging.info(f'Pre-processing pipeline used: {pp_method}')
 
             if pp_method in ['samtools', 'freebayes']:
-                afm = read_from_AD_DP(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_from_AD_DP(
+                    path_ch_matrix=path_ch_matrix, 
+                    path_meta=path_meta, 
+                    sample=sample, 
+                    pp_method=pp_method, 
+                    cell_col='cell', 
+                    scLT_system=scLT_system
+                )
             elif pp_method == 'cellsnp-lite':
                 afm = read_from_cellsnp(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif pp_method in ['mito_preprocessing', 'maegatk']:

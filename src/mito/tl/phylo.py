@@ -5,7 +5,10 @@ Phylogenetic inference.
 import logging
 import numpy as np
 import pandas as pd
+from anndata import AnnData
 import cassiopeia as cs
+from typing import Dict, Any
+from cassiopeia.data import CassiopeiaTree
 from ..pp.distances import call_genotypes, compute_distances
 
 
@@ -88,7 +91,11 @@ def get_clades(tree, with_root=True, with_singletons=False):
 ##
 
 
-def AFM_to_seqs(afm, bin_method='MiTo', binarization_kwargs={}):
+def AFM_to_seqs(
+    afm: AnnData, 
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}
+    ) -> Dict[str,str]:
     """
     Convert an AFM to a dictionary of sequences.
     """
@@ -122,7 +129,10 @@ def AFM_to_seqs(afm, bin_method='MiTo', binarization_kwargs={}):
 ##
 
 
-def get_internal_node_feature(tree, feature):
+def get_internal_node_feature(tree: CassiopeiaTree, feature: str) -> np.array:
+    """
+    Extract internal node feature `feature`.
+    """
 
     L = []
     for node in tree.internal_nodes:
@@ -139,9 +149,10 @@ def get_internal_node_feature(tree, feature):
 ##
 
 
-def get_internal_node_stats(tree):
+def get_internal_node_stats(tree: CassiopeiaTree):
     """
-    Get internal nodes supports, time, mut status and clade size
+    Get internal nodes stats (i.e, time, clade_size, support, expansion_pvalue, 
+    fitness scores and average cell similarity).
     """
 
     clades = get_clades(tree)
@@ -166,14 +177,40 @@ def get_internal_node_stats(tree):
 
 
 def build_tree(
-    afm, precomputed=False, distance_key='distances', metric='jaccard', 
-    bin_method='MiTo', solver='UPMGA', ncores=1, min_n_positive_cells=2, filter_muts=False,
-    max_frac_positive=.95, binarization_kwargs={}, solver_kwargs={},
-    ):
+    afm: AnnData, 
+    precomputed: bool = False, 
+    distance_key: str = 'distances', 
+    metric: str = 'weighted_jaccard', 
+    bin_method: str ='MiTo', 
+    solver: str = 'UPMGA', 
+    ncores: int = 1, 
+    min_n_positive_cells: int = 2, 
+    filter_muts: bool = False,
+    max_frac_positive: float = .95, 
+    binarization_kwargs: Dict[str,Any] = {}, 
+    solver_kwargs: Dict[str,Any] = {}, 
+    ) -> CassiopeiaTree:
     """
-    Wrapper around CassiopeiaTree distance-based and maximum parsimony solvers.
-    """
+    Wrapper around cassiopeia lineage solvers. MW Jones et al., 2020.
     
+    Args
+        afm: AnnData, 
+        precomputed: bool = False, 
+        distance_key: str = 'distances', 
+        metric: str = 'weighted_jaccard', 
+        bin_method: str ='MiTo', 
+        solver: str = 'UPMGA', 
+        ncores: int = 1, 
+        min_n_positive_cells: int = 2, 
+        filter_muts: bool = False,
+        max_frac_positive: float = .95, 
+        binarization_kwargs: Dict[str,Any] = {}, 
+        solver_kwargs: Dict[str,Any] = {}, 
+    
+    Returns:
+        tree (CassiopeiaTree): solved single-cell phylogeny
+    """
+
     # Compute (if necessary, cell-cell distances, and retrieve necessary afm .slots)
     if precomputed:
         if distance_key in afm.obsp and precomputed:
@@ -189,7 +226,11 @@ def build_tree(
             afm, distance_key=distance_key, metric=metric, 
             bin_method=bin_method, ncores=ncores, binarization_kwargs=binarization_kwargs
         )
-    M_raw, M, D = _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, max_frac_positive, filter_muts=filter_muts)
+    
+    # Init
+    M_raw, M, D = _initialize_CassiopeiaTree_kwargs(
+        afm, distance_key, min_n_positive_cells, max_frac_positive, filter_muts=filter_muts
+    )
  
     # Solve cell phylogeny
     metric = afm.uns['distance_calculations'][distance_key]['metric']

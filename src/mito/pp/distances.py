@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 import sklearn.preprocessing as pp
+from typing import Dict, Any
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import (
     pairwise_distances, 
@@ -29,10 +30,19 @@ continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 
 ##
 
 
-def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False):
+def genotype_mixtures(
+    AD: np.array, 
+    DP: np.array, 
+    t_prob: float = .75, 
+    t_vanilla: float = .001, 
+    min_AD: int = 2, 
+    debug: bool = False
+    ) -> np.array:
     """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior 
-    probabilities thresholding (Kwock et al., 2022).
+    Single-cell MT-SNVs probabilistic genotyping. 
+    Thresholds the binomial mixtures posterior 
+    probabilities obtained from the model defined in
+    (Kwock et al., 2022).
     """
 
     X = np.zeros(AD.shape)
@@ -52,12 +62,36 @@ def genotype_mixtures(AD, DP, t_prob=.75, t_vanilla=.001, min_AD=2, debug=False)
 ##
 
 
-def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=.1, debug=False):
+def genotype_MiTo(
+    AD: np.array, 
+    DP: np.array, 
+    t_prob: float = .7,
+    t_vanilla: float = 0, 
+    min_AD: int = 1, 
+    min_cell_prevalence: float = .1, 
+    debug: bool = False
+    ) -> np.array:
     """
-    Hybrid genotype calling strategy: if a mutation has prevalence (AD>=min_AD and AF>=t_vanilla) 
-    >= min_cell_prevalence, use probabilistic modeling as in 'bin_mixtures'. Else, use simple 
-    tresholding as in 'vanilla' method.
+    MiTo genotype calling strategy.
+    If a mutation has prevalence (i.e., fraction of positive cells with 
+    AD>=min_AD and AF>=t_vanilla) >= min_cell_prevalence, MiTo uses bin_mixtures
+    probabilistic modeling as in 'bin_mixtures' to assign each cell-variant genotype.
+    Otherwise, each cell mutational status is assigned with simple tresholding, 
+    as in 'vanilla' method.
+
+    Args:
+        AD (np.array): alternative allele (consensus) UMI counts. Cell x variant.
+        DP (np.array): total UMI counts. Cell x variant.
+        t_prob (float, optional. Default: .7): threshold on posterior probabilities.
+        t_vanilla (float, optional. Default: 0): threshold on raw allele frequency.
+        min_AD (int, optional. Default: 1): min number of alternative UMI counts to assign the 'mut' (1) genotype.
+        min_cell_prevalence (float, optional. Default: .1): min cell prevalence to use probabilistic genotyping.
+        debug (bool, optional. Default: False): print additional info for debugging purposes.
+  
+    Returns:
+        X (np.array): binary genotype array.
     """
+
     X = np.zeros(AD.shape)
     n_binom = 0
     
@@ -65,7 +99,10 @@ def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=
         test = (AD[:,idx]/(DP[:,idx]+.0000001)>t_vanilla)
         prevalence = test.sum() / test.size
         if prevalence >= min_cell_prevalence:
-            X[:,idx] = genotype_mix(AD[:,idx], DP[:,idx], t_prob=t_prob, t_vanilla=t_vanilla, min_AD=min_AD, debug=debug)
+            X[:,idx] = genotype_mix(
+                AD[:,idx], DP[:,idx], t_prob=t_prob, 
+                t_vanilla=t_vanilla, min_AD=min_AD, debug=debug
+            )
             n_binom += 1
         else:
             X[:,idx] = np.where(test & (AD[:,idx]>=min_AD), 1, 0)
@@ -79,8 +116,16 @@ def genotype_MiTo(AD, DP, t_prob=.7, t_vanilla=0, min_AD=1, min_cell_prevalence=
 
 
 def genotype_MiTo_smooth(
-    AD, DP, t_prob=.7, t_vanilla=0, min_AD=2, min_cell_prevalence=.05, k=5, 
-    gamma=.25, n_samples=100, resample=False
+    AD: np.array, 
+    DP: np.array, 
+    t_prob: float = .7, 
+    t_vanilla: float = 0, 
+    min_AD: int = 2, 
+    min_cell_prevalence: float = .05, 
+    k: int = 5, 
+    gamma: float = .25, 
+    n_samples: int = 100, 
+    resample: bool = False
     ):
     """
     Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding
@@ -136,7 +181,8 @@ def genotype_MiTo_smooth(
         compute_distances(
             afm_, 
             bin_method='MiTo', 
-            binarization_kwargs={'min_AD':min_AD, 't_vanilla':t_vanilla, 't_prob':t_prob, 'min_cell_prevalence':min_cell_prevalence},
+            binarization_kwargs={'min_AD':min_AD, 't_vanilla':t_vanilla, 
+                                 't_prob':t_prob, 'min_cell_prevalence':min_cell_prevalence},
             verbose=True,
         )
         logging.info(f'Compute kNN graph for smoothing')
@@ -180,10 +226,36 @@ def genotype_MiTo_smooth(
 ##
 
 
-def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2, 
-                   t_prob=.75, min_cell_prevalence=.1, k=5, gamma=.25, n_samples=100, resample=False):
+def call_genotypes(
+    afm: AnnData, 
+    bin_method: str = 'MiTo', 
+    t_vanilla: float = .0, 
+    min_AD: int = 2, 
+    t_prob: float = .75, 
+    min_cell_prevalence: float = .1, 
+    k: int = 5, 
+    gamma: float = .25, 
+    n_samples: int = 100, 
+    resample: bool = False
+    ):
     """
-    Call genotypes using simple thresholding or th MiTo binomial mixtures approachm (w/i or w/o kNN smoothing).
+    Call genotypes. The 'bin' layer is added in-place. 
+    3 strategies implemented:   
+    * 'vanilla': i.e., simple, hard tresholding on raw AF values or number of alternative allele counts
+    * 'MiTo': 'hybrid' MiTo genotype calling strategy (see mito.pp.genotype_MiTo) 
+    * 'MiTo_smooth': 'MiTo', but with kNN smoothing of posterior probability before genotype calling
+
+    Args:
+        afm (Anndata): Allele Frequency Matrix.
+        bin_method (str, optional. Default: 'MiTo'): genotyping strategy.
+        t_prob (float, optional. Default: .7): threshold on posterior probabilities.
+        t_vanilla (float, optional. Default: 0): threshold on raw allele frequencies.
+        min_AD (int, optional. Default: 1): min number of alternative UMI counts to assign the 'mut' (1) genotype.
+        min_cell_prevalence (float, optional. Default: .1): min cell prevalence to use probabilistic genotyping.
+        k (int, optional. Default: 5): n of neighbors for kNN search (if bin_method = 'MiTo_smooth')
+        gamma (float, optional. Default: .25): correction factor weight from neighboring cells (bin_method = 'MiTo_smooth')
+        n_samples (int, optional. Default: 100): n of cell profile replicates (bin_method = 'MiTo_smooth')
+        resample (bool, optional. Default: False): generate in-silico replicates of cell profiles before kNN (bin_method = 'MiTo_smooth')
     """
 
     assert 'AD' in afm.layers 
@@ -197,9 +269,11 @@ def call_genotypes(afm, bin_method='MiTo', t_vanilla=.0, min_AD=2,
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)
     elif bin_method == 'MiTo':
-        X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, min_AD=min_AD, min_cell_prevalence=min_cell_prevalence)
+        X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
+                          min_AD=min_AD, min_cell_prevalence=min_cell_prevalence)
     elif bin_method == 'MiTo_smooth':
-        X = genotype_MiTo_smooth(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, min_AD=min_AD, min_cell_prevalence=min_cell_prevalence, 
+        X = genotype_MiTo_smooth(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
+                                 min_AD=min_AD, min_cell_prevalence=min_cell_prevalence, 
                                  k=k, gamma=gamma, n_samples=n_samples, resample=resample)
     else:
         raise ValueError("""
@@ -331,7 +405,8 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
 
 
 def preprocess_feature_matrix(
-    afm, distance_key='distances', precomputed=False, metric='jaccard', bin_method='MiTo', binarization_kwargs={}, verbose=True
+    afm, distance_key='distances', precomputed=False, metric='jaccard', 
+    bin_method='MiTo', binarization_kwargs={}, verbose=True
     ):
     """
     Preprocess a feature matrix for cell-cell distance computations.
@@ -390,27 +465,31 @@ def preprocess_feature_matrix(
 ##
 
 
-# TO FIX!!!
 def compute_distances(
-    afm, distance_key='distances', metric='weighted_jaccard', precomputed=False,
-    bin_method='MiTo', binarization_kwargs={}, ncores=1, rescale=True, verbose=True
+    afm: AnnData,
+    distance_key: str = 'distances', 
+    metric: str = 'weighted_jaccard', 
+    precomputed: bool = False,
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}, 
+    ncores: int = 1, 
+    rescale: bool = True, 
+    verbose: bool = True
     ):
     """
-    Calculates pairwise cell-cell (or sample-) distances in some character space (e.g., MT-SNVs mutation space).
+    Pairwise cell-cell (or sample-) distance computation in some character space 
+    (e.g., MT-SNVs mutation space). Updates inplace afm.obsp slot.
 
     Args:
-        afm (AnnData): An annotated cell x character matrix with .X slot and bin or scaled layers.
-        distance_key (str, optional): Key in .obsp at which the new distances will be stored. Default: distances.
-        metric ((str, callable), optional): distance metric. Default: 'jaccard'.
-        bin_method (str, optional): method to binarize the provided character matrix, if the chosen metric 
-            involves comparison of discrete character vectors. Default: MiTo.
-        ncores (int, optional): n processors for parallel computation. Default: 8.
-        weights (np.array, optional): numerical weights to use for each MT-SNVs. Default None.
+        afm (AnnData): Allele Fraquency Matrix (.X slot or 'bin' layer present).
+        distance_key (str, optional. Default: 'distances'): key in .obsp at which distances will be stored.
+        metric (str, optional. Default: 'weighted_jaccard'): distance metric.
+        precomputed (bool, optional. Default: False): use precomputed genotypes, or recomputed from from scratch. 
+        bin_method (str, optional. Default: MiTo): Genotyping method.
         binarization_kwargs (dict, optional): **kwargs of the discretization function. Default: {}.
-        verbose (bool, optional): Level of verbosity. Default: True
-
-    Returns:
-        Updates inplace .obsp slot in afm AnnData with key 'distances'.
+        ncores (int, optional. Default: 1): n cores for parallel computation.
+        rescale (bool, optional. Default: True): Min-max rescaling of distance values.
+        verbose (bool, optional. Default: True): Print verbose logging.
     """
     
     # Preprocess afm

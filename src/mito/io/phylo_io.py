@@ -2,7 +2,6 @@
 I/O functions to read/write CassiopeiaTrees from annotated (supports) .newick strigs.
 """
 
-import anndata
 import pandas as pd
 from cassiopeia.data import CassiopeiaTree
 from Bio.Phylo.NewickIO import Parser
@@ -34,9 +33,22 @@ def _add_edges(G, clade, parent=None, counter=[1]):
 ##
 
 
-def read_newick(path, X_raw=None, X_bin=None, D=None, meta=None) -> CassiopeiaTree:
+def read_newick(
+    path, X_raw: pd.DataFrame = None, X_bin: pd.DataFrame = None, 
+    D: pd.DataFrame = None, meta: pd.DataFrame = None
+    ) -> CassiopeiaTree:
     """
-    Read an newick string as a CassiopeiaTree object.
+    Read a newick string as CassiopeiaTree object.
+
+    Args:
+        path (str): Path to newick string.
+        X_raw (pd.Dataframe, optional. Default: None): Raw allelic frequency table. Cell x variants.
+        X_bin (pd.Dataframe, optional. Default: None): Binary (1,0) cell genotypes. Cell x variants.
+        D (pd.Dataframe, optional. Default: None): Cell x cell distance matrix.
+        meta (pd.Dataframe, optional. Default: None): Cell metadata. Cell x covariates.
+    
+    Returns:
+        afm (AnnData): the assembled Allele Frequency Matrix (AFM)
     """
 
     with open(path, 'r') as f:
@@ -129,65 +141,20 @@ def _to_newick_str(g, node):
 ##
 
 
-def write_newick(tree: CassiopeiaTree, path=None):
+def write_newick(tree: CassiopeiaTree, path: str):
     """
-    Write a cassiopeia tree as newick.
+    Write a CassiopeiaTree as a newick string.
+
+    Args:
+        tree (CassiopeiaTree): Tree to write
+        path (str): Path to newick string.
     """
+    
     G = to_DiGraph(tree)
     root = [ node for node in G if G.in_degree(node) == 0 ][0]
     newick = f'{_to_newick_str(G, root)};'
     with open(path, 'w') as f:
         f.write(newick)
-
-
-##
-
-
-def create_from_annot(nodes: pd.DataFrame, edges: pd.DataFrame, afm: anndata.AnnData) -> CassiopeiaTree:
-    """
-    Helper function to reate a CassiopeiaTree from two nodes and edges dfs. 
-    Set nodes and branch attributes from scratch.
-    The nodes df needs to have columns:
-    - node
-    - cell
-    - support
-    - clonal_ancestor
-    - clone
-    - assigned_var
-    - p
-    - af1
-    - af0
-    - p1
-    - p0
-    Repeated nodes (i.e., multiple assigned MT-SNVs) and NaNs are allowed.
-    """
-
-    G = nx.DiGraph()
-
-    # Fix nodes names
-    map_leaves = { k:v for k,v in zip(nodes['node'], nodes['cell']) if isinstance(v, str) }
-    mapping = lambda x: map_leaves[x] if x in map_leaves else x
-    edges['u'] = edges['u'].map(mapping)
-    edges['v'] = edges['v'].map(mapping)
-    nodes['node'] = nodes['node'].map(mapping)
-
-    for node in nodes['node'].unique():
-        attributes = {
-            **nodes.loc[nodes['node']==node].iloc[:,:5].drop_duplicates().iloc[0,:].to_dict(),
-            **{ 'vars' : nodes.loc[nodes['node']==node].iloc[:,5:].reset_index(drop=True).set_index('assigned_var')}
-        }
-        G.add_node(node, **attributes)
-
-    for edge in edges.index:
-        u,v = edges.loc[edge,['u','v']]
-        attributes = edges.drop(columns=['u','v'], inplace=False).loc[edge].to_dict()
-        G.add_edge(u, v, **attributes)
-    
-    cells = afm.obs_names[afm.obs_names.isin(G.nodes)]
-    char_X = pd.DataFrame(afm.X, columns=afm.var_names, index=afm.obs_names).loc[cells]
-    tree = CassiopeiaTree(character_matrix=char_X, tree=G, cell_meta=afm.obs.loc[cells])
-
-    return tree
 
 
 ##

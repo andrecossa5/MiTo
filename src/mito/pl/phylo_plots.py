@@ -2,6 +2,10 @@
 Tree plotting utils.
 """
 
+import logging
+import pandas as pd
+from typing import Iterable, Dict, Any
+from cassiopeia.data import CassiopeiaTree
 from cassiopeia.plotting.local import utilities as ut
 from cassiopeia.plotting.local import *
 from .colors import *
@@ -61,7 +65,6 @@ def _place_tree_and_annotations(
     tree, 
     features=None, 
     characters=None,
-    depth_key=None, 
     orient=90, 
     extend_branches=True, 
     angled_branches=True, 
@@ -86,7 +89,6 @@ def _place_tree_and_annotations(
     # Node and branch coords
     node_coords, branch_coords = ut.place_tree(
         tree,
-        depth_key=depth_key,
         orient=orient,
         extend_branches=extend_branches,
         angled_branches=angled_branches,
@@ -259,25 +261,95 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
 
 
 def plot_tree(
-    tree, ax=None, depth_key=None, orient=90, 
-    extend_branches=True, angled_branches=True, add_root=False, 
-    features=None, categorical_cmaps=None, continuous_cmaps=None, 
-    characters=None, cont_character_cmap='mako', bin_character_cmap=None, layer='raw', 
-    vmin_characters=0, vmax_characters=.05,
-    colorstrip_spacing=.25, colorstrip_width=1.5, 
-    labels=True, label_size=10, label_offset=2,
-    meta_branches=None, cov_branches=None, cmap_branches='Spectral_r',
-    cov_leaves=None, cmap_leaves='tab20', 
-    feature_internal_nodes=None, cmap_internal_nodes='Spectral_r', 
-    vmin_internal_nodes=.2, vmax_internal_nodes=.8,
-    internal_node_labels=False, internal_node_subset=None, internal_node_label_size=7, show_internal=False, 
-    leaves_labels=False, leaf_label_size=5, 
-    colorstrip_kwargs={}, leaf_kwargs={}, internal_node_kwargs={}, branch_kwargs={}, 
-    x_space=1.5
-    ):
+    tree: CassiopeiaTree, 
+    ax: matplotlib.axes.Axes = None, 
+    orient: float|str = 90, 
+    extend_branches: bool = True, 
+    angled_branches: bool = True, 
+    add_root: bool = False, 
+    features: Iterable[str] = None, 
+    categorical_cmaps: Dict[str, str|Dict[str,Any]] = None, 
+    continuous_cmaps: Dict[str, str|Dict[str,Any]] = None, 
+    characters: Iterable[str] = None,  
+    cont_character_cmap: str = 'mako', 
+    bin_character_cmap: Dict[str,Any] = None, 
+    layer: str ='raw', 
+    vmin_characters: float = 0, 
+    vmax_characters: float =.05,
+    colorstrip_spacing: float =.25, 
+    colorstrip_width: float = 1.5, 
+    labels: bool = True, 
+    label_size: float = 10, 
+    label_offset: float = 2,
+    meta_branches: pd.DataFrame = None, 
+    cov_branches: str = None, 
+    cmap_branches: str|Dict[str,Any] = 'Spectral_r',
+    cov_leaves: str = None, 
+    cmap_leaves: str|Dict[str,Any] = 'tab20', 
+    feature_internal_nodes: str = None, 
+    cmap_internal_nodes: str|Dict[str,Any] ='Spectral_r', 
+    vmin_internal_nodes: float = .2, 
+    vmax_internal_nodes: float = .8,
+    internal_node_labels: bool = False, 
+    internal_node_subset: Iterable[str] = None, 
+    internal_node_label_size: float = 7, 
+    show_internal: bool = False, 
+    leaves_labels: bool = False, 
+    leaf_label_size: float = 5, 
+    colorstrip_kwargs: Dict[str,Any] = {}, 
+    leaf_kwargs: Dict[str,Any] = {}, 
+    internal_node_kwargs: Dict[str,Any] = {}, 
+    branch_kwargs: Dict[str,Any] = {}, 
+    x_space: float = 1.5
+    ) -> matplotlib.axes.Axes:
+
     """
     Plotting function that exends capabilities in cs.plotting.local.plot_matplotlib from
-    Cassiopeia, MW Jones.
+    Cassiopeia, MW Jones et al, 2020.
+
+    Args:
+        tree (CassiopeiaTree): tree to plot. 
+        ax (matplotlib.axes.Axes, optional. Default: None): ax object to draw on.
+        orient (float|str, optional. Default: 90): tree layout in polar (90) or cartesian coordinates (e.g., 'down')
+        extend_branches (bool, optional. Default: True): equal length branch from leave to root.
+        angled_branches (bool, optional. Default: True): make branches angled, not round.
+        add_root (bool, optional. Default: False): Add root to tree.
+        features (Iterable[str], optional. Default: None): features in tree.cell_meta to plot.
+        categorical_cmaps (Dict[str, str|Dict[str,Any]], optional. Default: None): dictionary of colors for categorical features.
+        continuous_cmaps (Dict[str, str|Dict[str,Any]], optional. Default: None): dictionary of colors for continuous features.
+        characters (Iterable[str], optional. Default: None): List of characters to plot.
+        cont_character_cmap (str, optional. Default: 'mako'): cmap for characters ('raw' layer).
+        bin_character_cmap (Dict[str,Any], optional. Default: None): colors for binary character states ('transformed' layer).
+        layer (str, optional. Default = 'raw'): layer in tree.layers to plot, if characters is not None. 
+        vmin_characters (float, optional. Default: float = 0): Min value for character colorbar. 
+        vmax_characters (float, optional. Default: float = .05): Max value for character colorbar. 
+        colorstrip_spacing (float, optional. Default: .25): Relative amount of spacing between colorstrips. 
+        colorstrip_width (float, optional. Default: 1.5): Relative colorstrip width. 
+        labels (bool, optional. Default: True): Draw labels for features and characters. 
+        label_size (float, optional. Default: 10): features and character label size.
+        label_offset (float, optional. Default: 2): features and character label offset.
+        meta_branches (pd.DataFrame, optional. Default: None): annotation table for branches. 
+        cov_branches (str, optional. Default: None): branch feature to plot. 
+        cmap_branches (str|Dict[str,Any], optional Default: 'Spectral_r'): cmap for branch feature.
+        cov_leaves (str, optional. Default: None): leaf feature to plot. 
+        cmap_leaves (str|Dict[str,Any], optional Default: 'tab20'): cmap for leaves feature.
+        feature_internal_nodes (str, optional. Default: None): internal node feature to plot. 
+        cmap_internal_nodes: (str|Dict[str,Any], optional Default: 'Spectral_r'): cmap for internal nodes feature.
+        vmin_internal_nodes (float, optional. Default: .2): Min value for internal node feature colobar. 
+        vmax_internal_nodes (float, optional. Default: .8): Max value for internal node feature colobar. 
+        internal_node_labels (bool, optional. Default: False): Draw internal node names on loc. 
+        internal_node_subset (Iterable[str], optional. Default: None): subset of internal nodes to plot. 
+        internal_node_label_size (float, optional. Default: 7): internal node name/label size. 
+        show_internal (bool, optional. Default: False): show internal nodes.
+        leaves_labels (bool, optional. Default: False): plot leaves names.
+        leaf_label_size (float, optional. Default: 5): leave name/label size. 
+        colorstrip_kwargs (Dict[str,Any], optional. Default: {}): additional colorstrip kwargs.
+        leaf_kwargs (Dict[str,Any], optional. Default: {}): additional leaves kwargs.
+        internal_node_kwargs (Dict[str,Any], optional. Default: {}): additional internal nodes kwargs.
+        branch_kwargs (Dict[str,Any], optional. Default: {}): additional branch kwargs.
+
+    Returns:
+        ax (matplotlib.axes.Axes): ax object.
     """
     
     # Set coord and axis
@@ -292,7 +364,6 @@ def plot_tree(
         tree, 
         features=features, 
         characters=characters,
-        depth_key=depth_key, 
         orient=orient, 
         extend_branches=extend_branches, 
         angled_branches=angled_branches, 

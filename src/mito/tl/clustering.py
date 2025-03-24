@@ -11,7 +11,7 @@ import leidenalg
 ##
 
 
-def leiden_clustering(A, res=0.5):
+def leiden_clustering(A: np.array, res: float = 0.5):
     """
     Compute leiden clustering, at some resolution.
     """

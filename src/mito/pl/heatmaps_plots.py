@@ -3,8 +3,16 @@ Utils and plotting functions to visualize (clustered and annotated) cells x vars
 or cells x cells distances/affinity matrices.
 """
 
-from .plotting_base import *
-from .colors import *
+import logging
+import matplotlib
+import pandas as pd
+import scanpy as sc
+import matplotlib.pyplot as plt
+from typing import Dict, Any
+from anndata import AnnData
+from cassiopeia.data import CassiopeiaTree
+from .plotting_base import format_ax, add_cbar, plot_heatmap
+from .colors import create_palette
 from ..tl.phylo import build_tree
 from ..tl.annotate import MiToTreeAnnotator
 
@@ -37,9 +45,26 @@ def _get_muts_order(tree):
 ##
 
 
-def heatmap_distances(afm, tree=None, vmin=.25, vmax=.95, cmap='Spectral', ax=None):
+def heatmap_distances(
+    afm: AnnData, 
+    tree: CassiopeiaTree = None, 
+    vmin: float = .25, vmax: float = .95, 
+    cmap: str = 'Spectral', 
+    ax: matplotlib.axes.Axes = None
+    ) -> matplotlib.axes.Axes:
     """
-    Heatmap cell/cell distances.
+    Heatmap cell/cell pairwise distances.
+
+    Args:
+        afm (AnnData): Allele Frequency Matrix
+        tree (CassiopeiaTree, optional. Default: None): Tree from which cell ordering can be retrieved. 
+        vmin (float, optional. Default: .25): Min value for colobar.
+        vmax (float, optional. Default: .95): Max value for colobar.
+        cmap (str, optional. Default: 'Spectral'): cmap for cell-cell distances.
+        ax (matplotlib.axes.Axes, optional. Default: False): ax object to draw on.
+
+    Returns:
+        ax (matplotlib.axes.Axes): ax object.
     """
 
     if 'distances' not in afm.obsp:
@@ -50,13 +75,13 @@ def heatmap_distances(afm, tree=None, vmin=.25, vmax=.95, cmap='Spectral', ax=No
         tree = build_tree(afm, precomputed=True)
 
     order = _get_leaves_order(tree)
-    ax.imshow(afm[order].obsp['distances'].A, cmap='Spectral')
+    ax.imshow(afm[order].obsp['distances'].A, cmap=cmap)
     format_ax(
         ax=ax, xlabel='Cells', ylabel='Cells', xticks=[], yticks=[],
         xlabel_size=10, ylabel_size=10
     )
     add_cbar(
-        afm.obsp['distances'].A.flatten(), ax=ax, palette='Spectral', 
+        afm.obsp['distances'].A.flatten(), ax=ax, palette=cmap, 
         label='Distance', layout='outside', label_size=10, ticks_size=10,
         vmin=vmin, vmax=vmax
     )
@@ -67,10 +92,35 @@ def heatmap_distances(afm, tree=None, vmin=.25, vmax=.95, cmap='Spectral', ax=No
 ##
 
 
-def heatmap_variants(afm, tree=None, label='Allelic Frequency', annot=None, 
-                     annot_cmap=None, layer=None, ax=None, cmap='mako', vmin=0, vmax=.1):
+def heatmap_variants(
+    afm: AnnData, 
+    tree: CassiopeiaTree = None,  
+    label: str = 'Allelic Frequency', 
+    annot: str = None, 
+    annot_cmap: Dict[str,Any] = None, 
+    layer: str = None, 
+    ax: matplotlib.axes.Axes = None, 
+    cmap: str = 'mako', 
+    vmin: float = 0, 
+    vmax: float = .1
+    ) -> matplotlib.axes.Axes:
     """
     Heatmap cell x variants.
+
+    Args:
+        afm (AnnData): Allele Frequency Matrix
+        tree (CassiopeiaTree, optional. Default: None): Tree from which cell ordering can be retrieved. 
+        label (str, optional. Default: 'Allelic Frequency'): Label for layer colorbar.
+        annot (str, optional. Default: None): afm.obs columns to annotate.
+        annot_cmap (Dict[str,Any], optional. Default: None): color mapping for afm.obs[annot].
+        layer (str, optional. Default: None): layer to plot.
+        ax (matplotlib.axes.Axes, optional. Default: False): ax object to draw on.
+        cmap (str, optional. Default: 'mako'): cmap for layer.
+        vmin (float, optional. Default: .25): Min value for colobar.
+        vmax (float, optional. Default: .95): Max value for colobar.
+
+    Returns:
+        ax (matplotlib.axes.Axes): ax object.
     """
 
     # Order cells and columns

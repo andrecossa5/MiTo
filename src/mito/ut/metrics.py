@@ -5,6 +5,7 @@ Metrics.
 from joblib import cpu_count, parallel_backend, Parallel, delayed
 import numpy as np
 import pandas as pd
+from typing import Dict, Iterable, Tuple, Any
 from scipy.stats import chi2
 from scipy.special import binom
 from sklearn.metrics import (
@@ -13,6 +14,7 @@ from sklearn.metrics import (
 from networkx import shortest_path_length
 from scipy.stats import pearsonr
 from sklearn.metrics.pairwise import pairwise_distances
+from cassiopeia.data import CassiopeiaTree
 from .utils import rescale
 
 
@@ -67,27 +69,23 @@ def kbet_one_chunk(index, batch, null_dist):
 ##
 
 
-def kbet(index, batch, alpha=0.05, only_score=True):
+def kbet(
+    index: np.array, 
+    batch: pd.Series, 
+    alpha: float = 0.05, 
+    only_score: bool = True
+    ) -> Tuple[float, float, float]:
     """
-    Computes the kBET metric to assess batch effects for an index matrix of a KNN graph.
+    Computes the kBET metric (Buttner et al., 2018) to assess batch effects for an index matrix of a KNN graph.
 
-    Parameters
-    ----------
-    index : numpy.ndarray
-        An array of shape (n_cells, n_neighbors) containing the indices of the k nearest neighbors for each cell.
-    batch : pandas.Series
-        A categorical pandas Series of length n_cells indicating the batch for each cell.
-    alpha : float, optional (default : 0.05)
-        The significance level of the test.
-    only_score : bool, optional (default : True)
-        Whether to return only the accept rate or the full kBET results.
+    Args
+        index (np.array): array of shape (n_cells, n_neighbors). kNN indices.
+        batch (pd.Series): discrete-valued annotation (size, n_cells)
+        alpha (float, optional. Default : 0.05) significance level of the ki-squared test.
+        only_score (bool, optional. Default: True): return only the accept rate or the full kBET results.
 
     Returns
-    -------
-    float or tuple of floats
-        If only_score is True, returns the accept rate of the test as a float between 0 and 1.
-        If only_score is False, returns a tuple of three floats: the mean test statistic, the mean p-value, and the
-        accept rate.
+        (stat_mean, pvalue_mean, accept_rate): kBET statistics.
     """
  
     # Compute null batch distribution
@@ -123,13 +121,14 @@ def kbet(index, batch, alpha=0.05, only_score=True):
 ##
 
 
-def NN_entropy(index, labels):
+def NN_entropy(index: np.array, labels: np.array) -> float:
     """
-    Calculate the median (over cells) lentiviral-labels Shannon Entropy, given an index matrix of a KNN graph.
+    Calculate the median (over cells) lentiviral-labels Shannon Entropy,
+    given an index matrix of a KNN graph.
     """
     SH = []
     for i in range(index.shape[0]):
-        freqs = labels[index[i, :]].value_counts(normalize=True).values
+        freqs = labels[index[i,:]].value_counts(normalize=True).values
         SH.append(-np.sum(freqs * np.log(freqs + 0.00001))) # Avoid 0 division
     
     return np.median(SH)
@@ -138,7 +137,7 @@ def NN_entropy(index, labels):
 ##
 
 
-def NN_purity(index, labels):
+def NN_purity(index: np.array, labels: np.array) -> float:
     """
     Calculate the median purity of cells neighborhoods.
     """
@@ -165,9 +164,9 @@ def binom_sum(x, k=2):
 ##
 
 
-def custom_ARI(g1, g2):
+def custom_ARI(g1: Iterable[Any], g2: Iterable[Any]) -> float:
     """
-    Compute scib modified ARI.
+    Compute scIB (Luecken et al., 2022) modified Adjusted Rand Index.
     """
 
     # Contingency table
@@ -187,10 +186,10 @@ def custom_ARI(g1, g2):
 ##
 
 
-def distance_AUPRC(D, labels):
+def distance_AUPRC(D: np.array, labels: Iterable[Any]) -> float:
     """
     Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
-    Reports Area Under Precision Recall Curve.
+    Reports Area Under Precision Recall Curve. Used in Ludwig et al., 2019.
     """
 
     labels = pd.Categorical(labels) 
@@ -224,9 +223,10 @@ def distance_AUPRC(D, labels):
 ##
 
 
-def calculate_corr_distances(tree):
+def calculate_corr_distances(tree: CassiopeiaTree) -> float:
     """
     Calculate correlation between tree and character matrix cell-cell distances. 
+    Used in Yang et al., 2023.
     """
 
     if tree.get_dissimilarity_map() is not None:
@@ -278,7 +278,7 @@ def char_compatibility(tree):
 ##
 
 
-def CI(tree):
+def CI(tree: CassiopeiaTree) -> float:
     """
     Calculate the Consistency Index (CI) of tree characters.
     """
@@ -296,7 +296,7 @@ def CI(tree):
 ##
 
 
-def RI(tree):
+def RI(tree: CassiopeiaTree) -> float:
     """
     Calculate the Consistency Index (RI) of tree characters.
     """

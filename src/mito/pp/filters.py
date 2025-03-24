@@ -38,7 +38,6 @@ filtering_options = [
 ##
 
 
-
 def nans_as_zeros(afm):
     """
     Fill nans with zeros.
@@ -52,25 +51,44 @@ def nans_as_zeros(afm):
 ##
 
 
-def filter_cells_with_at_least_one(a, bin_method='vanilla', binarization_kwargs={}):
+def filter_cells_with_at_least_one(
+    afm: AnnData, 
+    bin_method: str = 'vanilla', 
+    binarization_kwargs: Dict[str,Any] = {}
+    ) -> AnnData:
+    """
+    Filter cells with at least one variant (genotypes from `bin_method`).
 
-    X = call_genotypes(a=a, bin_method=bin_method, **binarization_kwargs)
-    a = a[a.obs_names[X.sum(axis=1)>=1],:]
-    a.uns['per_position_coverage'] = a.uns['per_position_coverage'].loc[a.obs_names,:]
-    a.uns['per_position_quality'] = a.uns['per_position_quality'].loc[a.obs_names,:]
+    Args:
+        afm (AnnData): Allele Frequency Matrix.
+        bin_method (str, optional. Default: 'vanilla'): genotyping method.
+        binarization_kwargs (Dict[str, Any], optional. Default: {}): genotyping method kwargs.
 
-    return a
+    Returns:
+        AnnData: filtered Allele Frequency Matrix
+    """
+    X = call_genotypes(a=afm.copy(), bin_method=bin_method, **binarization_kwargs)
+    afm = afm[afm.obs_names[X.sum(axis=1)>=1],:]
+    afm.uns['per_position_coverage'] = afm.uns['per_position_coverage'].loc[afm.obs_names,:]
+    afm.uns['per_position_quality'] = afm.uns['per_position_quality'].loc[afm.obs_names,:]
+
+    return afm
 
 
 ##
 
 
-def filter_cell_clones(afm, column='GBC', min_cell_number=10):
+def filter_cell_clones(
+    afm: AnnData, 
+    column: str = 'GBC', 
+    min_cell_number: int = 10
+    ) -> AnnData:
     """
-    Filter only cells from afm.obs.<column> categories with >= min_cell_number cells.
+    Filter only cells from groups in afm.obs[`column`] with more 
+    than `min_cell_number` cells.
     """
     
-    logging.info(f'Filtering cells from clones with >={min_cell_number} cells')
+    logging.info(f'Filtering cells from {column} groups with >={min_cell_number} cells')
     
     n0 = afm.shape[0]
     cell_counts = afm.obs.groupby(column).size()
@@ -87,7 +105,7 @@ def filter_cell_clones(afm, column='GBC', min_cell_number=10):
 ##
 
 
-def annotate_vars(afm, overwrite=False):
+def annotate_vars(afm: AnnData, overwrite: bool = False):
     """
     Annotate MT-SNVs properties as in in Weng et al., 2024, and Miller et al. 2022 before.
     Create vars_df and update .var.
@@ -143,13 +161,18 @@ def annotate_vars(afm, overwrite=False):
     )
 
 
-
 ##
 
 
-def filter_baseline(afm, min_site_cov=5, min_var_quality=30, min_n_positive=2, only_genes=True):
+def filter_baseline(
+    afm: AnnData, 
+    min_site_cov: int = 5, 
+    min_var_quality: int = 30, 
+    min_n_positive: int = 2, 
+    only_genes: bool = True
+    ) -> AnnData:
     """
-    Compute summary stats and filter baseline MT-SNVs (MAESTER, redeem).
+    Compute summary stats and baseline filter MT-SNVs (MAESTER, redeem).
     """
 
     if afm.uns['scLT_system'] == 'MAESTER':
@@ -194,9 +217,9 @@ def filter_baseline(afm, min_site_cov=5, min_var_quality=30, min_n_positive=2, o
 ##
 
 
-def filter_CV(afm, n_top=1000):
+def filter_CV(afm: AnnData, n_top: int = 1000) -> AnnData:
     """
-    Filter MT-SNVs (MAESTER, redeem) based on their coefficient of variation (CV).
+    Filter top `n_top` MT-SNVs (MAESTER, redeem), ranked by coefficient of variation (CV).
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -217,7 +240,15 @@ def filter_CV(afm, n_top=1000):
 ##
 
 
-def filter_miller2022(afm, min_site_cov=100, min_var_quality=30, p1=1, p2=99, perc1=0.01, perc2=0.1): 
+def filter_miller2022(
+    afm: AnnData, 
+    min_site_cov: float = 100, 
+    min_var_quality: float = 30, 
+    p1: int = 1, 
+    p2: int = 99, 
+    perc1: float = 0.01, 
+    perc2: float = 0.1
+    ) -> AnnData: 
     """
     Filter MT-SNVs (MAESTER only) based on adaptive tresholds adopted in Miller et al., 2022.
     """
@@ -268,9 +299,29 @@ def fit_MQuad_mixtures(afm, n_top=None, path_=None, ncores=8, minDP=10, minAD=1,
 ##
 
 
-def filter_MQuad(afm, ncores=8, minDP=5, minAD=1, minCell=2, path_=None, n_top=None):
+def filter_MQuad(
+    afm: AnnData, 
+    ncores: int = 8, 
+    minDP: int = 5, 
+    minAD: int = 1,
+    minCell: int = 2, 
+    path_: str = None, 
+    n_top: int = None
+    ) -> AnnData:
     """
-    Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
+    Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022).
+
+    Args:
+        afm: AnnData, 
+        ncores: int = 8, 
+        minDP: int = 5, 
+        minAD: int = 1,
+        minCell: int = 2, 
+        path_: str = None, 
+        n_top: int = None
+
+    Returns:
+        afm (AnnData): filtered Allele Frequency Matrix
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -304,18 +355,28 @@ def filter_MQuad(afm, ncores=8, minDP=5, minAD=1, minCell=2, path_=None, n_top=N
 
 
 def filter_weng2024(
-    afm, 
-    min_site_cov=5, 
-    min_var_quality=30, 
-    min_frac_negative=.9,
-    min_n_positive=2,
-    low_confidence_af=.1, 
-    high_confidence_af=.5, 
-    min_prevalence_low_confidence_af=.1, 
-    min_cells_high_confidence_af=2,
-    ):
+    afm: AnnData, 
+    min_site_cov: float = 5, 
+    min_var_quality: float = 30, 
+    min_frac_negative: float = .9,
+    min_n_positive: int = 2,
+    low_confidence_af: float = .1, 
+    high_confidence_af: float = .5, 
+    min_prevalence_low_confidence_af: float = .1, 
+    min_cells_high_confidence_af: int = 2
+    ) -> AnnData:
     """
     Filter MT-SNVs (MAESTER only) as in in Weng et al., 2024, and Miller et al. 2022 before.
+    Filter variants with:
+    * At least `min_site_cov` mean site coverage (across cells)
+    * At least `min_var_quality` mean variant allele basecall quality (across cells)
+    * At least n cells * `min_frac_negative` negative cells 
+    * At least `min_n_positive` (AF>0) cells
+    * At least `min_prevalence_low_confidence_af` prevalence at AF less than `low_confidence_af`
+    * At least than `min_cells_high_confidence_af` cells with AF major than `high_confidence_af`
+
+    Returns:
+        afm (AnnData): filtered Allele Frequency Matrix
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -379,18 +440,28 @@ def filter_weng2024(
 
 
 def filter_MiTo(
-    afm, 
-    min_cov=10,
-    min_var_quality=30,
-    min_frac_negative=0.2,
-    min_n_positive=5,
-    af_confident_detection=.01,
-    min_n_confidently_detected=2,
-    min_mean_AD_in_positives=1.5,
-    min_mean_DP_in_positives=25
-    ):
+    afm: AnnData, 
+    min_cov: float = 10,
+    min_var_quality: float = 30,
+    min_frac_negative: float = 0.2,
+    min_n_positive: int = 5,
+    af_confident_detection: float = .01,
+    min_n_confidently_detected: int = 2,
+    min_mean_AD_in_positives: float = 1.5,
+    min_mean_DP_in_positives: float = 25
+    ) -> AnnData:
     """
-    MiTo custom filter. Can be used for both MAESTER and redeem MT-SNVs.
+    MiTo custom filter. Filter variants with:
+    * At least `min_cov` mean site coverage (across cells)
+    * At least `min_var_quality` mean variant allele basecall quality (across cells)
+    * At least n cells * `min_frac_negative` negative cells 
+    * At least `min_n_positive` (AF>0) cells
+    * At least `min_n_confidently_detected` in which the variant has been detected with AF major than `af_confident_detection`
+    * At least `min_mean_AD_in_positives` mean AD in positive cells
+    * At least `min_mean_AD_in_positives` mean DP in positive cells
+
+    Returns:
+        afm (AnnData): filtered Allele Frequency Matrix
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -436,9 +507,28 @@ def filter_MiTo(
 ##
 
 
-def compute_lineage_biases(afm, lineage_column, target_lineage, bin_method='MiTo', binarization_kwargs={}, alpha=.05):
+def compute_lineage_biases(
+    afm: AnnData, 
+    lineage_column: str, 
+    target_lineage: str, 
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}, 
+    alpha: float = .05
+    ) -> pd.DataFrame:
     """
-    Compute -log10(FDR) Fisher's exact test: lineage biases of some mutation.
+    Compute MT-SNVs enrichment scores for some lineage category (i.e., 
+    -log10(FDR) Fisher's exact test). 
+
+    Args:
+        afm (AnnData): Allele Frequency Matrix.
+        lineage_column (str): field in afm.obs. The 'lineage' categorical variable.
+        target_lineage (str): the category in afm.obs[lineage_column] tested for MT-SNV enrichment. 
+        bin_method (str, optional. Default: 'MiTo'): genotyping method. 
+        binarization_kwargs (Dict[str,Any], optional. Default: {}): genotyping **kwargs. 
+        alpha (float, optional. Default: .05): family-wise error rate for pvalue correction.
+
+    Returns:
+        results (pd.DataFrame): computed stats.
     """
 
     if lineage_column not in afm.obs.columns:
@@ -499,12 +589,29 @@ def compute_lineage_biases(afm, lineage_column, target_lineage, bin_method='MiTo
 ##
 
 
-def filter_GT_enriched(afm, lineage_column=None, fdr_treshold=.1, n_enriched_groups=2, 
-                       bin_method='MiTo', binarization_kwargs={}):
-
+def filter_GT_enriched(
+    afm: AnnData, 
+    lineage_column: str = None, 
+    fdr_treshold: float = .1,
+    n_enriched_groups: int = 2, 
+    bin_method: str = 'MiTo', 
+    binarization_kwargs: Dict[str,Any] = {}
+    ) -> AnnData:
     """
-    Given an afm matrix with a <cov> columns in .obs wich correspond to 
-    ground truth clones, filter cells and vars.
+    Filter an Allele Frequency Matrix for MT-SNVs that are significantly enriched in 
+    some `lineage_column` category.
+
+    Args:
+        afm (AnnData): Allele Frequency Matrix.
+        lineage_column (str): field in afm.obs. The 'lineage' categorical variable.
+        fdr_treshold (float, optional. Default: .01): FDR significance threshold.
+        n_enriched_groups (int, optional. Default: 2): max number of lineages into which a MT-SNVs can be enriched.
+        bin_method (str, optional. Default: 'MiTo'): genotyping method. 
+        binarization_kwargs (Dict[str,Any], optional. Default: {}): genotyping **kwargs. 
+        alpha (float, optional. Default: .05): family-wise error rate for pvalue correction.
+
+    Returns:
+        results (pd.DataFrame): computed stats.
     """
 
     if lineage_column is not None and lineage_column in afm.obs.columns:
@@ -535,6 +642,9 @@ def filter_GT_enriched(afm, lineage_column=None, fdr_treshold=.1, n_enriched_gro
 
 
 def moran_I(W, x, num_permutations=1000):
+    """
+    Calculate normalized Moran's I statistics and permutation-based pvalue.
+    """
 
     W = W / W.sum()
     x_stdzd = (x-np.mean(x)) / np.std(x,ddof=0)
@@ -554,9 +664,14 @@ def moran_I(W, x, num_permutations=1000):
 ##
 
 
-def filter_variant_moransI(afm, num_permutations=100, pval_treshold=.01):
+def filter_variant_moransI(
+    afm: AnnData, 
+    num_permutations: int = 100, 
+    pval_treshold: float =.01
+    ) -> AnnData:
+
     """
-    Filter MT-SNVs if not significantnly auto-correlated.
+    Filter MT-SNVs if not significantly auto-correlated.
     """
     
     assert 'distances' in afm.obsp

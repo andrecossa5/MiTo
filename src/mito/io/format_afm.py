@@ -591,7 +591,14 @@ def make_afm(
             logging.info(f'Pre-processing pipeline used: {pp_method}')
 
             if pp_method in ['samtools', 'freebayes']:
-                afm = read_from_AD_DP(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_from_AD_DP(
+                    path_ch_matrix=path_ch_matrix, 
+                    path_meta=path_meta, 
+                    sample=sample, 
+                    pp_method=pp_method, 
+                    cell_col='cell', 
+                    scLT_system=scLT_system
+                )
             elif pp_method == 'cellsnp-lite':
                 afm = read_from_cellsnp(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif pp_method in ['mito_preprocessing', 'maegatk']:

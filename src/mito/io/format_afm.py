@@ -60,7 +60,7 @@ def read_from_AD_DP(
 
     """
 
-    table = pd.read_csv(os.path.join(path_ch_matrix, 'allele_table.csv.gz'), index_col=0)
+    table = pd.read_csv(path_ch_matrix, index_col=0)
     if path_meta is not None:
         cell_meta = pd.read_csv(path_meta, index_col=0)
     if sample is not None:

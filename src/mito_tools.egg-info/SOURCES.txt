@@ -2,17 +2,7 @@ LICENSE
 README.md
 setup.cfg
 setup.py
-src/MiTo.egg-info/PKG-INFO
-src/MiTo.egg-info/SOURCES.txt
-src/MiTo.egg-info/dependency_links.txt
-src/MiTo.egg-info/requires.txt
-src/MiTo.egg-info/top_level.txt
 src/mito/__init__.py
-src/mito.egg-info/PKG-INFO
-src/mito.egg-info/SOURCES.txt
-src/mito.egg-info/dependency_links.txt
-src/mito.egg-info/requires.txt
-src/mito.egg-info/top_level.txt
 src/mito/io/__init__.py
 src/mito/io/format_afm.py
 src/mito/io/phylo_io.py
@@ -41,3 +31,8 @@ src/mito/ut/metrics.py
 src/mito/ut/positions.py
 src/mito/ut/stats_utils.py
 src/mito/ut/utils.py
+src/mito_tools.egg-info/PKG-INFO
+src/mito_tools.egg-info/SOURCES.txt
+src/mito_tools.egg-info/dependency_links.txt
+src/mito_tools.egg-info/requires.txt
+src/mito_tools.egg-info/top_level.txt

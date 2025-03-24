@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="mito",
+    name="mito-utils",
     version="0.0.1",
     author="Your Name",
     author_email="your.email@example.com",

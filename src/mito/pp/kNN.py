@@ -73,7 +73,7 @@ def get_idx_from_simmetric_matrix(X, k=15):
 
 
 def kNN_graph(
-    X: np.array, 
+    X: np.array = None, 
     D: np.array = None,
     k: int = 10, 
     from_distances: bool = False, 

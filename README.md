@@ -13,10 +13,11 @@ A preliminary documentation of key functionalitites and APIs is available at [Mi
 mamba env create -f ./envs/environment.yml -n MiTo
 ```
 
-3. Activate the environment:
+3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
 
 ```bash
 mamba activate MiTo
+pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
 ```
 
 4. Install `MiTo`:
@@ -33,4 +34,3 @@ import mito as mt
 
 ## Releases
 See [CHANGELOG.md](CHANGELOG.md) for a history of notable changes.
-

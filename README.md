@@ -3,7 +3,7 @@ This is the first release of `MiTo`: a python package for robust inference of mi
 See also [nf-MiTo](https://github.com/andrecossa5/nf-MiTo), the companion Nextflow pipeline.
 
 ## Documentation
-A preliminary documentation of key functionalitites and APIs is available at [MiTo Docs](https://<your-docs-link>.readthedocs.io/).
+A preliminary documentation of key functionalitites and APIs is available at [MiTo Docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
 
 ## Installation
 1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)
@@ -34,4 +34,3 @@ import mito as mt
 
 ## Releases
 See [CHANGELOG.md](CHANGELOG.md) for a history of notable changes.
-

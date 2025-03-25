@@ -128,18 +128,29 @@ def reduce_dimensions(
     ):
     """
     Dimensionality reduction for an Allele Frequency Matrix.
-    
-    Args:
-        afm (AnnData): Allele Frequency Matrix.
-        layer (str, optional, Default: 'bin'): layer to use.
-        distance_key (str, optional. Default: 'distances'): afm.obsp key to append distances.
-        seed (int, optional. Default: 1234): random seed.
-        method (str, optional. Default: 'UMAP'): dimensionality reduction method.
-        k (int, optional. Defaults: k=10): n of neighbors to use for kNN search.
-        n_comps (int, optional. Default: 2): number of dimension of the output embedding. Defaults to 2.
-        metric (str, optional. Default to 'weightde_jaccard'): dissimilarity metric to use.
-        bin_method (str, optional. Default to 'MiTo'): genotyping method.
-        binarization_kwargs (Dict[str,Any], optional. Default: {}): kwargs for binarization.
+
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    layer : str, optional
+        Layer to use. Default is "bin".
+    distance_key : str, optional
+        afm.obsp key to append distances. Default is "distances".
+    seed : int, optional
+        Random seed. Default is 1234.
+    method : str, optional
+        Dimensionality reduction method. Default is "UMAP".
+    k : int, optional
+        Number of neighbors to use for kNN search. Default is 10.
+    n_comps : int, optional
+        Number of dimensions of the output embedding. Default is 2.
+    metric : str, optional
+        Dissimilarity metric to use. Default is "weightde_jaccard".
+    bin_method : str, optional
+        Genotyping method. Default is "MiTo".
+    binarization_kwargs : dict, optional
+        Keyword arguments for binarization. Default is {}.
     """
 
     kwargs = dict(metric=metric, bin_method=bin_method, ncores=ncores, binarization_kwargs=binarization_kwargs)

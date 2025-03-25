@@ -55,16 +55,25 @@ def heatmap_distances(
     """
     Heatmap cell/cell pairwise distances.
 
-    Args:
-        afm (AnnData): Allele Frequency Matrix
-        tree (CassiopeiaTree, optional. Default: None): Tree from which cell ordering can be retrieved. 
-        vmin (float, optional. Default: .25): Min value for colobar.
-        vmax (float, optional. Default: .95): Max value for colobar.
-        cmap (str, optional. Default: 'Spectral'): cmap for cell-cell distances.
-        ax (matplotlib.axes.Axes, optional. Default: False): ax object to draw on.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    tree : CassiopeiaTree, optional
+        Tree from which cell ordering can be retrieved. Default is None.
+    vmin : float, optional
+        Minimum value for the colorbar. Default is 0.25.
+    vmax : float, optional
+        Maximum value for the colorbar. Default is 0.95.
+    cmap : str, optional
+        Color map for cell-cell distances. Default is "Spectral".
+    ax : matplotlib.axes.Axes, optional
+        Axes object to draw on. Default is False.
 
-    Returns:
-        ax (matplotlib.axes.Axes): ax object.
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        Axes object.
     """
 
     if 'distances' not in afm.obsp:
@@ -107,20 +116,33 @@ def heatmap_variants(
     """
     Heatmap cell x variants.
 
-    Args:
-        afm (AnnData): Allele Frequency Matrix
-        tree (CassiopeiaTree, optional. Default: None): Tree from which cell ordering can be retrieved. 
-        label (str, optional. Default: 'Allelic Frequency'): Label for layer colorbar.
-        annot (str, optional. Default: None): afm.obs columns to annotate.
-        annot_cmap (Dict[str,Any], optional. Default: None): color mapping for afm.obs[annot].
-        layer (str, optional. Default: None): layer to plot.
-        ax (matplotlib.axes.Axes, optional. Default: False): ax object to draw on.
-        cmap (str, optional. Default: 'mako'): cmap for layer.
-        vmin (float, optional. Default: .25): Min value for colobar.
-        vmax (float, optional. Default: .95): Max value for colobar.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    tree : CassiopeiaTree, optional
+        Tree from which cell ordering can be retrieved. Default is None.
+    label : str, optional
+        Label for layer colorbar. Default is "Allelic Frequency".
+    annot : str, optional
+        afm.obs column to annotate. Default is None.
+    annot_cmap : dict, optional
+        Color mapping for afm.obs[annot]. Default is None.
+    layer : str, optional
+        Layer to plot. Default is None.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to draw on. Default is False.
+    cmap : str, optional
+        Color map for layer. Default is "mako".
+    vmin : float, optional
+        Minimum value for the colorbar. Default is 0.25.
+    vmax : float, optional
+        Maximum value for the colorbar. Default is 0.95.
 
-    Returns:
-        ax (matplotlib.axes.Axes): ax object.
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        Axes object.
     """
 
     # Order cells and columns

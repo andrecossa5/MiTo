@@ -192,23 +192,38 @@ def build_tree(
     ) -> CassiopeiaTree:
     """
     Wrapper around cassiopeia lineage solvers. MW Jones et al., 2020.
-    
-    Args
-        afm: AnnData, 
-        precomputed: bool = False, 
-        distance_key: str = 'distances', 
-        metric: str = 'weighted_jaccard', 
-        bin_method: str ='MiTo', 
-        solver: str = 'UPMGA', 
-        ncores: int = 1, 
-        min_n_positive_cells: int = 2, 
-        filter_muts: bool = False,
-        max_frac_positive: float = .95, 
-        binarization_kwargs: Dict[str,Any] = {}, 
-        solver_kwargs: Dict[str,Any] = {}, 
-    
-    Returns:
-        tree (CassiopeiaTree): solved single-cell phylogeny
+
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    precomputed : bool, optional
+        Whether to use precomputed data. Default is False.
+    distance_key : str, optional
+        Key in afm.obsp where distances are stored. Default is "distances".
+    metric : str, optional
+        Distance metric to use. Default is "weighted_jaccard".
+    bin_method : str, optional
+        Genotyping method. Default is "MiTo".
+    solver : str, optional
+        Lineage solver to use. Default is "UPMGA".
+    ncores : int, optional
+        Number of cores to use for computation. Default is 1.
+    min_n_positive_cells : int, optional
+        Minimum number of positive cells required. Default is 2.
+    filter_muts : bool, optional
+        Whether to filter mutations. Default is False.
+    max_frac_positive : float, optional
+        Maximum fraction of positive cells allowed. Default is 0.95.
+    binarization_kwargs : dict, optional
+        Additional keyword arguments for genotyping. Default is {}.
+    solver_kwargs : dict, optional
+        Additional keyword arguments for the solver. Default is {}.
+
+    Returns
+    -------
+    CassiopeiaTree
+        Solved single-cell phylogeny.
     """
 
     # Compute (if necessary, cell-cell distances, and retrieve necessary afm .slots)

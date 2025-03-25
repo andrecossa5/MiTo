@@ -82,15 +82,26 @@ def kNN_graph(
     """
     kNN graph computation.
 
-    Args:
-        X (np.array): feature matrix (obs x features).
-        D (np.array, optional. Default: None): Pairwise distance matrix.
-        k (int, optional, Default: 10): n neighbors.
-        from_distances (bool, optional. Default=False): starts from precomputed distances.
-        nn_kwargs (Dict[str,Any], optional): kNN search **kwargs.
+    Parameters
+    ----------
+    X : np.array
+        Feature matrix (observations x features).
+    D : np.array, optional
+        Pairwise distance matrix. Default is None.
+    k : int, optional
+        Number of neighbors. Default is 10.
+    from_distances : bool, optional
+        Whether to start from precomputed distances. Default is False.
+    nn_kwargs : dict, optional
+        Additional keyword arguments for kNN search.
 
-    Returns:
-        Tuple[np.array,csr_matrix,csr_matrix]: _description_
+    Returns
+    -------
+    tuple of (np.array, csr_matrix, csr_matrix)
+        A tuple containing:
+        - A numpy array of shape (n_samples, k) with the indices of the k-nearest neighbors.
+        - A csr_matrix representing the connectivity matrix of the kNN graph.
+        - A csr_matrix representing the distances corresponding to the kNN graph.
     """
 
     if from_distances:

@@ -58,14 +58,6 @@ def filter_cells_with_at_least_one(
     ) -> AnnData:
     """
     Filter cells with at least one variant (genotypes from `bin_method`).
-
-    Args:
-        afm (AnnData): Allele Frequency Matrix.
-        bin_method (str, optional. Default: 'vanilla'): genotyping method.
-        binarization_kwargs (Dict[str, Any], optional. Default: {}): genotyping method kwargs.
-
-    Returns:
-        AnnData: filtered Allele Frequency Matrix
     """
     X = call_genotypes(a=afm.copy(), bin_method=bin_method, **binarization_kwargs)
     afm = afm[afm.obs_names[X.sum(axis=1)>=1],:]
@@ -311,17 +303,27 @@ def filter_MQuad(
     """
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022).
 
-    Args:
-        afm: AnnData, 
-        ncores: int = 8, 
-        minDP: int = 5, 
-        minAD: int = 1,
-        minCell: int = 2, 
-        path_: str = None, 
-        n_top: int = None
+    Parameters
+    ----------
+    afm : AnnData
+        The Allele Frequency Matrix.
+    ncores : int, optional
+        Number of cores to use for computation. Default is 8.
+    minDP : int, optional
+        Minimum depth (DP) required. Default is 5.
+    minAD : int, optional
+        Minimum alternative allele (AD) count required. Default is 1.
+    minCell : int, optional
+        Minimum number of cells required. Default is 2.
+    path_ : str, optional
+        Path for saving output or intermediate results. Default is None.
+    n_top : int, optional
+        Number of top MT-SNVs to select. Default is None.
 
-    Returns:
-        afm (AnnData): filtered Allele Frequency Matrix
+    Returns
+    -------
+    afm : AnnData
+        Filtered Allele Frequency Matrix.
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -366,17 +368,41 @@ def filter_weng2024(
     min_cells_high_confidence_af: int = 2
     ) -> AnnData:
     """
-    Filter MT-SNVs (MAESTER only) as in in Weng et al., 2024, and Miller et al. 2022 before.
-    Filter variants with:
-    * At least `min_site_cov` mean site coverage (across cells)
-    * At least `min_var_quality` mean variant allele basecall quality (across cells)
-    * At least n cells * `min_frac_negative` negative cells 
-    * At least `min_n_positive` (AF>0) cells
-    * At least `min_prevalence_low_confidence_af` prevalence at AF less than `low_confidence_af`
-    * At least than `min_cells_high_confidence_af` cells with AF major than `high_confidence_af`
+    Filter MT-SNVs (MAESTER only) as in Weng et al., 2024, and Miller et al. 2022.
 
-    Returns:
-        afm (AnnData): filtered Allele Frequency Matrix
+    Filters variants using the following criteria:
+    - At least `min_site_cov` mean site coverage (across cells)
+    - At least `min_var_quality` mean variant allele basecall quality (across cells)
+    - At least n cells * `min_frac_negative` negative cells 
+    - At least `min_n_positive` (AF > 0) cells
+    - At least `min_prevalence_low_confidence_af` prevalence at AF less than `low_confidence_af`
+    - At least `min_cells_high_confidence_af` cells with AF greater than `high_confidence_af`
+
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    min_site_cov : float
+        Minimum mean site coverage across cells.
+    min_var_quality : float
+        Minimum mean variant allele basecall quality across cells.
+    min_frac_negative : float
+        Fraction of cells that must be negative.
+    min_n_positive : int
+        Minimum number of cells with AF > 0.
+    min_prevalence_low_confidence_af : float
+        Minimum prevalence (fraction of cells) with AF less than low_confidence_af.
+    low_confidence_af : float
+        Threshold for low confidence allele frequency.
+    min_cells_high_confidence_af : int
+        Minimum number of cells required with AF greater than high_confidence_af.
+    high_confidence_af : float
+        Threshold for high confidence allele frequency.
+
+    Returns
+    -------
+    afm : AnnData
+        Filtered Allele Frequency Matrix.
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -452,16 +478,40 @@ def filter_MiTo(
     ) -> AnnData:
     """
     MiTo custom filter. Filter variants with:
-    * At least `min_cov` mean site coverage (across cells)
-    * At least `min_var_quality` mean variant allele basecall quality (across cells)
-    * At least n cells * `min_frac_negative` negative cells 
-    * At least `min_n_positive` (AF>0) cells
-    * At least `min_n_confidently_detected` in which the variant has been detected with AF major than `af_confident_detection`
-    * At least `min_mean_AD_in_positives` mean AD in positive cells
-    * At least `min_mean_AD_in_positives` mean DP in positive cells
+    - At least `min_cov` mean site coverage (across cells)
+    - At least `min_var_quality` mean variant allele basecall quality (across cells)
+    - At least n cells * `min_frac_negative` negative cells 
+    - At least `min_n_positive` (AF > 0) cells
+    - At least `min_n_confidently_detected` cells in which the variant has been detected with AF greater than `af_confident_detection`
+    - At least `min_mean_AD_in_positives` mean AD in positive cells
+    - At least `min_mean_DP_in_positives` mean DP in positive cells
 
-    Returns:
-        afm (AnnData): filtered Allele Frequency Matrix
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    min_cov : float
+        Minimum mean site coverage (across cells).
+    min_var_quality : float
+        Minimum mean variant allele basecall quality (across cells).
+    min_frac_negative : float
+        Minimum fraction of negative cells (expressed as a fraction of total cells).
+    min_n_positive : int
+        Minimum number of cells with AF > 0.
+    min_n_confidently_detected : int
+        Minimum number of cells in which the variant has been detected with an AF greater than
+        `af_confident_detection`.
+    af_confident_detection : float
+        Allele frequency threshold for confident detection.
+    min_mean_AD_in_positives : float
+        Minimum mean alternative allele count (AD) in positive cells.
+    min_mean_DP_in_positives : float
+        Minimum mean total UMI counts (DP) in positive cells.
+
+    Returns
+    -------
+    afm : AnnData
+        Filtered Allele Frequency Matrix.
     """
 
     scLT_system = afm.uns['scLT_system']
@@ -516,19 +566,27 @@ def compute_lineage_biases(
     alpha: float = .05
     ) -> pd.DataFrame:
     """
-    Compute MT-SNVs enrichment scores for some lineage category (i.e., 
-    -log10(FDR) Fisher's exact test). 
+    Compute MT-SNVs enrichment scores for a given lineage category using Fisher's exact test.
 
-    Args:
-        afm (AnnData): Allele Frequency Matrix.
-        lineage_column (str): field in afm.obs. The 'lineage' categorical variable.
-        target_lineage (str): the category in afm.obs[lineage_column] tested for MT-SNV enrichment. 
-        bin_method (str, optional. Default: 'MiTo'): genotyping method. 
-        binarization_kwargs (Dict[str,Any], optional. Default: {}): genotyping **kwargs. 
-        alpha (float, optional. Default: .05): family-wise error rate for pvalue correction.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    lineage_column : str
+        Field in afm.obs containing the 'lineage' categorical variable.
+    target_lineage : str
+        The category in afm.obs[lineage_column] to test for MT-SNV enrichment.
+    bin_method : str, optional
+        Genotyping method. Default is "MiTo".
+    binarization_kwargs : dict, optional
+        Additional keyword arguments for genotyping. Default is {}.
+    alpha : float, optional
+        Family-wise error rate for p-value correction. Default is 0.05.
 
-    Returns:
-        results (pd.DataFrame): computed stats.
+    Returns
+    -------
+    results : pd.DataFrame
+        DataFrame containing computed statistics (e.g., -log10(FDR) from Fisher's exact test).
     """
 
     if lineage_column not in afm.obs.columns:
@@ -598,20 +656,28 @@ def filter_GT_enriched(
     binarization_kwargs: Dict[str,Any] = {}
     ) -> AnnData:
     """
-    Filter an Allele Frequency Matrix for MT-SNVs that are significantly enriched in 
-    some `lineage_column` category.
+    Compute MT-SNVs enrichment scores for a given lineage category using 
+    -log10(FDR) from Fisher's exact test.
 
-    Args:
-        afm (AnnData): Allele Frequency Matrix.
-        lineage_column (str): field in afm.obs. The 'lineage' categorical variable.
-        fdr_treshold (float, optional. Default: .01): FDR significance threshold.
-        n_enriched_groups (int, optional. Default: 2): max number of lineages into which a MT-SNVs can be enriched.
-        bin_method (str, optional. Default: 'MiTo'): genotyping method. 
-        binarization_kwargs (Dict[str,Any], optional. Default: {}): genotyping **kwargs. 
-        alpha (float, optional. Default: .05): family-wise error rate for pvalue correction.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    lineage_column : str
+        Field in afm.obs that contains the 'lineage' categorical variable.
+    target_lineage : str
+        The category in afm.obs[lineage_column] to test for MT-SNV enrichment.
+    bin_method : str, optional
+        Genotyping method. Default is "MiTo".
+    binarization_kwargs : dict, optional
+        Additional keyword arguments for genotyping. Default is {}.
+    alpha : float, optional
+        Family-wise error rate for p-value correction. Default is 0.05.
 
-    Returns:
-        results (pd.DataFrame): computed stats.
+    Returns
+    -------
+    results : pd.DataFrame
+        Computed statistics.
     """
 
     if lineage_column is not None and lineage_column in afm.obs.columns:

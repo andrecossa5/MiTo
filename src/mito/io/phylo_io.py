@@ -40,15 +40,23 @@ def read_newick(
     """
     Read a newick string as CassiopeiaTree object.
 
-    Args:
-        path (str): Path to newick string.
-        X_raw (pd.Dataframe, optional. Default: None): Raw allelic frequency table. Cell x variants.
-        X_bin (pd.Dataframe, optional. Default: None): Binary (1,0) cell genotypes. Cell x variants.
-        D (pd.Dataframe, optional. Default: None): Cell x cell distance matrix.
-        meta (pd.Dataframe, optional. Default: None): Cell metadata. Cell x covariates.
-    
-    Returns:
-        afm (AnnData): the assembled Allele Frequency Matrix (AFM)
+    Parameters
+    ----------
+    path : str
+        Path to newick string.
+    X_raw : pd.DataFrame, optional
+        Raw allelic frequency table. Cell x variants. Default is None.
+    X_bin : pd.DataFrame, optional
+        Binary (1,0) cell genotypes. Cell x variants. Default is None.
+    D : pd.DataFrame, optional
+        Cell x cell distance matrix. Default is None.
+    meta : pd.DataFrame, optional
+        Cell metadata. Cell x covariates. Default is None.
+
+    Returns
+    -------
+    afm : AnnData
+        The assembled Allele Frequency Matrix (AFM).
     """
 
     with open(path, 'r') as f:
@@ -145,9 +153,12 @@ def write_newick(tree: CassiopeiaTree, path: str):
     """
     Write a CassiopeiaTree as a newick string.
 
-    Args:
-        tree (CassiopeiaTree): Tree to write
-        path (str): Path to newick string.
+    Parameters
+    ----------
+    tree : CassiopeiaTree
+        Tree to write.
+    path : str
+        Path to newick string.
     """
     
     G = to_DiGraph(tree)

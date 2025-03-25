@@ -37,21 +37,32 @@ def filter_cells(
     min_perc_covered_sites: float = .75
     ) -> AnnData:
     """
-    Filter cells from MAESTER/RedeeM Allele Frequency Matrix.
+    Filter cells from a MAESTER/RedeeM Allele Frequency Matrix.
 
-    Args:
-        afm (str): Allele Frequency Matrix.
-        cell_subset (Iterable[str], optional. Default: None): subset of cells to retain.
-        cell_filter (str, optional): cell filtering strategy.
-            1. **'filter1'**: Filter cells based on mean MT-genome coverage (all sites).
-            2. **'filter2'**: Filter cells based on median target MT-sites coverage and min % of target sites covered (MAESTER only).
-        nmads (int, optional): n Minimum Absolute Deviations to filter cells with high MT-library UMI counts. Defaults to 5.
-        mean_coverage (int, optional): minimum mean consensus (at least 3-supporting-reads) UMI coverage across MT-genome, per cell. Defaults to 20.
-        median_cov_target (int, optional): minimum median UMI coverage at target MT-sites (only for MAESTER data). Defaults to 25.
-        min_perc_covered_sites (float, optional): minimum fraction of MT target sites covered (only for MAESTER data). Defaults to .75.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    cell_subset : Iterable[str], optional
+        Subset of cells to retain. Default is None.
+    cell_filter : str, optional
+        Cell filtering strategy. Options are:
+        - "filter1": Filter cells based on mean MT-genome coverage (all sites).
+        - "filter2": Filter cells based on median target MT-sites coverage and minimum percentage of target sites covered (MAESTER only).
+        Default is None.
+    nmads : int, optional
+        Number of Minimum Absolute Deviations to filter cells with high MT-library UMI counts. Default is 5.
+    mean_coverage : int, optional
+        Minimum mean consensus (at least 3-supporting-reads) UMI coverage across the MT-genome per cell. Default is 20.
+    median_cov_target : int, optional
+        Minimum median UMI coverage at target MT-sites (only for MAESTER data). Default is 25.
+    min_perc_covered_sites : float, optional
+        Minimum fraction of MT target sites covered (only for MAESTER data). Default is 0.75.
 
-    Returns:
-        AnnData: Filetered Allele Frequency Matrix
+    Returns
+    -------
+    AnnData
+        Filtered Allele Frequency Matrix.
     """
 
     if cell_subset is not None: 
@@ -267,38 +278,69 @@ def filter_afm(
     ):
     """
     Filter an Allele Frequency Matrix for downstream analysis.
+
     This function implements different strategies to subset the detected cells and MT-SNVs
     to those that exhibit optimal properties for single-cell lineage tracing (scLT). The user
     can tune filtering method defaults via the `filtering_kwargs` argument. Pre-computed sets
     of cells and variants can be selected without relying on any specific method (the function
     ensures integrity of the AFM `AnnData` object after subsetting).
 
-    Args
-        afm (AnnData): Allele Frequency Matrix.
-        lineage_column (str, optional. Default: None): lineage column of interest.
-        min_cell_number (int, optional. Default: 0): minimum number of cells required for groups in afm.obs[`lineage_column`]
-        cells (Iterable[str], optional. Default: None): pre-defined list of cells.
-        filtering (str, optional. Default: 'MiTo'): MT-SNVs filtering strategy. See mito.pp.filters for available strategies and parameters.
-        filtering_kwargs (Dict[str,Any], optional. Default: {}): **kwargs for the selected `filtering` method.
-        filter_moransI (bool, optional. Default: True): remove MT-SNVs that are not spatially auto-correlated.
-        max_AD_counts (int, optional. Default: 2): retain MT-SNV if at least one cell has `max_AD_counts` alternative allele counts. 
-        variants (Iterable[str], optional. Default: None): pre-defined list of variants.
-        min_n_var (int, optional. Default: 1): retain cells with at least `min_n_var` MT-SNVs.
-        fit_mixtures (bool, optional. Default: False): fit MQuad (Kwock et al., 2022) binomial mixtures.
-        only_positive_deltaBIC (bool, optional. Default: False): retain only MT-SNVs with positive deltaBIC (from MQuad)
-        path_dbSNP (str, optional. Default: None): path to tab-separated file with "COMMON" MT-SNVs (dbSNP database). See tutorial.
-        path_REDIdb (str, optional. Default: None): path to tab-separated file with common MT-RNA edits (REDIdb database). See tutorial.
-        compute_enrichment (bool, optional. Default: True): compute MT-SNVs enrichment in `lineage_column`
-        bin_method (str, optional. Default: 'MiTo'): genotyping method.
-        binarization_kwargs (Dict[str,Any], optional. Default: {}). genotyping **kwargs.
-        metric (str, optional. Default: 'weighted_jaccard'): distance metric.
-        ncores (int, optional. Default: 1): n cores to use for distance computations and fit_MQuad mixtures, if necessary.
-        spatial_metrics (bool, optional. Default: False): compute "spatial" connectivity metrics for filtered MT-SNVs.
-        tree_kwargs (Dict[str,Any], optional. Default: {}). tree inference (i.e., `mito.tl.build_tree`) **kwargs.
-        return_tree (bool, optional. Default: False): return CassiopeiaTree, if `spatial_metrics` == True
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix.
+    lineage_column : str, optional
+        Lineage column of interest in afm.obs. Default is None.
+    min_cell_number : int, optional
+        Minimum number of cells required for groups in afm.obs[lineage_column]. Default is 0.
+    cells : Iterable[str], optional
+        Pre-defined list of cells to retain. Default is None.
+    filtering : str, optional
+        MT-SNVs filtering strategy. See mito.pp.filters for available strategies and parameters.
+        Default is "MiTo".
+    filtering_kwargs : dict, optional
+        Additional keyword arguments for the selected filtering method. Default is {}.
+    filter_moransI : bool, optional
+        Whether to remove MT-SNVs that are not spatially auto-correlated. Default is True.
+    max_AD_counts : int, optional
+        Retain an MT-SNV if at least one cell has this number of alternative allele counts.
+        Default is 2.
+    variants : Iterable[str], optional
+        Pre-defined list of variants to retain. Default is None.
+    min_n_var : int, optional
+        Retain cells with at least this number of MT-SNVs. Default is 1.
+    fit_mixtures : bool, optional
+        Whether to fit MQuad (Kwock et al., 2022) binomial mixtures. Default is False.
+    only_positive_deltaBIC : bool, optional
+        Retain only MT-SNVs with positive deltaBIC (from MQuad). Default is False.
+    path_dbSNP : str, optional
+        Path to a tab-separated file with "COMMON" MT-SNVs (dbSNP database). See tutorial.
+        Default is None.
+    path_REDIdb : str, optional
+        Path to a tab-separated file with common MT-RNA edits (REDIdb database). See tutorial.
+        Default is None.
+    compute_enrichment : bool, optional
+        Whether to compute MT-SNVs enrichment in the lineage_column. Default is True.
+    bin_method : str, optional
+        Genotyping method. Default is "MiTo".
+    binarization_kwargs : dict, optional
+        Additional keyword arguments for genotyping. Default is {}.
+    metric : str, optional
+        Distance metric to use. Default is "weighted_jaccard".
+    ncores : int, optional
+        Number of cores to use for distance computations and fitting MQuad mixtures, if necessary.
+        Default is 1.
+    spatial_metrics : bool, optional
+        Whether to compute "spatial" connectivity metrics for filtered MT-SNVs. Default is False.
+    tree_kwargs : dict, optional
+        Additional keyword arguments for tree inference (i.e., mito.tl.build_tree). Default is {}.
+    return_tree : bool, optional
+        Whether to return a CassiopeiaTree if spatial_metrics is True. Default is False.
 
     Returns
-        afm (AnnData): Filtered Allelic Frequency Matrix.
+    -------
+    AnnData
+        Filtered Allelic Frequency Matrix.
     """
 
     logging.info('Compute general dataset metrics...')

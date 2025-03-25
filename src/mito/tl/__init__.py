@@ -6,3 +6,8 @@ from .phylo import (
     build_tree, AFM_to_seqs, get_clades, 
     get_internal_node_stats, get_internal_node_feature
 )
+
+__all__ = [
+    "compute_clonal_fate_bias", "compute_scPlasticity", "MiToTreeAnnotator",
+    "build_tree", "bootstrap_MiTo", "get_internal_node_stats"
+]

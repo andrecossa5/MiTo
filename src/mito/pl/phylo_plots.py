@@ -302,54 +302,95 @@ def plot_tree(
     branch_kwargs: Dict[str,Any] = {}, 
     x_space: float = 1.5
     ) -> matplotlib.axes.Axes:
-
     """
-    Plotting function that exends capabilities in cs.plotting.local.plot_matplotlib from
+    Plotting function that extends capabilities in cs.plotting.local.plot_matplotlib from
     Cassiopeia, MW Jones et al, 2020.
 
-    Args:
-        tree (CassiopeiaTree): tree to plot. 
-        ax (matplotlib.axes.Axes, optional. Default: None): ax object to draw on.
-        orient (float|str, optional. Default: 90): tree layout in polar (90) or cartesian coordinates (e.g., 'down')
-        extend_branches (bool, optional. Default: True): equal length branch from leave to root.
-        angled_branches (bool, optional. Default: True): make branches angled, not round.
-        add_root (bool, optional. Default: False): Add root to tree.
-        features (Iterable[str], optional. Default: None): features in tree.cell_meta to plot.
-        categorical_cmaps (Dict[str, str|Dict[str,Any]], optional. Default: None): dictionary of colors for categorical features.
-        continuous_cmaps (Dict[str, str|Dict[str,Any]], optional. Default: None): dictionary of colors for continuous features.
-        characters (Iterable[str], optional. Default: None): List of characters to plot.
-        cont_character_cmap (str, optional. Default: 'mako'): cmap for characters ('raw' layer).
-        bin_character_cmap (Dict[str,Any], optional. Default: None): colors for binary character states ('transformed' layer).
-        layer (str, optional. Default = 'raw'): layer in tree.layers to plot, if characters is not None. 
-        vmin_characters (float, optional. Default: float = 0): Min value for character colorbar. 
-        vmax_characters (float, optional. Default: float = .05): Max value for character colorbar. 
-        colorstrip_spacing (float, optional. Default: .25): Relative amount of spacing between colorstrips. 
-        colorstrip_width (float, optional. Default: 1.5): Relative colorstrip width. 
-        labels (bool, optional. Default: True): Draw labels for features and characters. 
-        label_size (float, optional. Default: 10): features and character label size.
-        label_offset (float, optional. Default: 2): features and character label offset.
-        meta_branches (pd.DataFrame, optional. Default: None): annotation table for branches. 
-        cov_branches (str, optional. Default: None): branch feature to plot. 
-        cmap_branches (str|Dict[str,Any], optional Default: 'Spectral_r'): cmap for branch feature.
-        cov_leaves (str, optional. Default: None): leaf feature to plot. 
-        cmap_leaves (str|Dict[str,Any], optional Default: 'tab20'): cmap for leaves feature.
-        feature_internal_nodes (str, optional. Default: None): internal node feature to plot. 
-        cmap_internal_nodes: (str|Dict[str,Any], optional Default: 'Spectral_r'): cmap for internal nodes feature.
-        vmin_internal_nodes (float, optional. Default: .2): Min value for internal node feature colobar. 
-        vmax_internal_nodes (float, optional. Default: .8): Max value for internal node feature colobar. 
-        internal_node_labels (bool, optional. Default: False): Draw internal node names on loc. 
-        internal_node_subset (Iterable[str], optional. Default: None): subset of internal nodes to plot. 
-        internal_node_label_size (float, optional. Default: 7): internal node name/label size. 
-        show_internal (bool, optional. Default: False): show internal nodes.
-        leaves_labels (bool, optional. Default: False): plot leaves names.
-        leaf_label_size (float, optional. Default: 5): leave name/label size. 
-        colorstrip_kwargs (Dict[str,Any], optional. Default: {}): additional colorstrip kwargs.
-        leaf_kwargs (Dict[str,Any], optional. Default: {}): additional leaves kwargs.
-        internal_node_kwargs (Dict[str,Any], optional. Default: {}): additional internal nodes kwargs.
-        branch_kwargs (Dict[str,Any], optional. Default: {}): additional branch kwargs.
+    Parameters
+    ----------
+    tree : CassiopeiaTree
+        Tree to plot.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to draw on. Default is None.
+    orient : float or str, optional
+        Tree layout in polar (90) or cartesian coordinates (e.g., "down"). Default is 90.
+    extend_branches : bool, optional
+        Equal length branch from leaf to root. Default is True.
+    angled_branches : bool, optional
+        Make branches angled, not round. Default is True.
+    add_root : bool, optional
+        Add root to tree. Default is False.
+    features : Iterable[str], optional
+        Features in tree.cell_meta to plot. Default is None.
+    categorical_cmaps : dict of {str: str or dict}, optional
+        Dictionary of colors for categorical features. Default is None.
+    continuous_cmaps : dict of {str: str or dict}, optional
+        Dictionary of colors for continuous features. Default is None.
+    characters : Iterable[str], optional
+        List of characters to plot. Default is None.
+    cont_character_cmap : str, optional
+        Color map for characters ("raw" layer). Default is "mako".
+    bin_character_cmap : dict, optional
+        Colors for binary character states ("transformed" layer). Default is None.
+    layer : str, optional
+        Layer in tree.layers to plot, if characters is not None. Default is "raw".
+    vmin_characters : float, optional
+        Minimum value for character colorbar. Default is 0.
+    vmax_characters : float, optional
+        Maximum value for character colorbar. Default is 0.05.
+    colorstrip_spacing : float, optional
+        Relative amount of spacing between colorstrips. Default is 0.25.
+    colorstrip_width : float, optional
+        Relative colorstrip width. Default is 1.5.
+    labels : bool, optional
+        Draw labels for features and characters. Default is True.
+    label_size : float, optional
+        Features and character label size. Default is 10.
+    label_offset : float, optional
+        Features and character label offset. Default is 2.
+    meta_branches : pd.DataFrame, optional
+        Annotation table for branches. Default is None.
+    cov_branches : str, optional
+        Branch feature to plot. Default is None.
+    cmap_branches : str or dict, optional
+        Color map for branch feature. Default is "Spectral_r".
+    cov_leaves : str, optional
+        Leaf feature to plot. Default is None.
+    cmap_leaves : str or dict, optional
+        Color map for leaves feature. Default is "tab20".
+    feature_internal_nodes : str, optional
+        Internal node feature to plot. Default is None.
+    cmap_internal_nodes : str or dict, optional
+        Color map for internal nodes feature. Default is "Spectral_r".
+    vmin_internal_nodes : float, optional
+        Minimum value for internal node feature colorbar. Default is 0.2.
+    vmax_internal_nodes : float, optional
+        Maximum value for internal node feature colorbar. Default is 0.8.
+    internal_node_labels : bool, optional
+        Draw internal node names on location. Default is False.
+    internal_node_subset : Iterable[str], optional
+        Subset of internal nodes to plot. Default is None.
+    internal_node_label_size : float, optional
+        Internal node name/label size. Default is 7.
+    show_internal : bool, optional
+        Show internal nodes. Default is False.
+    leaves_labels : bool, optional
+        Plot leaves names. Default is False.
+    leaf_label_size : float, optional
+        Leaf name/label size. Default is 5.
+    colorstrip_kwargs : dict, optional
+        Additional colorstrip keyword arguments. Default is {}.
+    leaf_kwargs : dict, optional
+        Additional leaves keyword arguments. Default is {}.
+    internal_node_kwargs : dict, optional
+        Additional internal nodes keyword arguments. Default is {}.
+    branch_kwargs : dict, optional
+        Additional branch keyword arguments. Default is {}.
 
-    Returns:
-        ax (matplotlib.axes.Axes): ax object.
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        Axes object.
     """
     
     # Set coord and axis

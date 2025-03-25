@@ -1,0 +1,389 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mito.ut.stats_utils &mdash; MiTo 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../../../about.html" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mito.ut.stats_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mito.ut.stats_utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Discretization module.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">stats</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">minimize</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">logsumexp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bbmix.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixtureBinomial</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_binom</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">logratio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">BIC</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fit a binomial distribution to ad, dp counts using MLE.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">p_mle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ad</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dp</span><span class="p">)</span>
+    <span class="n">ad_th</span> <span class="o">=</span> <span class="n">dp</span> <span class="o">*</span> <span class="n">p_mle</span> 
+
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">logratio</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">binom</span><span class="o">.</span><span class="n">logpmf</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">dp</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">p_mle</span><span class="p">))</span>
+        <span class="n">log_likelihood_saturated</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">([</span> <span class="n">stats</span><span class="o">.</span><span class="n">binom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">k</span><span class="o">/</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span><span class="n">ad</span><span class="p">)</span> <span class="p">]))</span>
+        <span class="n">G2_stat</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_likelihood_saturated</span> <span class="o">-</span> <span class="n">log_likelihood</span><span class="p">)</span>
+        <span class="n">G2_p_value</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">G2_stat</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_stat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_stat</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_p_value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_p_value</span>
+    <span class="k">elif</span> <span class="n">BIC</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">binom</span><span class="o">.</span><span class="n">logpmf</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">dp</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">p_mle</span><span class="p">))</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;BIC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">log_likelihood</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;L&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">log_likelihood</span>
+    
+    <span class="k">return</span> <span class="n">ad_th</span><span class="p">,</span> <span class="n">d</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_nbinom</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">logratio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">BIC</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fit a negative-binomial distribution to ad, dp counts using MLE.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_negbinom_log_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">ad</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Negative log-likelihood function for the negative binomial distribution.</span>
+<span class="sd">        params: list of [r, p], where r is the number of failures and p is the probability of success.</span>
+<span class="sd">        ad: observed allele depths.</span>
+<span class="sd">        dp: observed depths.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="k">if</span> <span class="n">r</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span> 
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">nbinom</span><span class="o">.</span><span class="n">logpmf</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">r</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">p</span><span class="p">))</span>
+        <span class="k">return</span> <span class="o">-</span><span class="n">log_likelihood</span>
+
+    <span class="n">mean_ad</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">var_ad</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">var</span><span class="p">()</span>
+    <span class="n">p_initial</span> <span class="o">=</span> <span class="n">mean_ad</span> <span class="o">/</span> <span class="n">var_ad</span> <span class="k">if</span> <span class="n">var_ad</span> <span class="o">&gt;</span> <span class="n">mean_ad</span> <span class="k">else</span> <span class="mf">0.5</span>
+    <span class="n">r_initial</span> <span class="o">=</span> <span class="n">mean_ad</span> <span class="o">*</span> <span class="p">(</span><span class="n">mean_ad</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_ad</span> <span class="o">-</span> <span class="n">mean_ad</span><span class="p">))</span> <span class="k">if</span> <span class="n">var_ad</span> <span class="o">&gt;</span> <span class="n">mean_ad</span> <span class="k">else</span> <span class="mi">1</span>
+
+    <span class="n">bounds</span> <span class="o">=</span> <span class="p">[(</span><span class="mf">1e-5</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="p">(</span><span class="mf">1e-5</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-5</span><span class="p">)]</span>  <span class="c1"># r &gt; 0 and 0 &lt; p &lt; 1</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="n">_negbinom_log_likelihood</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="p">[</span><span class="n">r_initial</span><span class="p">,</span> <span class="n">p_initial</span><span class="p">],</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">ad</span><span class="p">),</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">)</span>
+    <span class="n">r_mle</span><span class="p">,</span> <span class="n">p_mle</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">ad_th</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">nbinom</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">r_mle</span><span class="p">,</span> <span class="n">p_mle</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">logratio</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="o">-</span><span class="n">_negbinom_log_likelihood</span><span class="p">([</span><span class="n">r_mle</span><span class="p">,</span> <span class="n">p_mle</span><span class="p">],</span> <span class="n">ad</span><span class="p">)</span>
+        <span class="n">log_likelihood_saturated</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">([</span><span class="n">stats</span><span class="o">.</span><span class="n">nbinom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">r_mle</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="o">+</span><span class="mf">.0000001</span><span class="p">)</span><span class="o">/</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span> <span class="n">ad</span><span class="p">)]))</span>
+        <span class="n">G2_stat</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_likelihood_saturated</span> <span class="o">-</span> <span class="n">log_likelihood</span><span class="p">)</span>
+        <span class="n">G2_p_value</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">G2_stat</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_stat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_stat</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_p_value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_p_value</span>
+    <span class="k">elif</span> <span class="n">BIC</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="o">-</span><span class="n">_negbinom_log_likelihood</span><span class="p">([</span><span class="n">r_mle</span><span class="p">,</span> <span class="n">p_mle</span><span class="p">],</span> <span class="n">ad</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;BIC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">log_likelihood</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;L&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">log_likelihood</span>
+    
+    <span class="k">return</span> <span class="n">ad_th</span><span class="p">,</span> <span class="n">d</span>
+    
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_betabinom</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">logratio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">BIC</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_betabinom_log_likelihood</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Negative log-likelihood function for the Beta-Binomial distribution.</span>
+<span class="sd">        params: list of [alpha, beta], where alpha and beta are the parameters of the Beta distribution.</span>
+<span class="sd">        ad: observed allele depths (number of successes).</span>
+<span class="sd">        dp: observed depths (total trials).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="k">if</span> <span class="n">alpha</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">beta</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">betabinom</span><span class="o">.</span><span class="n">logpmf</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">))</span>
+        <span class="k">return</span> <span class="o">-</span><span class="n">log_likelihood</span>
+
+    <span class="c1"># Initial guess for alpha and beta</span>
+    <span class="n">mean_ad</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">var_ad</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">var</span><span class="p">()</span>
+    <span class="n">p_initial</span> <span class="o">=</span> <span class="n">mean_ad</span> <span class="o">/</span> <span class="n">dp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">alpha_initial</span> <span class="o">=</span> <span class="n">p_initial</span> <span class="o">*</span> <span class="p">((</span><span class="n">p_initial</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_initial</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_ad</span> <span class="o">/</span> <span class="n">dp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">beta_initial</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_initial</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">p_initial</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_initial</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_ad</span> <span class="o">/</span> <span class="n">dp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">alpha_initial</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">alpha_initial</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">)</span>
+    <span class="n">beta_initial</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">beta_initial</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">)</span>
+
+    <span class="n">bounds</span> <span class="o">=</span> <span class="p">[(</span><span class="mf">1e-5</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="p">(</span><span class="mf">1e-5</span><span class="p">,</span> <span class="kc">None</span><span class="p">)]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="n">_betabinom_log_likelihood</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="p">[</span><span class="n">alpha_initial</span><span class="p">,</span> <span class="n">beta_initial</span><span class="p">],</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">),</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">)</span>
+    <span class="n">alpha_mle</span><span class="p">,</span> <span class="n">beta_mle</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">ad_th</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">betabinom</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">dp</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">alpha_mle</span><span class="p">,</span> <span class="n">beta_mle</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">logratio</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="o">-</span><span class="n">_betabinom_log_likelihood</span><span class="p">([</span><span class="n">alpha_mle</span><span class="p">,</span> <span class="n">beta_mle</span><span class="p">],</span> <span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">)</span>
+        <span class="n">log_likelihood_saturated</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">([</span><span class="n">stats</span><span class="o">.</span><span class="n">betabinom</span><span class="o">.</span><span class="n">pmf</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">alpha_mle</span><span class="p">,</span> <span class="n">beta_mle</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span> <span class="n">ad</span><span class="p">)]))</span>
+        <span class="n">G2_stat</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_likelihood_saturated</span> <span class="o">-</span> <span class="n">log_likelihood</span><span class="p">)</span>
+        <span class="n">G2_p_value</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="n">G2_stat</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_stat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_stat</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;G2_p_value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">G2_p_value</span>
+    <span class="k">elif</span> <span class="n">BIC</span><span class="p">:</span>
+        <span class="n">log_likelihood</span> <span class="o">=</span> <span class="o">-</span><span class="n">_betabinom_log_likelihood</span><span class="p">([</span><span class="n">alpha_mle</span><span class="p">,</span> <span class="n">beta_mle</span><span class="p">],</span> <span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;L&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">log_likelihood</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;BIC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">dp</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">log_likelihood</span>
+    
+    <span class="k">return</span> <span class="n">ad_th</span><span class="p">,</span> <span class="n">d</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_mixbinom</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">logratio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">BIC</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">MixtureBinomial</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">tor</span><span class="o">=</span><span class="mf">1e-20</span><span class="p">)</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">),</span> <span class="n">max_iters</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">early_stop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">ad_th</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">dp</span><span class="p">)</span>
+
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">logratio</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Logratio test not implemented yet...&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">BIC</span><span class="p">:</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;L&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">log_likelihood_mixture_bin</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="s1">&#39;BIC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">model_scores</span><span class="p">[</span><span class="s1">&#39;BIC&#39;</span><span class="p">]</span>
+    
+    <span class="k">return</span> <span class="n">ad_th</span><span class="p">,</span> <span class="n">d</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_posteriors</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">):</span>
+    
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">MixtureBinomial</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">tor</span><span class="o">=</span><span class="mf">1e-20</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">),</span> <span class="n">max_iters</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">early_stop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Access the estimated parameters</span>
+    <span class="n">ps</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">pis</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+    <span class="n">idx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+    <span class="n">idx0</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">idx1</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">1</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">ps</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span>
+    <span class="n">p0</span> <span class="o">=</span> <span class="n">ps</span><span class="p">[</span><span class="n">idx0</span><span class="p">]</span>
+    <span class="n">pi1</span> <span class="o">=</span> <span class="n">pis</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span>
+    <span class="n">pi0</span> <span class="o">=</span> <span class="n">pis</span><span class="p">[</span><span class="n">idx0</span><span class="p">]</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;p&#39;</span><span class="p">:[</span><span class="n">p0</span><span class="p">,</span><span class="n">p1</span><span class="p">],</span> <span class="s1">&#39;pi&#39;</span><span class="p">:[</span><span class="n">pi0</span><span class="p">,</span><span class="n">pi1</span><span class="p">]}</span>
+
+    <span class="c1"># Get posterior probabilities</span>
+    <span class="n">log_likelihoods</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ad</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+        <span class="n">log_likelihoods</span><span class="p">[:,</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">log_likelihood_binomial</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;pi&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">])</span>
+    <span class="n">log_weighted_likelihoods</span> <span class="o">=</span> <span class="n">log_likelihoods</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;pi&#39;</span><span class="p">])</span>
+    <span class="n">log_likelihood_sums</span> <span class="o">=</span> <span class="n">logsumexp</span><span class="p">(</span><span class="n">log_weighted_likelihoods</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">log_posterior_probs</span> <span class="o">=</span> <span class="n">log_weighted_likelihoods</span> <span class="o">-</span> <span class="n">log_likelihood_sums</span>
+    <span class="n">posterior_probs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_posterior_probs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">posterior_probs</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="genotype_mix">
+<a class="viewcode-back" href="../../../api.html#mito.ut.genotype_mix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">genotype_mix</span><span class="p">(</span>
+    <span class="n">ad</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> 
+    <span class="n">dp</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> 
+    <span class="n">t_prob</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.7</span><span class="p">,</span> 
+    <span class="n">t_vanilla</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> 
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> 
+    <span class="n">min_AD</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Derive a discrete genotype (1:&#39;MUT&#39;, 0:&#39;WT&#39;) for each cell, given the </span>
+<span class="sd">    AD and DP counts of one of its candidate mitochondrial variants.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">positive_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">dp</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">posterior_probs</span> <span class="o">=</span> <span class="n">get_posteriors</span><span class="p">(</span><span class="n">ad</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">],</span> <span class="n">dp</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">])</span>
+    <span class="n">tests</span> <span class="o">=</span> <span class="p">[</span> 
+        <span class="p">(</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;</span><span class="n">t_prob</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">&lt;</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">t_prob</span><span class="p">)),</span> <span class="c1"># &amp; (ad[positive_idx]&gt;=min_AD),  # REMOVE!!</span>
+        <span class="p">(</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">&lt;</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">t_prob</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">&gt;</span><span class="n">t_prob</span><span class="p">)</span> 
+    <span class="p">]</span>
+    <span class="n">geno_prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">tests</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">genotypes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ad</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+    <span class="n">genotypes</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">geno_prob</span>
+    
+    <span class="c1"># Compare to vanilla genotyping (AF&gt;t --&gt; 1, 0 otherwise)</span>
+    <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+        <span class="n">test</span> <span class="o">=</span> <span class="p">(</span><span class="n">ad</span><span class="o">/</span><span class="n">dp</span><span class="o">&gt;</span><span class="n">t_vanilla</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">ad</span><span class="o">&gt;=</span><span class="n">min_AD</span><span class="p">)</span>
+        <span class="n">geno_vanilla</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">test</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>                        
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+          <span class="s1">&#39;ad&#39;</span><span class="p">:</span><span class="n">ad</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">],</span> <span class="s1">&#39;dp&#39;</span><span class="p">:</span><span class="n">dp</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">],</span> 
+          <span class="s1">&#39;geno_vanilla&#39;</span><span class="p">:</span><span class="n">geno_vanilla</span><span class="p">[</span><span class="n">positive_idx</span><span class="p">],</span> 
+          <span class="s1">&#39;geno_prob&#39;</span><span class="p">:</span><span class="n">geno_prob</span><span class="p">,</span> 
+          <span class="s1">&#39;p0&#39;</span><span class="p">:</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;p1&#39;</span><span class="p">:</span><span class="n">posterior_probs</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">})</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">crosstab</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;geno_vanilla&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;geno_prob&#39;</span><span class="p">],</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">df</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">genotypes</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_posteriors_and_params</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">):</span>
+    
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">MixtureBinomial</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">tor</span><span class="o">=</span><span class="mf">1e-20</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">),</span> <span class="n">max_iters</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">early_stop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">ps</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">pis</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+    <span class="n">idx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+    <span class="n">idx0</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">idx1</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">1</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">ps</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span>
+    <span class="n">p0</span> <span class="o">=</span> <span class="n">ps</span><span class="p">[</span><span class="n">idx0</span><span class="p">]</span>
+    <span class="n">pi1</span> <span class="o">=</span> <span class="n">pis</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span>
+    <span class="n">pi0</span> <span class="o">=</span> <span class="n">pis</span><span class="p">[</span><span class="n">idx0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">p0</span><span class="p">,</span><span class="n">p1</span><span class="p">],</span> <span class="p">[</span><span class="n">pi0</span><span class="p">,</span><span class="n">pi1</span><span class="p">]</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">simulate_component_data</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">n_trials</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n_trials</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">p</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">n_samples</span><span class="p">)</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_components</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">):</span>
+
+    <span class="n">ps</span><span class="p">,</span> <span class="n">pis</span> <span class="o">=</span> <span class="n">get_posteriors_and_params</span><span class="p">(</span><span class="n">ad</span><span class="p">,</span> <span class="n">dp</span><span class="p">)</span>
+    <span class="n">p0</span><span class="p">,</span> <span class="n">p1</span> <span class="o">=</span> <span class="n">ps</span>
+    <span class="n">pi0</span><span class="p">,</span> <span class="n">pi1</span> <span class="o">=</span> <span class="n">pis</span>
+
+    <span class="n">n_samples</span> <span class="o">=</span> <span class="mi">10000</span>
+    <span class="n">n_trials</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dp</span><span class="p">))</span>
+    <span class="n">n_samples_0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_samples</span> <span class="o">*</span> <span class="n">pi0</span><span class="p">)</span>
+    <span class="n">n_samples_1</span> <span class="o">=</span> <span class="n">n_samples</span> <span class="o">-</span> <span class="n">n_samples_0</span>
+
+    <span class="n">x_component_0</span> <span class="o">=</span> <span class="n">simulate_component_data</span><span class="p">(</span><span class="n">p0</span><span class="p">,</span> <span class="n">n_trials</span><span class="p">,</span> <span class="n">n_samples_0</span><span class="p">)</span>
+    <span class="n">x_component_1</span> <span class="o">=</span> <span class="n">simulate_component_data</span><span class="p">(</span><span class="n">p1</span><span class="p">,</span> <span class="n">n_trials</span><span class="p">,</span> <span class="n">n_samples_1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">x_component_0</span><span class="p">,</span> <span class="n">x_component_1</span>
+
+
+<span class="c1">##</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

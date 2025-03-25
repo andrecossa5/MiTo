@@ -10,13 +10,13 @@ A comprehensive documentation of key functionalitites and APIs is in the making.
 2. Reproduce the environment with all needed dependencies at once, with:
 
 ```bash
-mamba env create -f ./envs/environment.yml -n <your conda env name>
+mamba env create -f ./envs/environment.yml -n MiTo
 ```
 
 3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
 
 ```bash
-mamba activate <your conda env name>
+mamba activate MiTo
 pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
 ```
 

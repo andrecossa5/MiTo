@@ -38,4 +38,5 @@ dependencies:
       - sphinx-rtd-theme
       - sphinx-autodoc-typehints
       - sphinxcontrib-napoleon
+      - git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
 

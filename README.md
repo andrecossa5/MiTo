@@ -3,7 +3,7 @@ This is the first release of `MiTo`: a python package for robust inference of mi
 See also [nf-MiTo](https://github.com/andrecossa5/nf-MiTo), the companion Nextflow pipeline.
 
 ## Documentation
-A preliminary documentation of key functionalitites and APIs is available at [MiTo Docs](https://<your-docs-link>.readthedocs.io/).
+A preliminary documentation of key functionalitites and APIs is available at [MiTo Docs](...).
 
 ## Installation
 1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)
@@ -13,11 +13,10 @@ A preliminary documentation of key functionalitites and APIs is available at [Mi
 mamba env create -f ./envs/environment.yml -n MiTo
 ```
 
-3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
+3. Activate the environment:
 
 ```bash
 mamba activate MiTo
-pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
 ```
 
 4. Install `MiTo`:

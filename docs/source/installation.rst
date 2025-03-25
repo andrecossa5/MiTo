@@ -25,16 +25,7 @@ To reproduce this environment, run:
    mamba env create -f envs/environment.yml -n MiTo
    mamba activate MiTo
 
-Step 3: Install cassiopeia-lineage
---------------------------------------------
-
-MiTo depends on the cassiopeia-lineage package, which must be installed manually. Run the following command in the activated Conda environment:
-
-.. code-block:: bash
-
-   pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
-
-Step 4: Install MiTo
+Step 3: Install MiTo
 --------------------
 
 With the environment set up and the manual dependency installed, you can now install MiTo from the project root:
@@ -43,7 +34,7 @@ With the environment set up and the manual dependency installed, you can now ins
 
    pip install .
 
-Step 5: Verify installation
+Step 4: Verify installation
 -------------------------------
 
 To verify a successful installation, open a Python interpreter and check the version:
@@ -55,17 +46,5 @@ To verify a successful installation, open a Python interpreter and check the ver
 
 Additional Notes
 ----------------
-
-- **Manual Dependency:**  
-  MiTo is built upon functionalities provided by cassiopeia-lineage. To ensure seamless compatibility, the specific commit 
-  ``e7606afd10035a75f718ffb988666264e721700e`` must be installed. Automatic dependency resolution by pip is disabled for this 
-  package, as it might reinstall or upgrade packages already present in the environment, leading to incompatibilities. Please 
-  follow the installation step exactly. Future releases of MiTo may address this dependency handling.
-
-- **Troubleshooting:**  
-  If you experience issues during installation, please verify that:
-  
-  - Your Conda environment is active.
-  - The manual installation command for cassiopeia-lineage executed without errors.
 
 For further assistance, please refer to our documentation or open an issue on GitHub.

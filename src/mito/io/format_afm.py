@@ -568,15 +568,27 @@ def make_afm(
     Creates an annotated Allele Frequency Matrix from different 
     scLT_system and pre-processing pipelines outputs.
 
-    Args:
-        path_ch_matrix (str): Path to folder with necessary data for provided scLT_system.
-        path_meta (str, optional. Default: None): Path to .csv file with cell meta-data.
-        sample (str, optional. Default: None): Sample name to append at preprocessed CBs.
-        pp_method (str, optional. Default: 'maegatk'): Preprocessing method (MAESTER data only). Available options: mito_preprocessing, maegatk, cellsnp-lite, freebayes, samtools.
-        scLT_system (str, optional. Default: 'MAESTER'): scLT system (i.e., marker) used for tracing. Available options: MAESTER, RedeeM, Cas9, scWGS.
-    
-    Returns:
-        afm (AnnData): the assembled Allele Frequency Matrix (AFM)
+    Parameters
+    ----------
+    path_ch_matrix : str
+        Path to folder with necessary data for provided scLT_system.
+    path_meta : str, optional
+        Path to .csv file with cell meta-data. Default is None.
+    sample : str, optional
+        Sample name to append at preprocessed CBs. Default is None.
+    pp_method : str, optional
+        Preprocessing method (MAESTER data only). Available options:
+        mito_preprocessing, maegatk, cellsnp-lite, freebayes, samtools.
+        Default is 'maegatk'.
+    scLT_system : str, optional
+        scLT system (i.e., marker) used for tracing. Available options:
+        MAESTER, RedeeM, Cas9, scWGS.
+        Default is 'MAESTER'.
+
+    Returns
+    -------
+    afm : AnnData
+        The assembled Allele Frequency Matrix (AFM).
     """
 
     if os.path.exists(path_ch_matrix):

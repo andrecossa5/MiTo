@@ -14,3 +14,10 @@ from .utils import (
     Timer, update_params,  rescale, format_tuning, flatten_dict,
     extract_kwargs, rank_items, subsample_afm
 )
+
+
+__all__ = [
+    "genotype_mix", "subsample_afm", "distance_AUPRC", 
+    "NN_entropy", "calculate_corr_distances",
+    "custom_ARI", "kbet", "CI", "RI"
+]

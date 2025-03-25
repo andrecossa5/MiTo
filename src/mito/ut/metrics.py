@@ -78,14 +78,24 @@ def kbet(
     """
     Computes the kBET metric (Buttner et al., 2018) to assess batch effects for an index matrix of a KNN graph.
 
-    Args
-        index (np.array): array of shape (n_cells, n_neighbors). kNN indices.
-        batch (pd.Series): discrete-valued annotation (size, n_cells)
-        alpha (float, optional. Default : 0.05) significance level of the ki-squared test.
-        only_score (bool, optional. Default: True): return only the accept rate or the full kBET results.
+    Parameters
+    ----------
+    index : np.array
+        Array of shape (n_cells, n_neighbors) containing kNN indices.
+    batch : pd.Series
+        Discrete-valued batch annotation for each cell (length n_cells).
+    alpha : float, optional
+        Significance level of the chi-squared test. Default is 0.05.
+    only_score : bool, optional
+        If True, return only the accept rate; otherwise, return full kBET results. Default is True.
 
     Returns
-        (stat_mean, pvalue_mean, accept_rate): kBET statistics.
+    -------
+    tuple of (stat_mean, pvalue_mean, accept_rate)
+        kBET statistics, where:
+        - stat_mean is the mean test statistic,
+        - pvalue_mean is the mean p-value,
+        - accept_rate is the overall acceptance rate.
     """
  
     # Compute null batch distribution

@@ -1,22 +1,22 @@
 # MiTo
 This is the first release of `MiTo`: a python package for robust inference of mitochondrial clones and phylogenies.
-See `nf-MiTo`, the companion Nextflow pipeline, at [https://github.com/andrecossa5/nf-MiTo].
+See also [nf-MiTo](https://github.com/andrecossa5/nf-MiTo), the companion Nextflow pipeline.
 
 ## Documentation
-A comprehensive documentation of key functionalitites and APIs is in the making.
+A preliminary documentation of key functionalitites and APIs is available at [MiTo Docs](https://<your-docs-link>.readthedocs.io/).
 
 ## Installation
-1. Install mamba (or conda) (https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)
+1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)
 2. Reproduce the environment with all needed dependencies at once, with:
 
 ```bash
-mamba env create -f ./envs/environment.yml -n <your conda env name>
+mamba env create -f ./envs/environment.yml -n MiTo
 ```
 
-3. Activate the environment and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
+3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
 
 ```bash
-mamba activate <your conda env name>
+mamba activate MiTo
 pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
 ```
 

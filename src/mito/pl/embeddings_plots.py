@@ -33,25 +33,43 @@ def draw_embedding(
     """
     sc.pl.embedding, with some defaults and a custom legend.
 
-    Args:
-        afm (AnnData): Allele Frequency Matrix with some basis to plot in afm.obsm.
-        basis (str, optional. Default: X_umap): key in afm.obsm.
-        feature (Iterable[str], optional. Default: []): features to plot.
-        ax (matplotlib.axes.Axes, optional. Default: None): ax object to populate.
-        categorical_cmap (str|Dict[str,Any], optional. Default: sc.pl.palettes.vega_20_scanpy): color palette for categoricals.
-        continuous_cmap (str, optional. Defaults>: 'viridis'): color palette for continuous data.
-        size (float, optional. Default: None): point size.
-        frameon (bool, optional. Default: False): draw frame araund ax, or not.
-        outline (bool, optional. Default: False): Fancy outline around dots.
-        legend (bool, optional. Default: False): draw authomatically a legend.
-        loc (str, optional. Default: 'center left'): which corner of the legend to anchor.
-        bbox_to_anchor (Tuple[float, float], optional. Default: (1,.5)): anchor 'loc' legend corner to ax.transformed coordinates.
-        artists_size (float, optional. Default: 10): size of legend artists.
-        label_size (float, optional. Default: 10): size of legend label.
-        ticks_size (float, optional. Default: 10): size of legend ticks.
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix with some basis to plot in afm.obsm.
+    basis : str, optional
+        Key in afm.obsm. Default is "X_umap".
+    feature : Iterable[str], optional
+        Features to plot. Default is an empty list.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to populate. Default is None.
+    categorical_cmap : str or dict, optional
+        Color palette for categoricals. Default is sc.pl.palettes.vega_20_scanpy.
+    continuous_cmap : str, optional
+        Color palette for continuous data. Default is "viridis".
+    size : float, optional
+        Point size. Default is None.
+    frameon : bool, optional
+        Whether to draw a frame around the axes. Default is False.
+    outline : bool, optional
+        Whether to draw a fancy outline around dots. Default is False.
+    legend : bool, optional
+        Whether to automatically draw a legend. Default is False.
+    loc : str, optional
+        Which corner of the legend to anchor. Default is "center left".
+    bbox_to_anchor : tuple of float, optional
+        Anchor 'loc' legend corner to ax.transformed coordinates. Default is (1, 0.5).
+    artists_size : float, optional
+        Size of legend artists. Default is 10.
+    label_size : float, optional
+        Size of legend labels. Default is 10.
+    ticks_size : float, optional
+        Size of legend ticks. Default is 10.
 
-    Returns:
-        ax (matplotlib.axes.Axes): ax object.
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        Axes object.
     """
 
     if not isinstance(categorical_cmap, dict):

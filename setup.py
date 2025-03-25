@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mito-utils",
-    version="0.0.1",
+    version="0.0.2",
     author="Your Name",
     author_email="your.email@example.com",
     description="Utilities for MT-based single cell Lineage Tracing (scLT).",
@@ -26,14 +26,5 @@ setup(
         # Note: for best reproducibility the environment must
         # be setup before hand, as indicated in the README.md
     ],
-    extras_require={
-        "dev": [
-            "pytest",
-            "sphinx",
-            "sphinx-rtd-theme",
-            "sphinx-autodoc-typehints",
-            "sphinxcontrib-napoleon",
-        ],
-    },
     include_package_data=True,
 )

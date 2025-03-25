@@ -1,4 +1,3 @@
-# scverse structure
 __version__ = "0.0.1"
 
 from . import io, pl, pp, tl, ut

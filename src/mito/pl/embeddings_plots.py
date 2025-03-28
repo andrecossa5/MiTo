@@ -6,8 +6,7 @@ import scanpy as sc
 import matplotlib
 from typing import Iterable, Dict, Any, Tuple
 from anndata import AnnData
-from .colors import create_palette
-from .plotting_base import add_legend
+import plotting_utils as plu
 
 
 ##
@@ -73,7 +72,7 @@ def draw_embedding(
     """
 
     if not isinstance(categorical_cmap, dict):
-        categorical_cmap = create_palette(afm.obs, feature, categorical_cmap)
+        categorical_cmap = plu.create_palette(afm.obs, feature, categorical_cmap)
     else:
         pass
 
@@ -92,7 +91,7 @@ def draw_embedding(
     )
 
     if legend:
-        add_legend(
+        plu.add_legend(
             ax=ax, 
             label=feature, 
             colors=categorical_cmap,

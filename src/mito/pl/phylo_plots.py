@@ -4,18 +4,19 @@ Tree plotting utils.
 
 import logging
 import pandas as pd
+import scanpy as sc
+import plotting_utils as plu
 from typing import Iterable, Dict, Any
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.plotting.local import utilities as ut
 from cassiopeia.plotting.local import *
-from .colors import *
-from .plotting_base import *
+from .other_plots import *
 
 
 ##
 
 
-_categorical_cmaps = [sc.pl.palettes.vega_20_scanpy, sc.pl.palettes.default_20, ten_godisnot, 'set1', 'dark']
+_categorical_cmaps = [sc.pl.palettes.vega_20_scanpy, sc.pl.palettes.default_20, plu.ten_godisnot, 'set1', 'dark']
 _continuous_cmaps = ['viridis', 'inferno', 'magma']
 _cont_character_cmap = 'mako'
 _bin_character_cmap = { 1 : 'r', 0 : 'b', -1 : 'lightgrey', np.nan : 'lightgrey' }
@@ -162,11 +163,11 @@ def _place_tree_and_annotations(
 
             if cov in features:
                 if categorical_cmaps is None or cov not in categorical_cmaps:
-                    categorical_cmap = create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat])
+                    categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat])
                 elif cov in categorical_cmaps:
                     _cmap = categorical_cmaps[cov]
                     if isinstance(_cmap, str) or isinstance(_cmap, list):
-                        categorical_cmap = create_palette(tree.cell_meta, cov, _cmap)
+                        categorical_cmap = plu.create_palette(tree.cell_meta, cov, _cmap)
                     elif isinstance(_cmap, dict):
                         categorical_cmap = _cmap
                     else:
@@ -241,7 +242,7 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
                 elif pd.api.types.is_string_dtype(x):
                     colors = (
                         meta[cov]
-                        .map(create_palette(meta, cov, cmap))
+                        .map(plu.create_palette(meta, cov, cmap))
                         .to_dict()
                     )
             elif isinstance(cmap, dict):

@@ -8,10 +8,10 @@ import pandas as pd
 import scanpy as sc
 import matplotlib
 import matplotlib.pyplot as plt
-from typing import Dict, Iterable, Tuple, List, Any
+import plotting_utils as plu
+from typing import Dict, Iterable, Tuple, Any
 from anndata import AnnData
 from matplotlib.ticker import FixedLocator, FuncFormatter
-from .plotting_base import format_ax, add_legend, bar
 from ..ut.utils import load_mut_spectrum_ref
 from ..ut.positions import MAESTER_genes_positions
 from ..pp.filters import mask_mt_sites
@@ -22,7 +22,10 @@ from ..pp.preprocessing import annotate_vars
 
 
 def vars_AF_spectrum(
-    afm: AnnData, ax: matplotlib.axes.Axes = None, color: str = 'b', **kwargs
+    afm: AnnData, 
+    ax: matplotlib.axes.Axes = None, 
+    color: str = 'b', 
+    **kwargs
     ) ->  matplotlib.axes.Axes:
     """
     Ranked AF distributions (as in Miller et al., 2022).
@@ -34,7 +37,7 @@ def vars_AF_spectrum(
         x = np.sort(x)
         ax.plot(x, '-', color=color, **kwargs)
 
-    format_ax(ax=ax, xlabel='Cells (ranked)', ylabel='Allelic Frequency (AF)')
+    plu.format_ax(ax=ax, xlabel='Cells (ranked)', ylabel='Allelic Frequency (AF)')
 
     return ax
 
@@ -43,9 +46,14 @@ def vars_AF_spectrum(
 
 
 def plot_ncells_nAD(
-    afm: AnnData, ax: matplotlib.axes.Axes = None, 
-    title: str = None, xticks: Iterable[Any] = None, 
-    yticks: str = None, s: float = 5, c: Any = 'k', alpha: float = .7, 
+    afm: AnnData, 
+    ax: matplotlib.axes.Axes = None, 
+    title: str = None, 
+    xticks: Iterable[Any] = None, 
+    yticks: str = None, 
+    s: float = 5, 
+    c: Any = 'k', 
+    alpha: float = .7, 
     **kwargs
     ) ->  matplotlib.axes.Axes:
     """
@@ -102,18 +110,36 @@ def mut_profile(
     prop_df = prop_df.set_index('three_plot')
     prop_df['group_change'] = prop_df['group_change'].map(lambda x: '>'.join(list(x)))
 
-
-    fig, axs = plt.subplots(1, prop_df['group_change'].unique().size, figsize=figsize, sharey=True, gridspec_kw={'wspace': 0.1},
-                            constrained_layout=True)
+    n = prop_df['group_change'].unique().size
+    fig, axs = plt.subplots(
+        1, n, figsize=figsize, sharey=True, 
+        gridspec_kw={'wspace': 0.1}, constrained_layout=True
+    )
     strand_palette = {'H': '#05A8B3', 'L': '#D76706'}
 
     for i,x in enumerate(prop_df['group_change'].unique()):
         ax = axs.ravel()[i]
         df_ = prop_df.query('group_change==@x')
-        bar(df_, 'n_obs', by='strand', c=strand_palette, ax=ax, s=1, a=.8, annot=False)
-        format_ax(ax, xticks=[], xlabel=x, ylabel='Substitution rate' if i==0 else '', title=f'n: {df_["n_obs"].sum()}')
+        for strand in df_['strand'].unique():
+            plu.counts_plot(
+                df_.query('strand==@strand'), 
+                'n_obs',
+                color=strand_palette[strand], 
+                width=1, alpha=.5, edgecolor=None, 
+                with_label=False,
+                ax=ax
+            )
+        
+        plu.format_ax(
+            ax, xticks=[], xlabel=x, 
+            ylabel='Substitution rate' if i==0 else '', 
+            title=f'n: {df_["n_obs"].sum()}'
+        )
 
-    add_legend(ax=axs.ravel()[0], colors=strand_palette, ncols=1, loc='upper left', bbox_to_anchor=(0,1), label='Strand', ticks_size=6)
+    plu.add_legend(
+        ax=axs.ravel()[0], colors=strand_palette, ncols=1, 
+        loc='upper left', bbox_to_anchor=(0,1), label='Strand', ticks_size=6
+    )
     fig.tight_layout()
 
     return fig

@@ -8,11 +8,10 @@ import matplotlib
 import pandas as pd
 import scanpy as sc
 import matplotlib.pyplot as plt
+import plotting_utils as plu
 from typing import Dict, Any
 from anndata import AnnData
 from cassiopeia.data import CassiopeiaTree
-from .plotting_base import format_ax, add_cbar, plot_heatmap
-from .colors import create_palette
 from ..tl.phylo import build_tree
 from ..tl.annotate import MiToTreeAnnotator
 
@@ -85,13 +84,12 @@ def heatmap_distances(
 
     order = _get_leaves_order(tree)
     ax.imshow(afm[order].obsp['distances'].A, cmap=cmap)
-    format_ax(
+    plu.format_ax(
         ax=ax, xlabel='Cells', ylabel='Cells', xticks=[], yticks=[],
-        xlabel_size=10, ylabel_size=10
     )
-    add_cbar(
+    plu.add_cbar(
         afm.obsp['distances'].A.flatten(), ax=ax, palette=cmap, 
-        label='Distance', layout='outside', label_size=10, ticks_size=10,
+        label='Distance', layout='outside',
         vmin=vmin, vmax=vmax
     )
 
@@ -176,7 +174,7 @@ def heatmap_variants(
     elif annot in afm.obs.columns:
 
         annot_cmap_ = sc.pl.palettes.vega_10_scanpy if annot_cmap is None else annot_cmap
-        palette = create_palette(afm.obs, annot, annot_cmap_)
+        palette = plu.create_palette(afm.obs, annot, annot_cmap_)
         colors = (
             afm.obs.loc[df_.index, annot]
             .astype('str')
@@ -199,8 +197,10 @@ def heatmap_variants(
         raise KeyError(f'{annot} not in afm.obs. Check annotation...')
     
     # Plot heatmap
-    plot_heatmap(df_, ax=ax, vmin=vmin, vmax=vmax, 
-                linewidths=0, y_names=False, label=label, palette=cmap)
+    plu.plot_heatmap(
+        df_, ax=ax, vmin=vmin, vmax=vmax, 
+        linewidths=0, y_names=False, label=label, palette=cmap
+    )
 
     return ax
 

@@ -12,7 +12,7 @@ from .stats_utils import (
 from .utils import (
     ji, make_folder, load_mt_gene_annot, load_mut_spectrum_ref,
     Timer, update_params,  rescale, format_tuning, flatten_dict,
-    extract_kwargs, rank_items, subsample_afm
+    extract_kwargs, rank_items, subsample_afm, load_common_dbSNP, load_edits_REDIdb
 )
 
 

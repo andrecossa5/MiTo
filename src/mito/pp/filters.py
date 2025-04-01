@@ -762,7 +762,7 @@ def filter_variant_moransI(
 ##
 
 
-def filter_dbSNP(afm: AnnData):
+def filter_dbSNP_common(afm: AnnData):
     """
     Filter Allele Frequency Matrix from "COMMON" MT-SNVs (annotated dbSNP database).
     """
@@ -779,7 +779,7 @@ def filter_dbSNP(afm: AnnData):
 ##
 
 
-def filter_REDIdb(afm: AnnData):
+def filter_REDIdb_edits(afm: AnnData):
     """
     Filter Allele Frequency Matrix from previously annotated RNA-edits (REDIdb database).
     """

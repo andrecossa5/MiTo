@@ -232,8 +232,8 @@ def extract_kwargs(args, only_tree=False):
                     'filtering' : filtering,
                     'bin_method' : bin_method,
                     'min_n_var' : min_n_var,
-                    'path_dbSNP' : args.path_dbSNP, 
-                    'path_REDIdb' : args.path_REDIdb,
+                    'filter_dbSNP' : args.filter_dbSNP, 
+                    'filter_REDIdb' : args.filter_REDIdb,
                     'ncores' : args.ncores,
                     'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
@@ -281,8 +281,8 @@ def extract_kwargs(args, only_tree=False):
                 'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
-                'path_dbSNP' : args.path_dbSNP, 
-                'path_REDIdb' : args.path_REDIdb,
+                'filter_dbSNP' : args.filter_dbSNP, 
+                'filter_REDIdb' : args.filter_REDIdb,
                 'ncores' : args.ncores,
                 'metric' : args.metric,
                 'spatial_metrics' : args.spatial_metrics,
@@ -375,7 +375,7 @@ def load_common_dbSNP():
 ##
 
 
-def load_common_REDIdbP():
+def load_edits_REDIdb():
     edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt'), index_col=0, sep='\t')
     edits = edits.query('nSamples>100')
     edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']

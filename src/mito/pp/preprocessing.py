@@ -389,38 +389,15 @@ def filter_afm(
 
     # Filter common SNVs and possible RNA-edits
     if filter_dbSNP:
-        afm, n_dbSNP = filter_dbSNP(afm)
+        afm, n_dbSNP = filter_dbSNP_common(afm)
     else:
         n_dbSNP = np.nan
 
-    # n_dbSNP = np.nan
-    # if path_dbSNP not in [None, 'null']:
-    #     if os.path.exists(path_dbSNP):
-    #         common = pd.read_csv(path_dbSNP, index_col=0, sep='\t')
-    #         common = common['pos'].astype('str') + '_' + common['REF'] + '>' + common['ALT'].map(lambda x: x.split('|')[0])
-    #         common = common.to_list()
-    #         n_dbSNP = afm.var_names.isin(common).sum()
-    #         logging.info(f'Exclude {n_dbSNP} common SNVs events (dbSNP)')
-    #         variants = afm.var_names[~afm.var_names.isin(common)]
-    #         afm = afm[:,variants].copy() 
-
     # Filter possible RNA-edits 
     if filter_REDIdb: 
-        afm, n_REDIdb = filter_REDIdb(afm)
+        afm, n_REDIdb = filter_REDIdb_edits(afm)
     else:
         n_REDIdb = np.nan
-
-    # n_REDIdb = np.nan     
-    # if path_REDIdb not in [None, 'null']:
-    #     if os.path.exists(path_REDIdb):
-    #         edits = pd.read_csv(path_REDIdb, index_col=0, sep='\t')
-    #         edits = edits.query('nSamples>100')
-    #         edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']
-    #         edits = edits.to_list()
-    #         n_REDIdb = afm.var_names.isin(edits).sum()
-    #         logging.info(f'Exclude {n_REDIdb} common RNA editing events (REDIdb)')
-    #         variants = afm.var_names[~afm.var_names.isin(edits)]
-    #         afm = afm[:,variants].copy()
 
     # Genotype cells, and filter the one with less than min_n_var mutations
     logging.info(f'Assign MT-genotypes with {bin_method} method')

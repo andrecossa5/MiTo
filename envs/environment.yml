@@ -12,12 +12,13 @@ dependencies:
   - python-igraph=0.9.11
   - leidenalg=0.8
   - matplotlib=3.5.3
-  - seaborn=0.11.2
+  - seaborn=0.13.2
   - scanpy=1.9.1
   - scikit-learn=1.1.2
   - yaml=0.2.5
   - pysam
   - conda-build
+  - lightgbm
   - pip
   - pip:
       - cvxpy==1.3

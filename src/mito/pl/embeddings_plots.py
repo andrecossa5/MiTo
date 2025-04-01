@@ -15,7 +15,7 @@ import plotting_utils as plu
 def draw_embedding(
     afm: AnnData, 
     basis: str = 'X_umap', 
-    feature: Iterable[str] = [],
+    feature: str = None,
     ax: matplotlib.axes.Axes = None,
     categorical_cmap: str|Dict[str,Any] = sc.pl.palettes.vega_20_scanpy,
     continuous_cmap: str = 'viridis',
@@ -27,7 +27,8 @@ def draw_embedding(
     bbox_to_anchor: Tuple[float, float] = (1,.5),
     artists_size: float = 10,
     label_size: float = 10,
-    ticks_size: float = 10
+    ticks_size: float = 10,
+    kwargs: Dict[str,Any] = {}
     ) -> matplotlib.axes.Axes:
     """
     sc.pl.embedding, with some defaults and a custom legend.
@@ -64,6 +65,8 @@ def draw_embedding(
         Size of legend labels. Default is 10.
     ticks_size : float, optional
         Size of legend ticks. Default is 10.
+    kwargs: dict, optional
+        Kwargs to sc.pl.embedding. Default is {}
 
     Returns
     -------
@@ -71,23 +74,27 @@ def draw_embedding(
         Axes object.
     """
 
-    if not isinstance(categorical_cmap, dict):
-        categorical_cmap = plu.create_palette(afm.obs, feature, categorical_cmap)
+    if isinstance(categorical_cmap, str) and feature in afm.obs.columns:
+        _cmap = plu.create_palette(afm.obs, feature, _cmap)
+    elif isinstance(categorical_cmap, dict) and feature in afm.obs.columns:
+        assert all(x in categorical_cmap for x in afm.obs[feature].unique())
+        _cmap = categorical_cmap
     else:
-        pass
+        _cmap = None
 
     ax = sc.pl.embedding(
         afm, 
         basis=basis, 
         ax=ax, 
         color=feature, 
-        palette=categorical_cmap,
+        palette=_cmap,
         color_map=continuous_cmap, 
         legend_loc=None,
         size=size, 
         frameon=frameon, 
         add_outline=outline,
-        show=False
+        show=False,
+        **kwargs
     )
 
     if legend:

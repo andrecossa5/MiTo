@@ -114,6 +114,7 @@ def _place_tree_and_annotations(
         if cov in features:
             if cov in tree.cell_meta.columns:
                 x = tree.cell_meta[cov].copy()
+                x = x.astype('category')
             else:
                 raise KeyError(f'{cov} not in tree.cell_meta!')
         
@@ -163,13 +164,14 @@ def _place_tree_and_annotations(
 
             if cov in features:
                 if categorical_cmaps is None or cov not in categorical_cmaps:
-                    categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat])
+                    categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat], add_na=True)
                 elif cov in categorical_cmaps:
                     _cmap = categorical_cmaps[cov]
                     if isinstance(_cmap, str) or isinstance(_cmap, list):
-                        categorical_cmap = plu.create_palette(tree.cell_meta, cov, _cmap)
+                        categorical_cmap = plu.create_palette(tree.cell_meta, cov, _cmap, add_na=True)
                     elif isinstance(_cmap, dict):
                         categorical_cmap = _cmap
+                        categorical_cmap[np.nan] = 'lightgrey'
                     else:
                         raise ValueError(f'''Adjust categorical_cmaps. {cov}: 
                                          categorical_cmaps is nor a str, a list or a dict...''')
@@ -186,8 +188,8 @@ def _place_tree_and_annotations(
                 for i,missing in enumerate(missing_cats):
                     categorical_cmap[missing] = sc.pl.palettes.godsnot_102[i]
 
-            categorical_cmap.update({'unassigned':'lightgrey', np.nan:'lightgrey'})
-            assert(all([ cat in categorical_cmap.keys() for cat in x.unique() ]))
+            assert (all([ cat in categorical_cmap.keys() for cat in x.unique() ]))
+            assert categorical_cmap[np.nan] == 'lightgrey'
 
             # Place
             boxes, anchor_coords = ut.place_colorstrip(
@@ -195,9 +197,8 @@ def _place_tree_and_annotations(
             )
             
             colorstrip = {}
-            for leaf in x.index:
-                cat = x.loc[leaf]
-                colorstrip[leaf] = boxes[leaf] + (categorical_cmap[cat], f"{leaf}\n{cat}")
+            for leaf,value in zip(x.index, x.values):
+                colorstrip[leaf] = boxes[leaf] + (categorical_cmap[value], f"{leaf}\n{value}")
 
             n_cat += 1
 

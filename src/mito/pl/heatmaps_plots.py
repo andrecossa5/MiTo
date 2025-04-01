@@ -109,7 +109,8 @@ def heatmap_variants(
     ax: matplotlib.axes.Axes = None, 
     cmap: str = 'mako', 
     vmin: float = 0, 
-    vmax: float = .1
+    vmax: float = .1,
+    kwargs: Dict[str, Any] = {} 
     ) -> matplotlib.axes.Axes:
     """
     Heatmap cell x variants.
@@ -136,6 +137,8 @@ def heatmap_variants(
         Minimum value for the colorbar. Default is 0.25.
     vmax : float, optional
         Maximum value for the colorbar. Default is 0.95.
+    kwargs: dict, optional
+        Optional kwargs to plu.plot_heatmap. Default is {}.
 
     Returns
     -------
@@ -190,7 +193,7 @@ def heatmap_variants(
             cax=axins, orientation=orientation
         )
         cb.ax.yaxis.set_label_position("left")
-        cb.set_label(annot, rotation=90, labelpad=0, fontsize=10)
+        cb.set_label(annot, rotation=90, labelpad=0)
         cb.ax.set(xticks=[], yticks=[])
 
     else:
@@ -199,7 +202,8 @@ def heatmap_variants(
     # Plot heatmap
     plu.plot_heatmap(
         df_, ax=ax, vmin=vmin, vmax=vmax, 
-        linewidths=0, y_names=False, label=label, palette=cmap
+        linewidths=0, y_names=False, label=label, palette=cmap,
+        **kwargs
     )
 
     return ax

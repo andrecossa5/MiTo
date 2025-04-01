@@ -224,6 +224,7 @@ def extract_kwargs(args, only_tree=False):
                 lineage_column = d['lineage_column']
                 filtering = d['filtering']
                 bin_method = d['bin_method']
+                metric = d['metric']
                 min_n_var = int(d['min_n_var'])
                 kwargs = {
                     'min_cell_number' : min_cell_number,
@@ -234,6 +235,7 @@ def extract_kwargs(args, only_tree=False):
                     'path_dbSNP' : args.path_dbSNP, 
                     'path_REDIdb' : args.path_REDIdb,
                     'ncores' : args.ncores,
+                    'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
                     'filter_moransI' : args.filter_moransI
                 }
@@ -272,7 +274,7 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter if args.cell_filter != _cell_filters else None
+            cell_filter = args.cell_filter if args.cell_filter in _cell_filters else None
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,
@@ -282,6 +284,7 @@ def extract_kwargs(args, only_tree=False):
                 'path_dbSNP' : args.path_dbSNP, 
                 'path_REDIdb' : args.path_REDIdb,
                 'ncores' : args.ncores,
+                'metric' : args.metric,
                 'spatial_metrics' : args.spatial_metrics,
                 'filter_moransI' : args.filter_moransI
             }
@@ -357,6 +360,27 @@ def load_mt_gene_annot():
     df = pd.read_csv(os.path.join(path_assets, 'formatted_table_wobble.csv'), index_col=0)
     df['mut'] = df['Position'].astype(str) + '_' + df['Reference'] + '>' + df['Variant']
     return df
+
+
+##
+
+
+def load_common_dbSNP():
+    common = pd.read_csv(os.path.join(path_assets, 'dbSNP_MT.txt'), index_col=0, sep='\t')
+    common = common['pos'].astype('str') + '_' + common['REF'] + '>' + common['ALT'].map(lambda x: x.split('|')[0])
+    common = common.to_list()
+    return common
+
+
+##
+
+
+def load_common_REDIdbP():
+    edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt'), index_col=0, sep='\t')
+    edits = edits.query('nSamples>100')
+    edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']
+    edits = edits.to_list()
+    return edits
 
 
 ##

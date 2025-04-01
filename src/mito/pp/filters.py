@@ -10,6 +10,7 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
 from .distances import *
 from ..io.format_afm import mask_mt_sites
+from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
 
 
 ##
@@ -209,7 +210,7 @@ def filter_baseline(
 ##
 
 
-def filter_CV(afm: AnnData, n_top: int = 1000) -> AnnData:
+def filter_CV(afm: AnnData, n_top: int = 100) -> AnnData:
     """
     Filter top `n_top` MT-SNVs (MAESTER, redeem), ranked by coefficient of variation (CV).
     """
@@ -467,13 +468,13 @@ def filter_weng2024(
 
 def filter_MiTo(
     afm: AnnData, 
-    min_cov: float = 10,
+    min_cov: float = 5,
     min_var_quality: float = 30,
     min_frac_negative: float = 0.2,
     min_n_positive: int = 5,
-    af_confident_detection: float = .01,
+    af_confident_detection: float = .02,
     min_n_confidently_detected: int = 2,
-    min_mean_AD_in_positives: float = 1.5,
+    min_mean_AD_in_positives: float = 1.25,
     min_mean_DP_in_positives: float = 25
     ) -> AnnData:
     """
@@ -491,22 +492,22 @@ def filter_MiTo(
     afm : AnnData
         Allele Frequency Matrix.
     min_cov : float
-        Minimum mean site coverage (across cells).
+        Minimum mean site coverage (across cells). Default is 5.
     min_var_quality : float
-        Minimum mean variant allele basecall quality (across cells).
+        Minimum mean variant allele basecall quality (across cells). Default is 30.
     min_frac_negative : float
-        Minimum fraction of negative cells (expressed as a fraction of total cells).
+        Minimum fraction of negative cells (expressed as a fraction of total cells). Default is 0.2.
     min_n_positive : int
-        Minimum number of cells with AF > 0.
+        Minimum number of cells with AF > 0. Default is 5.
     min_n_confidently_detected : int
         Minimum number of cells in which the variant has been detected with an AF greater than
-        `af_confident_detection`.
+        `af_confident_detection`. Default is 2.
     af_confident_detection : float
-        Allele frequency threshold for confident detection.
+        Allele frequency threshold for confident detection. Default is 0.02.
     min_mean_AD_in_positives : float
-        Minimum mean alternative allele count (AD) in positive cells.
+        Minimum mean alternative allele count (AD) in positive cells. Default is 1.25.
     min_mean_DP_in_positives : float
-        Minimum mean total UMI counts (DP) in positive cells.
+        Minimum mean total UMI counts (DP) in positive cells. Default is 25.
 
     Returns
     -------
@@ -707,7 +708,7 @@ def filter_GT_enriched(
 ##
 
 
-def moran_I(W, x, num_permutations=1000):
+def moran_I(W, x, num_permutations=100):
     """
     Calculate normalized Moran's I statistics and permutation-based pvalue.
     """
@@ -717,7 +718,6 @@ def moran_I(W, x, num_permutations=1000):
     I_obs = x_stdzd.T @ W @ x_stdzd
 
     # Perform permutation test
-    num_permutations = 100
     permuted_Is = np.zeros(num_permutations)
     for i in range(num_permutations):
         x_perm = np.random.permutation(x_stdzd)
@@ -757,6 +757,40 @@ def filter_variant_moransI(
     afm = afm[:,var_to_retain].copy()
 
     return afm
+
+
+##
+
+
+def filter_dbSNP(afm: AnnData):
+    """
+    Filter Allele Frequency Matrix from "COMMON" MT-SNVs (annotated dbSNP database).
+    """
+
+    common = load_common_dbSNP()    
+    n_dbSNP = afm.var_names.isin(common).sum()
+    logging.info(f'Exclude {n_dbSNP} common SNVs events (dbSNP)')
+    variants = afm.var_names[~afm.var_names.isin(common)]
+    afm = afm[:,variants].copy() 
+
+    return afm, n_dbSNP
+
+
+##
+
+
+def filter_REDIdb(afm: AnnData):
+    """
+    Filter Allele Frequency Matrix from previously annotated RNA-edits (REDIdb database).
+    """
+    
+    edits = load_edits_REDIdb()
+    n_REDIdb = afm.var_names.isin(edits).sum()
+    logging.info(f'Exclude {n_REDIdb} common RNA editing events (REDIdb)')
+    variants = afm.var_names[~afm.var_names.isin(edits)]
+    afm = afm[:,variants].copy()
+
+    return afm, n_REDIdb
 
 
 ##

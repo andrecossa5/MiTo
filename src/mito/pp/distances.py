@@ -243,7 +243,7 @@ def call_genotypes(
     bin_method: str = 'MiTo', 
     t_vanilla: float = .0, 
     min_AD: int = 2, 
-    t_prob: float = .75, 
+    t_prob: float = .7, 
     min_cell_prevalence: float = .1, 
     k: int = 5, 
     gamma: float = .25, 

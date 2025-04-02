@@ -410,3 +410,29 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
 
 
 ##
+
+
+def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
+    """
+    Select jobs, and choose one for clonal inference benchmarking
+    """
+    df_selected = (
+        df.loc[
+            (df['sample'] == sample) & \
+            (df['n_cells'] >= n_cells) & \
+            (df['n_GBC_groups'] >= n_GBC_groups) & \
+            (df['frac_unassigned'] <= frac_unassigned)  
+        ]
+    )
+    df_selected = (
+        df_selected[[
+            'job_id', 'pp_method', 'bin_method', 'af_confident_detection', 'min_cell_number', 'metric',
+            'ARI', 'corr', 'NMI', 'AUPRC', 'n_cells', 'unassigned', 'n_vars', 'n_GBC_groups', 'n MiTo clone',
+        ]]
+    )
+    df_final = df_selected.sort_values('ARI', ascending=False).head(5)
+
+    return df_selected, df_final
+
+
+##

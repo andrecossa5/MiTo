@@ -93,6 +93,7 @@ def filter_cells(
                 'min_perc_covered_sites':min_perc_covered_sites
             }
         else:
+            afm.uns['cell_filter'] = cell_filter
             raise ValueError(f'Cell filter {cell_filter} is not available for scLT_system {scLT_system}')
     
     else:

@@ -274,7 +274,7 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter if args.cell_filter in _cell_filters else None
+            cell_filter = args.cell_filter
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,

@@ -68,26 +68,31 @@ class Timer:
             raise TimerError(f"Timer is running. Use .stop() to stop it")
         self._start_time = time.perf_counter()
 
-    def stop(self):
+    def stop(self, pretty=True):
         """
         Stop the timer, and report the elapsed time.
         """
         if self._start_time is None:
             raise TimerError(f"Timer is not running. Use .start() to start it")
+        
         elapsed_time = time.perf_counter() - self._start_time
-
-        if elapsed_time > 100:
-            unit = 'min'
-            elapsed_time = elapsed_time / 60
-        elif elapsed_time > 1000:
-            unit = 'h'
-            elapsed_time = elapsed_time / 3600
-        else:
-            unit = 's'
-
         self._start_time = None
 
-        return f'{round(elapsed_time, 2)} {unit}'
+        if pretty:
+            if elapsed_time > 100:
+                unit = 'min'
+                elapsed_time = elapsed_time / 60
+            elif elapsed_time > 1000:
+                unit = 'h'
+                elapsed_time = elapsed_time / 3600
+            else:
+                unit = 's'
+            formatted_time = f'{round(elapsed_time, 2)} {unit}'
+
+        else:
+            formatted_time = round(elapsed_time, 2)
+        
+        return formatted_time
 
 
 ##

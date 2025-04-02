@@ -93,10 +93,10 @@ def filter_cells(
                 'min_perc_covered_sites':min_perc_covered_sites
             }
         else:
-            afm.uns['cell_filter'] = {}
             raise ValueError(f'Cell filter {cell_filter} is not available for scLT_system {scLT_system}')
     
     else:
+        afm.uns['cell_filter'] = {}
         logging.info(f'Skipping cell filters: {cell_filter} not available. Filtered cells: {afm.shape[0]}')
 
     # Ensure each site has been observed from at least one cell

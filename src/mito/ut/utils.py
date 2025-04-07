@@ -231,8 +231,8 @@ def extract_kwargs(args, only_tree=False):
                 bin_method = d['bin_method']
                 metric = d['metric']
                 min_n_var = int(d['min_n_var'])
-                filter_dbs = bool(int(d['filter_dbs']))
-                filter_moran = bool(int(d['filter_moran']))
+                filter_dbs = d['filter_dbs']
+                filter_moran = d['filter_moran']
                 kwargs = {
                     'min_cell_number' : min_cell_number,
                     'lineage_column' : lineage_column,
@@ -287,11 +287,11 @@ def extract_kwargs(args, only_tree=False):
                 'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
-                'filter_dbs' : bool(int(args.filter_dbs)),
+                'filter_dbs' : True if args.filter_dbs == 'true' else False,
                 'ncores' : args.ncores,
                 'metric' : args.metric,
-                'spatial_metrics' : bool(int(args.spatial_metrics)),
-                'filter_moran' : bool(int(args.filter_moran))
+                'spatial_metrics' : True if args.spatial_metrics == 'true' else False,
+                'filter_moran' : True if args.filter_moran == 'true' else False,
             }
             filtering_kwargs = {
                 'min_cov' : args.min_cov,

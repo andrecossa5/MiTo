@@ -419,13 +419,13 @@ def filter_afm(
     # Compute cell-cell distances and filter variants significantly auto-correlated.
     compute_distances(afm, precomputed=True, metric=metric, ncores=ncores)
     if filter_moransI:
+        logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
         n0 = afm.shape[1]
         afm = filter_variant_moransI(afm)
         n1 = afm.shape[1]
         n_not_autocorrelated = n0-n1
     else:
         n_not_autocorrelated = np.nan
-    logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
     
     # Final cell removal
     afm = afm[np.sum(afm.layers['bin'].A>0, axis=1)>=min_n_var,:].copy()
@@ -457,7 +457,7 @@ def filter_afm(
     afm.uns['char_filter'] = {
         'lineage_column' : lineage_column, 
         'min_cell_number' : min_cell_number,
-        'filtering' : filtering if (cells is not None) or (variants is not None) else 'predefined_sets',
+        'filtering' : filtering if not((cells is not None) or (variants is not None)) else 'predefined_sets',
         'max_AD_counts' : max_AD_counts,
         'only_positive_deltaBIC' : only_positive_deltaBIC,
         'compute_enrichment' : compute_enrichment,

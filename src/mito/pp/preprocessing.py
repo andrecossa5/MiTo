@@ -419,7 +419,12 @@ def filter_afm(
     # Compute cell-cell distances and filter variants significantly auto-correlated.
     compute_distances(afm, precomputed=True, metric=metric, ncores=ncores)
     if filter_moransI:
+        n0 = afm.shape[1]
         afm = filter_variant_moransI(afm)
+        n1 = afm.shape[1]
+        n_not_autocorrelated = n0-n1
+    else:
+        n_not_autocorrelated = np.nan
     logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
     
     # Final cell removal
@@ -462,6 +467,7 @@ def filter_afm(
         'spatial_metrics' : spatial_metrics,
         'n_dbSNP' : n_dbSNP,
         'n_REDIdb' : n_REDIdb,
+        'n_not_autocorrelated' : n_not_autocorrelated,
         'min_n_var' : min_n_var
     }
     afm.uns['char_filter'].update(filtering_kwargs)

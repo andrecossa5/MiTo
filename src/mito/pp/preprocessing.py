@@ -247,14 +247,13 @@ def filter_afm(
     cells: Iterable[str] = None,
     filtering: str = 'MiTo', 
     filtering_kwargs: Dict[str,Any] = {}, 
-    filter_moransI: bool = True, 
+    filter_moran: bool = True, 
     max_AD_counts: int = 2, 
     variants: Iterable[str] = None, 
     min_n_var: int = 1, 
     fit_mixtures: bool = False, 
     only_positive_deltaBIC: bool = False, 
-    filter_dbSNP: bool = True, 
-    filter_REDIdb: bool = True, 
+    filter_dbs: bool = True, 
     compute_enrichment: bool = True, 
     bin_method: str = 'MiTo', 
     binarization_kwargs: Dict[str,Any] = {}, 
@@ -288,7 +287,7 @@ def filter_afm(
         Default is MiTo.
     filtering_kwargs : dict, optional
         Additional keyword arguments for the selected filtering method. Default is {}.
-    filter_moransI : bool, optional
+    filter_moran : bool, optional
         Whether to remove MT-SNVs that are not spatially auto-correlated. Default is True.
     max_AD_counts : int, optional
         Retain an MT-SNV if at least one cell has this number of alternative allele counts.
@@ -301,10 +300,8 @@ def filter_afm(
         Whether to fit MQuad (Kwock et al., 2022) binomial mixtures. Default is False.
     only_positive_deltaBIC : bool, optional
         Retain only MT-SNVs with positive deltaBIC (from MQuad). Default is False.
-    filter_dbSNP : bool, optional
-        Filter MT-SNVs from dbSNP database. Default is True.
-    filter_REDIdb : bool, optional
-        Filter MT-SNVs from REDIdb database. Default is True.
+    filter_dbs : bool, optional
+        Filter MT-SNVs from dbSNP and REDIdb database. Default is True.
     compute_enrichment : bool, optional
         Whether to compute MT-SNVs enrichment in the lineage_column. Default is True.
     bin_method : str, optional
@@ -389,16 +386,12 @@ def filter_afm(
     logging.info(f'afm after {filtering} filter: n cells={afm.shape[0]}, n features={afm.shape[1]}')
 
     # Filter common SNVs and possible RNA-edits
-    if filter_dbSNP:
+    if filter_dbs:
         afm, n_dbSNP = filter_dbSNP_common(afm)
-    else:
-        n_dbSNP = np.nan
-
-    # Filter possible RNA-edits 
-    if filter_REDIdb: 
         afm, n_REDIdb = filter_REDIdb_edits(afm)
     else:
         n_REDIdb = np.nan
+        n_dbSNP = np.nan
 
     # Genotype cells, and filter the one with less than min_n_var mutations
     logging.info(f'Assign MT-genotypes with {bin_method} method')
@@ -418,7 +411,7 @@ def filter_afm(
 
     # Compute cell-cell distances and filter variants significantly auto-correlated.
     compute_distances(afm, precomputed=True, metric=metric, ncores=ncores)
-    if filter_moransI:
+    if filter_moran:
         logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
         n0 = afm.shape[1]
         afm = filter_variant_moransI(afm)
@@ -461,9 +454,8 @@ def filter_afm(
         'max_AD_counts' : max_AD_counts,
         'only_positive_deltaBIC' : only_positive_deltaBIC,
         'compute_enrichment' : compute_enrichment,
-        'filter_dbSNP' : filter_dbSNP,
-        'filter_REDIdb' : filter_REDIdb,
-        'filter_moransI' : filter_moransI,
+        'filter_dbs' : filter_dbs,
+        'filter_moran' : filter_moran,
         'spatial_metrics' : spatial_metrics,
         'n_dbSNP' : n_dbSNP,
         'n_REDIdb' : n_REDIdb,

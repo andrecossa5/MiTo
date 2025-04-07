@@ -231,21 +231,19 @@ def extract_kwargs(args, only_tree=False):
                 bin_method = d['bin_method']
                 metric = d['metric']
                 min_n_var = int(d['min_n_var'])
-                filter_dbSNP = bool(int(d['filter_dbSNP']))
-                filter_REDIdb = bool(int(d['filter_REDIdb']))
-                filter_moransI = bool(int(d['filter_moransI']))
+                filter_dbs = bool(int(d['filter_dbs']))
+                filter_moran = bool(int(d['filter_moran']))
                 kwargs = {
                     'min_cell_number' : min_cell_number,
                     'lineage_column' : lineage_column,
                     'filtering' : filtering,
                     'bin_method' : bin_method,
                     'min_n_var' : min_n_var,
-                    'filter_dbSNP' : filter_dbSNP, 
-                    'filter_REDIdb' : filter_REDIdb,
+                    'filter_REDIdb' : filter_dbs,
                     'ncores' : args.ncores,
                     'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
-                    'filter_moransI' : filter_moransI
+                    'filter_moran' : filter_moran
                 }
                 filtering_kwargs = {
                     'min_cov' : int(d['min_cov']),
@@ -289,12 +287,11 @@ def extract_kwargs(args, only_tree=False):
                 'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
-                'filter_dbSNP' : bool(int(args.filter_dbSNP)), 
-                'filter_REDIdb' : bool(int(args.filter_REDIdb)),
+                'filter_dbs' : bool(int(args.filter_dbs)),
                 'ncores' : args.ncores,
                 'metric' : args.metric,
                 'spatial_metrics' : bool(int(args.spatial_metrics)),
-                'filter_moransI' : bool(int(args.filter_moransI))
+                'filter_moran' : bool(int(args.filter_moran))
             }
             filtering_kwargs = {
                 'min_cov' : args.min_cov,

@@ -231,9 +231,9 @@ def extract_kwargs(args, only_tree=False):
                 bin_method = d['bin_method']
                 metric = d['metric']
                 min_n_var = int(d['min_n_var'])
-                filter_dbSNP = bool(d['filter_dbSNP'])
-                filter_REDIdb = bool(d['filter_REDIdb'])
-                filter_moransI = bool(d['filter_moransI'])
+                filter_dbSNP = bool(int(d['filter_dbSNP']))
+                filter_REDIdb = bool(int(d['filter_REDIdb']))
+                filter_moransI = bool(int(d['filter_moransI']))
                 kwargs = {
                     'min_cell_number' : min_cell_number,
                     'lineage_column' : lineage_column,
@@ -289,12 +289,12 @@ def extract_kwargs(args, only_tree=False):
                 'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
-                'filter_dbSNP' : bool(args.filter_dbSNP), 
-                'filter_REDIdb' : bool(args.filter_REDIdb),
+                'filter_dbSNP' : bool(int(args.filter_dbSNP)), 
+                'filter_REDIdb' : bool(int(args.filter_REDIdb)),
                 'ncores' : args.ncores,
                 'metric' : args.metric,
-                'spatial_metrics' : bool(args.spatial_metrics),
-                'filter_moransI' : bool(args.filter_moransI)
+                'spatial_metrics' : bool(int(args.spatial_metrics)),
+                'filter_moransI' : bool(int(args.filter_moransI))
             }
             filtering_kwargs = {
                 'min_cov' : args.min_cov,

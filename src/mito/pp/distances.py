@@ -438,7 +438,10 @@ def preprocess_feature_matrix(
 
     layer = None
     scLT_system = afm.uns['scLT_system'] 
-    afm.uns['distance_calculations'] = {}
+    if 'distance_calculations' not in afm.uns:
+        afm.uns['distance_calculations'] = { distance_key: {}}
+    else:
+        afm.uns['distance_calculations'][distance_key] = {}
 
     if scLT_system in ['RedeeM', 'scWGS', 'MAESTER']:
 
@@ -482,7 +485,7 @@ def preprocess_feature_matrix(
     else:
         raise ValueError(f'{scLT_system} is not a valid scLT system. Choose one between MAESTER, scWGS, RedeeM, and Cas9.')
 
-    afm.uns['distance_calculations'][distance_key] = {'metric':metric}
+    afm.uns['distance_calculations'][distance_key]['metric'] = metric
     afm.uns['distance_calculations'][distance_key]['layer'] = layer
 
 

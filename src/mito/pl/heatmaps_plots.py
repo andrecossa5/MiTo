@@ -46,6 +46,7 @@ def _get_muts_order(tree):
 
 def heatmap_distances(
     afm: AnnData, 
+    distance_key: str = 'distances',
     tree: CassiopeiaTree = None, 
     vmin: float = .25, vmax: float = .95, 
     cmap: str = 'Spectral', 
@@ -58,6 +59,8 @@ def heatmap_distances(
     ----------
     afm : AnnData
         Allele Frequency Matrix.
+    distance_key : str,
+        Distence key in afm.obsp. Default is distances
     tree : CassiopeiaTree, optional
         Tree from which cell ordering can be retrieved. Default is None.
     vmin : float, optional
@@ -75,7 +78,7 @@ def heatmap_distances(
         Axes object.
     """
 
-    if 'distances' not in afm.obsp:
+    if distance_key not in afm.obsp:
         raise ValueError('Compute distances first!')
 
     if tree is None:
@@ -83,12 +86,12 @@ def heatmap_distances(
         tree = build_tree(afm, precomputed=True)
 
     order = _get_leaves_order(tree)
-    ax.imshow(afm[order].obsp['distances'].A, cmap=cmap)
+    ax.imshow(afm[order].obsp[distance_key].A, cmap=cmap)
     plu.format_ax(
         ax=ax, xlabel='Cells', ylabel='Cells', xticks=[], yticks=[],
     )
     plu.add_cbar(
-        afm.obsp['distances'].A.flatten(), ax=ax, palette=cmap, 
+        afm.obsp[distance_key].A.flatten(), ax=ax, palette=cmap, 
         label='Distance', layout='outside',
         vmin=vmin, vmax=vmax
     )
@@ -202,6 +205,7 @@ def heatmap_variants(
     # Plot heatmap
     plu.plot_heatmap(
         df_, ax=ax, vmin=vmin, vmax=vmax, 
+        ylabel='Cells',
         linewidths=0, y_names=False, label=label, palette=cmap,
         **kwargs
     )

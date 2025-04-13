@@ -1,0 +1,22 @@
+name: mito
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scanpy
+  - gseapy
+  - openblas
+  - statsmodels
+  - scikit-learn
+  - yaml
+  - cospar
+  - pysam
+  - conda-build
+  - lightgbm
+  - pip

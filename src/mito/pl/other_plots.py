@@ -5,8 +5,9 @@ Other plots (i.e., packed_circle_plot)
 import pandas as pd 
 import matplotlib
 import matplotlib.pyplot as plt
+import seaborn as sns
 import plotting_utils as plu
-from typing import Dict, Any
+from typing import Dict, Any, Iterable
 from circlify import circlify, Circle
 
 

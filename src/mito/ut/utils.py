@@ -5,10 +5,12 @@ Miscellaneous utilities.
 import os 
 import sys
 import time 
+import pickle
 from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 
 
 
@@ -438,6 +440,54 @@ def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
     df_final = df_selected.sort_values('ARI', ascending=False).head(5)
 
     return df_selected, df_final
+
+
+##
+
+
+def extract_bench_df(path):
+
+    L = []
+    for folder,_,files in os.walk(path):
+        for file in files:
+            if file.endswith('pickle'):
+                with open(os.path.join(folder, file), 'rb') as f:
+                    d = pickle.load(f)
+                del d['labels']
+                L.append(d)
+    df_bench = pd.DataFrame(L)
+
+    return df_bench
+
+
+def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
+    """
+    Perturb AD and .X layers of afm.
+    """
+    afm = a.copy()
+    AD_new = afm.layers['AD'].A.copy()
+
+    n_vars = AD_new.shape[1]
+    n_sites = int(np.round(n_vars * perc_sites))
+    idx = np.random.choice(np.arange(n_vars), n_sites)
+
+    for i in idx:
+        ad = afm.layers['AD'].A[:,10]
+        dp = afm.layers['site_coverage'].A[:,10]
+        p_fit = np.sum(ad) / np.sum(dp)
+        p_noise = theta * p_fit
+        if add:
+            new_ad = ad + (dp * p_noise)
+        else:
+            new_ad = ad - (dp * p_noise)
+
+        AD_new[:,i] = new_ad
+
+    corr = np.corrcoef(afm.layers['AD'].A.flatten(), AD_new.flatten())[0,1]
+    afm.layers['AD'] = csr_matrix(AD_new)
+    afm.X = csr_matrix(np.divide(AD_new, afm.layers['DP'].A+.000001))
+
+    return afm, corr
 
 
 ##

@@ -114,7 +114,6 @@ def _place_tree_and_annotations(
         if cov in features:
             if cov in tree.cell_meta.columns:
                 x = tree.cell_meta[cov].copy()
-                x = x.astype('category')
             else:
                 raise KeyError(f'{cov} not in tree.cell_meta!')
         
@@ -162,6 +161,8 @@ def _place_tree_and_annotations(
 
         elif pd.api.types.is_string_dtype(x) or x.dtype == 'category':
 
+            x = x.astype('category')
+            
             if cov in features:
                 if categorical_cmaps is None or cov not in categorical_cmaps:
                     categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat], add_na=True)

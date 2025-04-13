@@ -3,42 +3,27 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.10.6
-  - numpy=1.22.4
-  - scipy=1.9.0
-  - pandas==1.5.3
-  - anndata=0.8.0
-  - networkx=2.8.6
-  - python-igraph=0.9.11
-  - leidenalg=0.8
-  - matplotlib=3.5.3
-  - seaborn=0.13.2
-  - scanpy=1.9.1
+  - python=3.11
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scanpy
+  - python-igraph
+  - leidenalg
   - gseapy
   - openblas
   - statsmodels
-  - scikit-learn=1.1.2
-  - yaml=0.2.5
+  - scikit-learn
+  - yaml
   - pysam
   - conda-build
   - lightgbm
   - pip
   - pip:
-      - cvxpy==1.3
-      - Biopython==1.71
-      - bokeh==0.12.15
-      - ete3==3.1.1
-      - ngs-tools==1.5.6
-      - plotly==5.0.0
-      - pyseq-align==1.0.2
-      - itolapi
-      - hits
-      - PyYAML
-      - parameterized
-      - circlify
-      - mquad==0.1.8
-      - sphinx==8.1.3
-      - sphinx-rtd-theme
-      - sphinx-autodoc-typehints
-      - sphinxcontrib-napoleon
-
+      - flax
+      - diffrax
+      - moscot
+      - MQuad
+      - git+https://github.com/YosefLab/Cassiopeia.git@bf85cf6c007fd6385dffb767df51fe52cf08fd3a#egg=cassiopeia-lineage

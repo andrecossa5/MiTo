@@ -86,12 +86,13 @@ def heatmap_distances(
         tree = build_tree(afm, precomputed=True)
 
     order = _get_leaves_order(tree)
-    ax.imshow(afm[order].obsp[distance_key].A, cmap=cmap)
+    D = afm[order].obsp[distance_key].toarray()
+    ax.imshow(D, cmap=cmap)
     plu.format_ax(
         ax=ax, xlabel='Cells', ylabel='Cells', xticks=[], yticks=[],
     )
     plu.add_cbar(
-        afm.obsp[distance_key].A.flatten(), ax=ax, palette=cmap, 
+        D.flatten(), ax=ax, palette=cmap, 
         label='Distance', layout='outside',
         vmin=vmin, vmax=vmax
     )
@@ -161,7 +162,7 @@ def heatmap_variants(
     mut_order = _get_muts_order(tree)
 
     if layer is None:
-        X = afm.X.A
+        X = afm.X.toarray()
     elif layer in afm.layers:
         X = afm.layers[layer]
     else:

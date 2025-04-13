@@ -8,7 +8,7 @@ import pandas as pd
 import cassiopeia as cs
 from tqdm import tqdm
 from itertools import product
-from typing import Iterable, Tuple, Dict, Any
+from typing import Iterable, Tuple
 from cassiopeia.data import CassiopeiaTree
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
@@ -415,7 +415,8 @@ class MiToTreeAnnotator():
             data_list.append([level, int(valid_tmp), len(tree.leaves_in_subtree(node_tmp)), name])
             for j0, child_tmp in enumerate(tree.children(node_tmp)):
                 _collect_clade_info(
-                    tree, child_tmp, usable_mutations, level=level+1, data_list=data_list, name=f"{name},{j0}"
+                    tree, child_tmp, usable_mutations, level=level+1, 
+                    data_list=data_list, name=f"{name},{j0}"
                 )
 
         ##
@@ -493,6 +494,11 @@ class MiToTreeAnnotator():
         df_predict = pd.concat(df_list, ignore_index=True)
         df_predict = df_predict.set_index('cell')
         df_predict.loc[df_predict['muts'].isna(), 'MiTo clone'] = np.nan
+
+        # Set types
+        df_predict['MiTo clone'] = pd.Categorical(df_predict['MiTo clone'])
+        df_predict['lca'] = pd.Categorical(df_predict['lca'])
+        df_predict['muts'] = pd.Categorical(df_predict['muts'])
 
         # Resolve over-clustering
         labels, similarities = self.resolve_ambiguous_clones(

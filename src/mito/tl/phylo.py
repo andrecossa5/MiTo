@@ -47,12 +47,12 @@ def _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, m
     assert distance_key in afm.obsp
 
     layer = 'bin' if 'bin' in afm.layers else 'scaled'
-    D = afm.obsp[distance_key].A.copy()
+    D = afm.obsp[distance_key].toarray()
     D[np.isnan(D)] = 0
     D = pd.DataFrame(D, index=afm.obs_names, columns=afm.obs_names)
-    M = pd.DataFrame(afm.layers[layer].A, index=afm.obs_names, columns=afm.var_names)
+    M = pd.DataFrame(afm.layers[layer].toarray(), index=afm.obs_names, columns=afm.var_names)
     if afm.X is not None:
-        M_raw = pd.DataFrame(afm.X.A, index=afm.obs_names, columns=afm.var_names)
+        M_raw = pd.DataFrame(afm.X.toarray(), index=afm.obs_names, columns=afm.var_names)
     else:
         M_raw = M.copy()
 
@@ -109,7 +109,7 @@ def AFM_to_seqs(
         call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
 
     # Convert to a dict of strings
-    X_bin = afm.layers['bin'].A.copy()
+    X_bin = afm.layers['bin'].toarray()
     d = {}
     for i, cell in enumerate(afm.obs_names):
         m_ = X_bin[i,:]

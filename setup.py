@@ -1,6 +1,5 @@
 # Setup.py
 from setuptools import setup, find_packages
-import os
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -21,7 +20,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.10',
+    python_requires='>=3.11',
     install_requires=[
         # Note: for best reproducibility the environment must
         # be setup before hand, as indicated in the README.md

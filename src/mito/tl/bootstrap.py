@@ -19,7 +19,7 @@ def bootstrap_allele_tables(afm, layer='AD', frac_char_resampling=.8):
     # Get layer
     if layer in afm.layers:
         X = afm.layers[layer]
-        X = X if not issparse(X) else X.A
+        X = X if not issparse(X) else X.toarray()
     else:
         raise KeyError(f'{layer} not present in afm! Check your inputs...')
 
@@ -46,7 +46,7 @@ def jackknife_allele_tables(afm, layer='AD'):
     # Get layer
     if layer in afm.layers:
         X = afm.layers[layer]
-        X = X if not issparse(X) else X.A
+        X = X if not issparse(X) else X.toarray()
     else:
         raise KeyError(f'{layer} not present in afm! Check your inputs...')
 

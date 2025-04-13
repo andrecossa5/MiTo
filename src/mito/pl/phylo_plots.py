@@ -159,10 +159,9 @@ def _place_tree_and_annotations(
                 vmax_annot
             )
 
-        elif pd.api.types.is_string_dtype(x) or x.dtype == 'category':
+        elif pd.api.types.is_string_dtype(x) or pd.api.types.is_categorical_dtype(x):
 
             x = x.astype('category')
-            
             if cov in features:
                 if categorical_cmaps is None or cov not in categorical_cmaps:
                     categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat], add_na=True)

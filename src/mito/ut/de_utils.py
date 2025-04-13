@@ -40,8 +40,8 @@ def format_rank_genes_groups(
         df_['group'] = cat
         cell_group = adata.obs_names[adata.obs[group_col] == cat]
         cell_rest = adata.obs_names[adata.obs[group_col] != cat]
-        df_['mean_exp_group'] = adata[cell_group, df_['gene']].X.A.mean(axis=0)
-        df_['mean_exp_rest'] = adata[cell_rest, df_['gene']].X.A.mean(axis=0)
+        df_['mean_exp_group'] = adata[cell_group, df_['gene']].X.mean(axis=0).flatten()
+        df_['mean_exp_rest'] = adata[cell_rest, df_['gene']].X.mean(axis=0).flatten()
         
         if filter_genes:
             df_ = df_.query('log2FC>=@min_log2FC and pct_group>@min_pct_group and pct_rest<=@max_pct_rest')

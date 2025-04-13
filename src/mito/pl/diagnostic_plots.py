@@ -31,7 +31,7 @@ def vars_AF_spectrum(
     Ranked AF distributions (as in Miller et al., 2022).
     """
 
-    X = afm.X.A
+    X = afm.X.toarray()
     for i in range(X.shape[1]):
         x = X[:,i]
         x = np.sort(x)

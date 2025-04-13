@@ -100,7 +100,7 @@ def filter_cells(
         logging.info(f'Skipping cell filters: {cell_filter} not available. Filtered cells: {afm.shape[0]}')
 
     # Ensure each site has been observed from at least one cell
-    test_atleastone = np.sum(afm.X.A>0, axis=0)>0
+    test_atleastone = (afm.X>0).sum(axis=0).A1>0
     afm = afm[:,test_atleastone].copy()
 
     return afm
@@ -180,7 +180,7 @@ def compute_metrics_filtered(afm, spatial_metrics=False, tree_kwargs={}):
 
     d = {}
     assert 'bin' in afm.layers    
-    X_bin = afm.layers['bin'].A.copy()
+    X_bin = afm.layers['bin'].toarray()
 
     # n cells and vars
     d['n_cells'] = X_bin.shape[0]
@@ -193,7 +193,8 @@ def compute_metrics_filtered(afm, spatial_metrics=False, tree_kwargs={}):
     d['median_n_cells_per_var'] = np.median((X_bin>0).sum(axis=0))
     d['std_n_cells_per_var'] = np.std((X_bin>0).sum(axis=0))
     # AFM sparseness and genotypes uniqueness
-    d['density'] = (X_bin>0).sum() / np.product(X_bin.shape)
+
+    d['density'] = (X_bin>0).sum() / (X_bin.shape[0] * X_bin.shape[1])
     seqs = AFM_to_seqs(afm)
     unique_genomes_occurrences = pd.Series(seqs).value_counts(normalize=True)
     d['genomes_redundancy'] = 1-(unique_genomes_occurrences.size / X_bin.shape[0])
@@ -396,7 +397,7 @@ def filter_afm(
     # Genotype cells, and filter the one with less than min_n_var mutations
     logging.info(f'Assign MT-genotypes with {bin_method} method')
     call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
-    afm = afm[np.sum(afm.layers['bin'].A>0, axis=1)>=min_n_var,:].copy()
+    afm = afm[(afm.layers['bin']>0).sum(axis=1).A1>=min_n_var,:].copy()
     logging.info(f'Retain only cells with at least {min_n_var} MT-SNVs: {afm.shape[0]}')
  
     # Bimodal mixture modelling: deltaBIC (MQuad-like) and max AD in at least one cell (Weng et al., 2024)
@@ -406,7 +407,7 @@ def filter_afm(
             afm = afm[:,afm.var['deltaBIC']>0].copy()
             logging.info(f'Remove MT-SNVs with MQuad deltaBIC<0')
     if max_AD_counts>1:
-        afm = afm[:,np.max(afm.layers['AD'].A, axis=0)>=max_AD_counts].copy()
+        afm = afm[:,afm.layers['AD'].max(axis=0).toarray()>=max_AD_counts].copy()
         logging.info(f'Remove MT-SNVs with no +cells having at least {max_AD_counts} AD counts')
 
     # Compute cell-cell distances and filter variants significantly auto-correlated.
@@ -421,7 +422,7 @@ def filter_afm(
         n_not_autocorrelated = np.nan
     
     # Final cell removal
-    afm = afm[np.sum(afm.layers['bin'].A>0, axis=1)>=min_n_var,:].copy()
+    afm = afm[(afm.layers['bin']>0).sum(axis=1).A1>=min_n_var,:].copy()
     annotate_vars(afm, overwrite=True)
     logging.info(f'Retain cells with at least {min_n_var} MT-SNVs: {afm.shape[0]}')
     logging.info(f'Final afm after all filters: n cells={afm.shape[0]}, n features={afm.shape[1]}')

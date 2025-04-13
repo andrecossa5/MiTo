@@ -174,7 +174,7 @@ def genotype_MiTo_smooth(
                 binarization_kwargs={'min_AD':1, 't_vanilla':0}, # Loose genotyping.
                 verbose=False
             )
-            L.append(afm_.obsp['distances'].A)
+            L.append(afm_.obsp['distances'].toarray())
 
         D = np.mean(np.stack(L, axis=0), axis=0)
         logging.info(f'Compute kNN graph for smoothing')
@@ -198,7 +198,7 @@ def genotype_MiTo_smooth(
             verbose=True,
         )
         logging.info(f'Compute kNN graph for smoothing')
-        index, _, _ = kNN_graph(D=afm_.obsp['distances'].A, k=k, from_distances=True)
+        index, _, _ = kNN_graph(D=afm_.obsp['distances'].toarray(), k=k, from_distances=True)
 
     ##
 
@@ -286,9 +286,9 @@ def call_genotypes(
     assert 'site_coverage' in afm.layers or 'DP' in afm.layers
     cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP' 
 
-    X = afm.X.A.copy()
-    AD = afm.layers['AD'].A.copy()
-    DP = afm.layers[cov_layer].A.copy()
+    X = afm.X.toarray()
+    AD = afm.layers['AD'].toarray()
+    DP = afm.layers[cov_layer].toarray()
     
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)
@@ -452,7 +452,7 @@ def preprocess_feature_matrix(
                     logging.info('Use precomputed scaled layer...')
             else:
                 logging.info('Scale raw AFs in afm.X')
-                afm.layers['scaled'] = csr_matrix(pp.scale(afm.X.A))
+                afm.layers['scaled'] = csr_matrix(pp.scale(afm.X.toarray()))
 
         elif metric in discrete_metrics:
             layer = 'bin'
@@ -537,14 +537,15 @@ def compute_distances(
     )
     layer = afm.uns['distance_calculations'][distance_key]['layer']
     metric = afm.uns['distance_calculations'][distance_key]['metric']
-    X = afm.layers[layer].A.copy()
+    X = afm.layers[layer].toarray()
 
     if verbose:
         logging.info(f'Compute distances: ncores={ncores}, metric={metric}.')
 
     # Calculate distances (handle weights, if necessary)
     if metric=='weighted_jaccard':
-        w = np.nanmedian(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
+        af = afm.X.toarray()
+        w = np.nanmedian(np.where(af>0, af, np.nan), axis=0)
         D = weighted_jaccard(X, w)
     elif metric=='weighted_hamming':
         w = _get_priors(afm)

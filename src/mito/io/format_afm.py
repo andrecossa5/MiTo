@@ -124,8 +124,8 @@ def read_from_cellsnp(
 
     vcf = pd.read_csv(path_vcf, sep='\t', skiprows=1)
     variants = vcf['POS'].astype(str) + '_' + vcf['REF'] + '>' + vcf['ALT']
-    AD = pd.DataFrame(mmread(path_AD).A.T, index=cells, columns=variants)
-    DP = pd.DataFrame(mmread(path_DP).A.T, index=cells, columns=variants)
+    AD = pd.DataFrame(mmread(path_AD).toarray().T, index=cells, columns=variants)
+    DP = pd.DataFrame(mmread(path_DP).toarray().T, index=cells, columns=variants)
     
     if path_meta is not None and os.path.exists(path_meta):
         cell_meta = pd.read_csv(path_meta, index_col=0)

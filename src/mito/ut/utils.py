@@ -404,8 +404,8 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
     cells = []
     for clone, f in zip(clones, freqs):
         afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
-        afm_clone = afm_clone[np.sum(afm_clone.layers['bin'].A>0, axis=1)>2,
-                              np.sum(afm_clone.layers['bin'].A>0, axis=0)>=2]
+        afm_clone = afm_clone[(afm_clone.layers['bin']>0).sum(axis=1).flatten()>2,
+                              (afm_clone.layers['bin']>0).sum(axis=0).flatten()>=2]
         n_cells_clone = min(round(ncells*f), afm_clone.shape[0])
         cells.extend(
             np.random.choice(afm_clone.obs_names, n_cells_clone, replace=False).tolist()
@@ -465,15 +465,15 @@ def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
     Perturb AD and .X layers of afm.
     """
     afm = a.copy()
-    AD_new = afm.layers['AD'].A.copy()
+    AD_new = afm.layers['AD'].copy()
 
     n_vars = AD_new.shape[1]
     n_sites = int(np.round(n_vars * perc_sites))
     idx = np.random.choice(np.arange(n_vars), n_sites)
 
     for i in idx:
-        ad = afm.layers['AD'].A[:,10]
-        dp = afm.layers['site_coverage'].A[:,10]
+        ad = afm.layers['AD'][:,i].toarray().flatten()
+        dp = afm.layers['site_coverage'][:,i].toarray().flatten()
         p_fit = np.sum(ad) / np.sum(dp)
         p_noise = theta * p_fit
         if add:
@@ -483,9 +483,9 @@ def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
 
         AD_new[:,i] = new_ad
 
-    corr = np.corrcoef(afm.layers['AD'].A.flatten(), AD_new.flatten())[0,1]
-    afm.layers['AD'] = csr_matrix(AD_new)
-    afm.X = csr_matrix(np.divide(AD_new, afm.layers['DP'].A+.000001))
+    corr = np.corrcoef(afm.layers['AD'].toarray().flatten(), AD_new.toarray().flatten())[0,1]
+    afm.layers['AD'] = AD_new
+    afm.X = AD_new / (afm.layers['DP']+.000001)
 
     return afm, corr
 

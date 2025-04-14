@@ -1,4 +1,4 @@
-from .phenotype import compute_clonal_fate_bias, compute_scPlasticity
+from .phenotype import compute_clonal_fate_bias, compute_scPlasticity, nb_regression
 from .annotate import MiToTreeAnnotator
 from .bootstrap import bootstrap_bin, bootstrap_MiTo
 from .clustering import leiden_clustering
@@ -9,5 +9,5 @@ from .phylo import (
 
 __all__ = [
     "compute_clonal_fate_bias", "compute_scPlasticity", "MiToTreeAnnotator",
-    "build_tree", "bootstrap_MiTo", "get_internal_node_stats"
+    "build_tree", "bootstrap_MiTo", "get_internal_node_stats", "nb_regression"
 ]

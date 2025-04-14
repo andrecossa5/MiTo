@@ -4,11 +4,14 @@ Tools to map phenotype to lineage structures.
 
 import numpy as np
 import pandas as pd
-from typing import Any
+from tqdm import tqdm
+from typing import Any, Iterable
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 
 ##
@@ -102,6 +105,57 @@ def compute_scPlasticity(tree: CassiopeiaTree, meta_column: str):
             parent = tree.parent(parent)
 
         tree.cell_meta.loc[leaf, "scPlasticity"] = np.mean(plasticities)
+
+
+##
+
+
+def nb_regression(df: pd.DataFrame, features: Iterable[str], predictor: str) -> pd.DataFrame:
+    """
+    Negative binomial regression approach to associate 
+    clonal-level features to gene expression.
+
+    Parameters
+    ----------
+    afm : pd.DataFrame (clone/sample x features/covariates)
+        Input data table. Contains raw counts for all genes, and covariates of interest.
+    features : list, str
+        List of variables to test the GLM model coefficients on.
+    predictor : str
+        Model specification via formula interface. Formula is in the form:
+        "gene ~ predictor". Example predictor: "fitness + counts"
+
+    Returns
+    -------
+    AnnData
+        Filtered Allelic Frequency Matrix.
+    """
+
+    L = []
+    for gene in tqdm(features, total=len(features), desc="Features"):
+        try:
+            formula = f'{gene} ~ {predictor}'
+            family = sm.families.NegativeBinomial()
+            model = (
+                smf.glm(formula=formula, data=df, family=family)
+                .fit()
+            )
+            df_ = (
+                model.params.to_frame('coef')
+                .join(model.pvalues.to_frame('pval'))
+                .reset_index(names='param')
+                .query('param!="Intercept"')
+                .assign(gene=gene)
+            )
+            L.append(df_)
+        except:
+            pass
+
+    results = pd.concat(L)
+    results['-logp10'] = -np.log10(results['pval'])
+    results = results[['gene', 'param', 'coef', 'pval', '-logp10']]
+
+    return results
 
 
 ##

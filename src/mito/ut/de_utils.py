@@ -4,6 +4,7 @@ Utils for DE, GSEA analysis.
 
 import pandas as pd
 import gseapy
+from typing import List
 from anndata import AnnData
 from sklearn.metrics import pairwise_distances
 from scipy.cluster.hierarchy import linkage, leaves_list
@@ -103,7 +104,7 @@ def get_top_markers(df, groupby='group', sort_by='log2FC', ascending=False, orde
 
 def run_GSEA(
     ranked_list: pd.Series, 
-    collection: str  = 'MSigDB_Hallmark_2020',
+    collections: str|List[str] = 'MSigDB_Hallmark_2020',
     max_pval_adj: float = .01,
     min_size_set: int = 15,
     max_size_set: int =  1000
@@ -115,9 +116,10 @@ def run_GSEA(
     # names = pd.Series(gseapy.get_library_name())
     # names[names.str.contains('Hall')]
 
+    L = collections if isinstance(collections, list) else [collections]
     results = gseapy.prerank(
         rnk=ranked_list,
-        gene_sets=[collection],
+        gene_sets=L,
         threads=-1,
         min_size=min_size_set,
         max_size=max_size_set,
@@ -134,7 +136,7 @@ def run_GSEA(
         .sort_values('NES', ascending=False)
     )
 
-    return df
+    return results, df
 
 
 ##

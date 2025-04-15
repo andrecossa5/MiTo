@@ -248,7 +248,7 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
                     )
             elif isinstance(cmap, dict):
                 print('User-provided colors dictionary...')
-                colors = meta[cov].map(cmap).to_dict()
+                colors = meta[cov].astype('str').map(cmap).to_dict()
             else:
                 raise KeyError(f'{cov} You can either specify a string cmap or an element:color dictionary.')
         else:

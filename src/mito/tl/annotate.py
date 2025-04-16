@@ -109,6 +109,33 @@ class MiToTreeAnnotator():
 
     ##
 
+    def _check_inference(self):
+        """
+        Test if the clonal structure is OK.
+        """
+        clones = self.tree.cell_meta['MiTo clone'].unique()
+        clades = get_clades(self.tree)
+
+        for clone in clones:
+            nodes = (
+                self.tree.cell_meta
+                .loc[self.tree.cell_meta['MiTo clone']==clone, 'lca']
+                .unique()
+            )
+            assert len(nodes) <= 1
+
+            if len(nodes)==1:   # not np.nan MiTo clone
+                lca = nodes[0]
+                cells = (
+                    self.tree.cell_meta
+                    .loc[self.tree.cell_meta['MiTo clone']==clone]
+                    .index.to_list()
+                )
+                lca_ = self.tree.find_lca(*cells)
+                assert(lca==lca_)
+
+    ##
+
     def resolve_ambiguous_clones(
         self, 
         df_predict: pd.DataFrame, 
@@ -230,7 +257,9 @@ class MiToTreeAnnotator():
 
                 if test2: # and test1
                     df_predict.loc[cells_merged_clone, 'MiTo clone'] = int_clone
-                    df_predict.loc[cells_merged_clone, 'median cell similarity'] = self.tree.get_attribute(new_lca, 'similarity')
+                    df_predict.loc[cells_merged_clone, 'median cell similarity'] = (
+                        self.tree.get_attribute(new_lca, 'similarity')
+                    )
                     df_predict.loc[cells_merged_clone, 'n cells'] = cells_merged_clone.size
                     df_predict.loc[cells_merged_clone, 'lca'] = new_lca
                     df_predict.loc[cells_merged_clone, 'muts'] = new_clone_muts
@@ -248,7 +277,11 @@ class MiToTreeAnnotator():
 
         # Check if the df_predict info should be added to self.tree.cell_meta
         if add_to_meta:
+            df_predict['MiTo clone'] = pd.Categorical(df_predict['MiTo clone'])
+            df_predict['lca'] = pd.Categorical(df_predict['lca'])
+            df_predict['muts'] = pd.Categorical(df_predict['muts'])
             self.tree.cell_meta = self.tree.cell_meta.join(df_predict)
+            self._check_inference()
 
         return df_predict['MiTo clone'], df_predict['median cell similarity']
 
@@ -495,11 +528,6 @@ class MiToTreeAnnotator():
         df_predict = df_predict.set_index('cell')
         df_predict.loc[df_predict['muts'].isna(), 'MiTo clone'] = np.nan
 
-        # Set types
-        df_predict['MiTo clone'] = pd.Categorical(df_predict['MiTo clone'])
-        df_predict['lca'] = pd.Categorical(df_predict['lca'])
-        df_predict['muts'] = pd.Categorical(df_predict['muts'])
-
         # Resolve over-clustering
         labels, similarities = self.resolve_ambiguous_clones(
             df_predict, s_treshold=merging_treshold, add_to_meta=add_to_meta
@@ -560,7 +588,7 @@ class MiToTreeAnnotator():
                 n_clones.append(labels.unique().size)
                 similarities.append(sim.mean())
             except:
-                # Some error with this hyper-parameter combo
+                # Some error occurred with this hyper-parameter combo
                 pass
 
         # Pick optimal combination, and perform final splitting

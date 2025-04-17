@@ -12,33 +12,8 @@ import plotting_utils as plu
 from typing import Dict, Any
 from anndata import AnnData
 from cassiopeia.data import CassiopeiaTree
-from ..tl.phylo import build_tree
-from ..tl.annotate import MiToTreeAnnotator
-
-
-##
-
-
-def _get_leaves_order(tree):
-    order = []
-    for node in tree.depth_first_traverse_nodes():
-        if node in tree.leaves:
-            order.append(node)
-    return order
-
-
-##
-
-
-def _get_muts_order(tree):
-
-    tree_ = tree.copy()
-    model = MiToTreeAnnotator(tree_)
-    model.get_T()
-    model.get_M()
-    model.extract_mut_order()
-
-    return model.ordered_muts
+from ..tl.phylo import build_tree, _get_leaves_order
+from ..tl.annotate import _get_muts_order
 
 
 ##

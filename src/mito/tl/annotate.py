@@ -15,8 +15,85 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from sklearn.metrics import silhouette_score
 from cassiopeia.tools.fitness_estimator._lbi_jungle import LBIJungle
 from ..pp.distances import weighted_jaccard
-from ..tl.phylo import get_clades, get_internal_node_stats
+from ..tl.phylo import get_clades, get_internal_node_stats, _get_leaves_order
 from ..ut.utils import Timer, rescale
+
+
+##
+
+
+def get_ranges_and_gaps(s: pd.Series, label):
+
+    vals = s.values
+    m = (vals == label)
+
+    def _get_runs(bool_arr):
+        padded = np.concatenate(([False], bool_arr, [False]))
+        d = np.diff(padded.astype(int))
+        starts = np.where(d == 1)[0]
+        ends   = np.where(d == -1)[0]
+        return list(zip(starts, ends))
+
+    present = _get_runs(m)
+    gaps    = _get_runs(~m)
+    return present, gaps
+
+
+##
+
+
+def fing_longest_stretch(ranges, series):
+
+    n = len(ranges)
+    if n == 0:
+        return (), ()
+    
+    non_nan = ~series.isna().values
+    prefix = np.concatenate([[0], non_nan.cumsum()])
+    
+    best_start = 0
+    best_len = 1
+    curr_start = 0
+
+    for i in range(1, n):
+        prev_end = ranges[i-1][1]
+        curr_begin = ranges[i][0]
+        if prefix[curr_begin] - prefix[prev_end] == 0:
+            pass
+        else:
+            length = i - curr_start
+            if length > best_len:
+                best_len = length
+                best_start = curr_start
+                best_end = i - 1
+            curr_start = i
+
+    length = n - curr_start
+    if length > best_len:
+        best_len = length
+        best_start = curr_start
+        best_end = n - 1
+    else:
+        best_end = best_start + best_len - 1
+
+    best_seq = tuple(ranges[best_start:best_end+1])
+    others = tuple(r for idx, r in enumerate(ranges) if idx < best_start or idx > best_end)
+
+    return best_seq, others
+
+
+##
+
+
+def _get_muts_order(tree):
+
+    tree_ = tree.copy()
+    model = MiToTreeAnnotator(tree_)
+    model.get_T()
+    model.get_M()
+    model.extract_mut_order()
+
+    return model.ordered_muts
 
 
 ##
@@ -53,6 +130,8 @@ class MiToTreeAnnotator():
         Compute the "cell assignment" matrix, T.
         T is a cell x clade (internal node) binary matrix mapping each cell i to every clade j.
         """
+
+        logging.info('Retrieve cell assignment to tree clades')
         clades = get_clades(self.tree, with_root=with_root, with_singletons=True)
         T = np.array([[x in clades[clade] for x in self.tree.leaves] for clade in clades]).astype(int)
         T = (
@@ -69,6 +148,8 @@ class MiToTreeAnnotator():
         M is a mut x clade matrix storing for each mutation i and clade j the enrichment 
         value defined as -log10(pval) from a Fisher's Exact test.
         """
+
+        logging.info('Compute mutations enrichment')
         P = {}
         muts = self.tree.layers['transformed'].columns
 
@@ -109,12 +190,47 @@ class MiToTreeAnnotator():
 
     ##
 
+    def _get_disjoint_clones(self, ordered_clones):
+
+        cats = ordered_clones.value_counts().index
+        resolve_list = []
+
+        for cat in cats:
+
+            clone_ranges, gaps = get_ranges_and_gaps(ordered_clones, cat)
+
+            for r in clone_ranges:
+                assert (ordered_clones.iloc[r[0]:r[1]]==cat).all()
+            for g in gaps:
+                assert (ordered_clones.iloc[g[0]:g[1]]!=cat).all()
+
+            gaps = [ g for g in gaps if g[0]!=0 and g[1]!=len(ordered_clones) ]
+
+            all_gaps_nans = True
+            for g in gaps:
+                if not ordered_clones.iloc[g[0]:g[1]].isna().all():
+                    all_gaps_nans = False
+
+            if not all_gaps_nans:
+                resolve_list.append([cat, clone_ranges])
+
+        return resolve_list
+
+    ##
+
     def _check_inference(self):
-        """
-        Test if the clonal structure is OK.
-        """
-        clones = self.tree.cell_meta['MiTo clone'].unique()
-        clades = get_clades(self.tree)
+
+        ordered_clones = self.tree.cell_meta.loc[_get_leaves_order(self.tree), 'MiTo clone']
+        clones = ordered_clones.value_counts().index
+        
+        assert len(self._get_disjoint_clones(ordered_clones))==0
+        
+        assert ( 
+            (self.tree.cell_meta
+            .groupby('lca')['MiTo clone']
+            .nunique()==1)
+            .all()
+        )
 
         for clone in clones:
             nodes = (
@@ -124,7 +240,7 @@ class MiToTreeAnnotator():
             )
             assert len(nodes) <= 1
 
-            if len(nodes)==1:   # not np.nan MiTo clone
+            if len(nodes)==1:   
                 lca = nodes[0]
                 cells = (
                     self.tree.cell_meta
@@ -251,11 +367,9 @@ class MiToTreeAnnotator():
                 )
                 cells_clone = df_predict.loc[lambda x: x['MiTo clone'] == clone].index
                 cells_int_clone = df_predict.loc[lambda x: x['MiTo clone'] == int_clone].index
+                test =  len(set(cells_merged_clone) - (set(cells_clone) | set(cells_int_clone)) ) == 0
 
-                # test1 = len(set(new_clone_cells) - set(cells_merged_clone)) == 0
-                test2 =  len(set(cells_merged_clone) - (set(cells_clone) | set(cells_int_clone)) ) == 0
-
-                if test2: # and test1
+                if test:
                     df_predict.loc[cells_merged_clone, 'MiTo clone'] = int_clone
                     df_predict.loc[cells_merged_clone, 'median cell similarity'] = (
                         self.tree.get_attribute(new_lca, 'similarity')
@@ -268,18 +382,46 @@ class MiToTreeAnnotator():
 
                 n_trials += 1
 
-        # Put final, unresolved_clones as NaNs
+        # Put unresolved_clones as NaNs
         df_predict.loc[df_predict['MiTo clone'].isin(remained_unresolved), 'MiTo clone'] = np.nan
-        sizes = df_predict['MiTo clone'].value_counts()
+
+        # Last conflict resolution: solve disjoint clones, if any
+        ordered_clones = df_predict.loc[_get_leaves_order(self.tree), 'MiTo clone']
+        resolve_list = self._get_disjoint_clones(ordered_clones)
+        if resolve_list:
+            for i in range(len(resolve_list)):
+                clone, clone_ranges = resolve_list[i]
+                accepted, discarded = fing_longest_stretch(clone_ranges, ordered_clones)
+                accepted_range = (accepted[0][0], accepted[-1][1])
+                final_clone_cells = ordered_clones.index[accepted_range[0]:accepted_range[1]]
+                df_predict.loc[final_clone_cells, 'lca'] = (
+                    self.tree.find_lca(*final_clone_cells)
+                )
+                final_na_set = []
+                for r in discarded:
+                    final_na_set.extend(
+                        ordered_clones.index[r[0]:r[1]]
+                    )
+                df_predict.loc[final_na_set, 'MiTo clone'] = np.nan
+                df_predict.loc[final_na_set, 'lca'] = np.nan
+                df_predict.loc[final_na_set, 'muts'] = np.nan
+        
+        # Rename MiTo clones according to their lca size
+        sizes = df_predict['lca'].value_counts()
         mapping = { x : f'MT-{i}' for i,x in enumerate(sizes.index) }
-        df_predict['MiTo clone'] = df_predict['MiTo clone'].map(mapping)
-        self.clonal_nodes = df_predict.loc[lambda x: ~x['MiTo clone'].isna(), 'lca'].unique().tolist()
+        df_predict['MiTo clone'] = df_predict['lca'].map(mapping)
+        self.clonal_nodes = df_predict.loc[lambda x: ~x['lca'].isna(), 'lca'].unique().tolist()
 
         # Check if the df_predict info should be added to self.tree.cell_meta
         if add_to_meta:
             df_predict['MiTo clone'] = pd.Categorical(df_predict['MiTo clone'])
             df_predict['lca'] = pd.Categorical(df_predict['lca'])
             df_predict['muts'] = pd.Categorical(df_predict['muts'])
+            cols = [ 
+                x for x in self.tree.cell_meta.columns \
+                if x not in df_predict.columns
+            ]
+            self.tree.cell_meta = self.tree.cell_meta[cols]
             self.tree.cell_meta = self.tree.cell_meta.join(df_predict)
             self._check_inference()
 

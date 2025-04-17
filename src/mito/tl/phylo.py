@@ -266,3 +266,14 @@ def build_tree(
 
 
 ##
+
+
+def _get_leaves_order(tree):
+    order = []
+    for node in tree.depth_first_traverse_nodes():
+        if node in tree.leaves:
+            order.append(node)
+    return order
+
+
+##

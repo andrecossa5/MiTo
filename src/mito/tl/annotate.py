@@ -15,8 +15,9 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from sklearn.metrics import silhouette_score
 from cassiopeia.tools.fitness_estimator._lbi_jungle import LBIJungle
 from ..pp.distances import weighted_jaccard
-from ..tl.phylo import get_clades, get_internal_node_stats, _get_leaves_order
+from ..ut.phylo_utils import get_clades, get_internal_node_stats
 from ..ut.utils import Timer, rescale
+from .phylo import _get_leaves_order
 
 
 ##

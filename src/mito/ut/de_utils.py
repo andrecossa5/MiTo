@@ -2,6 +2,7 @@
 Utils for DE, GSEA analysis.
 """
 
+import numpy as np
 import pandas as pd
 import gseapy
 from typing import List
@@ -134,6 +135,34 @@ def run_GSEA(
         .rename(columns={'FDR q-val' : 'pval_adj'})
         .query('pval_adj<=@max_pval_adj')
         .sort_values('NES', ascending=False)
+    )
+
+    return results, df
+
+
+##
+
+
+def run_ORA(
+    gene_list: List[str], 
+    collections: str|List[str] = 'MSigDB_Hallmark_2020',
+    max_pval_adj: float = .01
+    ) -> pd.DataFrame :
+
+    L = collections if isinstance(collections, list) else [collections]
+    results = gseapy.enrichr(
+        gene_list=gene_list,
+        gene_sets=L,
+        cutoff=.1,
+        no_plot=True,
+        outdir=None, 
+    ).results
+    df = (
+        results
+        [[ 'Term', 'Overlap', 'Odds Ratio', 'Adjusted P-value', 'Genes' ]]
+        .rename(columns={'Adjusted P-value' : 'pval_adj'})
+        .query('pval_adj<=@max_pval_adj')
+        .sort_values('Odds Ratio', ascending=False)
     )
 
     return results, df

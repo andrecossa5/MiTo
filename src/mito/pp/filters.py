@@ -9,7 +9,7 @@ from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
 from .distances import *
-from ..io.format_afm import mask_mt_sites
+from ..ut.positions import mask_mt_sites
 from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
 
 

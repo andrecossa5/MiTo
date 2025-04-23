@@ -12,28 +12,8 @@ from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
 from ..ut.utils import Timer
-from ..ut.positions import MAESTER_genes_positions
+from ..ut.positions import MAESTER_genes_positions, mask_mt_sites
 warnings.filterwarnings("ignore")
-
-
-##
-
-
-def mask_mt_sites(site_list):
-    """
-    Function to mask all sites outside of known MT-genes bodies.
-    """
-
-    mask = []
-    for pos in site_list:
-        pos = int(pos)
-        t = [ pos>=start and pos<=end for _, start, end in MAESTER_genes_positions ]
-        if any(t):
-            mask.append(True)
-        else:
-            mask.append(False)
-
-    return np.array(mask)
 
 
 ##

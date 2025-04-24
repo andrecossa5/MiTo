@@ -9,6 +9,7 @@ from anndata import AnnData
 import cassiopeia as cs
 from typing import Dict, Any
 from cassiopeia.data import CassiopeiaTree
+from scipy.sparse import csr_matrix
 from ..pp.distances import call_genotypes, compute_distances
 
 
@@ -196,6 +197,36 @@ def build_tree(
     tree.layers['transformed'] = M
 
     return tree
+
+
+##
+
+
+def coarse_grained_tree(tree: CassiopeiaTree, groupby: str) -> CassiopeiaTree:
+    """
+    Take a full cell phylogeny and coarse-grained it into a clone or
+    "groupby" phylogeny.
+    """
+
+    meta = tree.cell_meta.copy()
+    X_raw = tree.layers['raw'].copy()
+    X_raw_agg = X_raw.join(meta[[groupby]]).groupby(groupby).median()
+    X_bin_agg = (X_raw_agg>0).astype(int)
+    muts = X_bin_agg.sum(axis=0).loc[lambda x: x>0].index
+    X_raw_agg = X_raw_agg[muts].copy()
+    X_bin_agg = X_bin_agg[muts].copy()
+
+    afm_agg = AnnData(
+        X=csr_matrix(X_raw_agg.values), 
+        obs=pd.DataFrame(index=X_raw_agg.index),
+        layers={'bin':csr_matrix(X_bin_agg.values)},
+        uns={'genotyping':{'bin_method':'vanilla', 'binarization_kwargs':{}}, 
+             'scLT_system':'MAESTER'}
+    )
+    compute_distances(afm_agg, precomputed=True, bin_method='vanilla')
+    tree_agg = build_tree(afm_agg, precomputed=True)
+
+    return tree_agg
 
 
 ##

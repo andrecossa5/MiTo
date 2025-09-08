@@ -4,6 +4,12 @@ channels:
   - bioconda
 dependencies:
   - python=3.11
+  - compilers
+  - make
+  - cmake
+  - openblas
+  - conda-build
+  - pip
   - numpy
   - scipy
   - pandas
@@ -13,17 +19,13 @@ dependencies:
   - python-igraph
   - leidenalg
   - gseapy
-  - openblas
   - statsmodels
   - scikit-learn
   - yaml
   - pysam
-  - conda-build
   - lightgbm
-  - pip
   - pip:
-      - flax
-      - diffrax
       - moscot
       - MQuad
+      - plotting_utils
       - git+https://github.com/YosefLab/Cassiopeia.git@bf85cf6c007fd6385dffb767df51fe52cf08fd3a#egg=cassiopeia-lineage

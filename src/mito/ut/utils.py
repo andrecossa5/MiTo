@@ -241,7 +241,6 @@ def extract_kwargs(args, only_tree=False):
                     'filtering' : filtering,
                     'bin_method' : bin_method,
                     'min_n_var' : min_n_var,
-                    'filter_REDIdb' : filter_dbs,
                     'ncores' : args.ncores,
                     'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
@@ -453,6 +452,7 @@ def extract_bench_df(path):
             if file.endswith('pickle'):
                 with open(os.path.join(folder, file), 'rb') as f:
                     d = pickle.load(f)
+                d['n_inferred'] = d['labels'].loc[lambda x: ~x.isna()].unique().size
                 del d['labels']
                 L.append(d)
     df_bench = pd.DataFrame(L)
@@ -485,7 +485,7 @@ def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
 
     corr = np.corrcoef(afm.layers['AD'].toarray().flatten(), AD_new.toarray().flatten())[0,1]
     afm.layers['AD'] = AD_new
-    afm.X = AD_new / (afm.layers['DP']+.000001)
+    afm.X = AD_new / (afm.layers['DP'].toarray() + .000001)
 
     return afm, corr
 

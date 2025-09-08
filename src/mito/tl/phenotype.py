@@ -224,7 +224,7 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
             pd.concat(pseudobulk_samples)
             .pivot_table(index='sample', columns='gene', values='counts')
         )
-
+        
     elif n_cells is not None and n_samples is None:
         
         pseudobulk_samples = []

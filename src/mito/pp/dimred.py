@@ -169,6 +169,9 @@ def reduce_dimensions(
         D = _get_D(afm, distance_key, **kwargs)
         P_prime, _,_,_, D_left = find_diffusion_matrix(D)
         afm.obsm['X_diffmap'] = find_diffusion_map(P_prime, D_left, n_eign=n_comps)
+    
+    else:
+        raise ValueError(f'Method {method} not recognized. Please use "PCA", "UMAP" or "diffmap".')
 
     return
 

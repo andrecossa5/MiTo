@@ -619,3 +619,21 @@ def make_afm(
 
 
 ##
+
+
+def read_coverage(afm_raw: AnnData, path_coverage: str, sample: str) -> pd.DataFrame:
+    """
+    Read coverage table from mito_preprocessing/maegatk output.
+    """
+    cov = pd.read_csv(path_coverage, header=None)
+    cov.columns = ['pos', 'cell', 'n'] 
+    cov['cell'] = cov['cell'].map(lambda x: f'{x}_{sample}')
+    cov = cov.query('cell in @afm_raw.obs_names')
+    cov['cell'] = pd.Categorical(cov['cell'], categories=afm_raw.obs_names)
+    cov['pos'] = pd.Categorical(cov['pos'], categories=range(1,16569+1))
+    cov = cov.pivot_table(index='cell', columns='pos', values='n', fill_value=0)
+
+    return cov
+
+
+##

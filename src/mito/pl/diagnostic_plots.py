@@ -85,7 +85,8 @@ def plot_ncells_nAD(
 
 
 def mut_profile(
-    mut_list: Iterable[str], figsize: Tuple[float,float] = (6,3),
+    mut_list: Iterable[str], 
+    figsize: Tuple[float,float] = (6,3),
     legend_kwargs: Dict[str,Any] = {}
     ) ->  matplotlib.figure.Figure:
     """
@@ -127,6 +128,7 @@ def mut_profile(
                 x='three_plot',
                 y='n_obs',
                 color=strand_palette[strand], 
+                categorical_cmap = None,
                 width=1, alpha=.5, edgecolor=None, 
                 with_label=False,
                 ax=ax
@@ -154,9 +156,13 @@ def MT_coverage_polar(
     cov: pd.DataFrame, 
     var_subset: Iterable[str] = None, 
     ax: matplotlib.axes.Axes = None, 
-    n_xticks: int = 6, xticks_size: float = 7, yticks_size: float = 2,
-    xlabel_size: float = 6, ylabel_size: float = 9, 
-    kwargs_main: Dict[str,Any] = {}, kwargs_subset: Dict[str,Any] = {}
+    n_xticks: int = 6, 
+    xticks_size: float = 7, 
+    yticks_size: float = 2,
+    xlabel_size: float = 6, 
+    ylabel_size: float = 9, 
+    kwargs_main: Dict[str,Any] = {}, 
+    kwargs_subset: Dict[str,Any] = {}
     ) ->  matplotlib.axes.Axes:
     """
     Plot coverage and muts across MT-genome positions.
@@ -167,8 +173,6 @@ def MT_coverage_polar(
     kwargs_main_.update(kwargs_main)
     kwargs_subset_.update(kwargs_subset)
 
-    cov['pos'] = pd.Categorical(cov['pos'], categories=range(1,16569+1))
-    cov = cov.pivot_table(index='cell', columns='pos', values='n', dropna=False, fill_value=0)
     x = cov.mean(axis=0)
 
     theta = np.linspace(0, 2*np.pi, len(x))

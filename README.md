@@ -1,5 +1,5 @@
 # MiTo
-This is the first release of `MiTo`: a python package for robust inference of mitochondrial clones and phylogenies.
+This is `MiTo`: a python package for robust inference of mitochondrial clones and phylogenies.
 See also [nf-MiTo](https://github.com/andrecossa5/nf-MiTo), the companion Nextflow pipeline.
 
 ## Documentation

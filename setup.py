@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mito-utils",
-    version="0.0.2",
+    version="0.0.3",
     author="Your Name",
     author_email="your.email@example.com",
     description="Utilities for MT-based single cell Lineage Tracing (scLT).",

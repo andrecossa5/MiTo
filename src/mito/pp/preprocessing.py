@@ -96,10 +96,11 @@ def filter_cells(
             raise ValueError(f'Cell filter {cell_filter} is not available for scLT_system {scLT_system}')
     
     else:
+        afm.uns['cell_filter'] = {}
         logging.info(f'Skipping cell filters: {cell_filter} not available. Filtered cells: {afm.shape[0]}')
 
     # Ensure each site has been observed from at least one cell
-    test_atleastone = np.sum(afm.X.A>0, axis=0)>0
+    test_atleastone = (afm.X>0).sum(axis=0).A1>0
     afm = afm[:,test_atleastone].copy()
 
     return afm
@@ -179,7 +180,7 @@ def compute_metrics_filtered(afm, spatial_metrics=False, tree_kwargs={}):
 
     d = {}
     assert 'bin' in afm.layers    
-    X_bin = afm.layers['bin'].A.copy()
+    X_bin = afm.layers['bin'].toarray()
 
     # n cells and vars
     d['n_cells'] = X_bin.shape[0]
@@ -192,7 +193,8 @@ def compute_metrics_filtered(afm, spatial_metrics=False, tree_kwargs={}):
     d['median_n_cells_per_var'] = np.median((X_bin>0).sum(axis=0))
     d['std_n_cells_per_var'] = np.std((X_bin>0).sum(axis=0))
     # AFM sparseness and genotypes uniqueness
-    d['density'] = (X_bin>0).sum() / np.product(X_bin.shape)
+
+    d['density'] = (X_bin>0).sum() / (X_bin.shape[0] * X_bin.shape[1])
     seqs = AFM_to_seqs(afm)
     unique_genomes_occurrences = pd.Series(seqs).value_counts(normalize=True)
     d['genomes_redundancy'] = 1-(unique_genomes_occurrences.size / X_bin.shape[0])
@@ -246,14 +248,13 @@ def filter_afm(
     cells: Iterable[str] = None,
     filtering: str = 'MiTo', 
     filtering_kwargs: Dict[str,Any] = {}, 
-    filter_moransI: bool = True, 
+    filter_moran: bool = True, 
     max_AD_counts: int = 2, 
     variants: Iterable[str] = None, 
     min_n_var: int = 1, 
     fit_mixtures: bool = False, 
     only_positive_deltaBIC: bool = False, 
-    filter_dbSNP: bool = True, 
-    filter_REDIdb: bool = True, 
+    filter_dbs: bool = True, 
     compute_enrichment: bool = True, 
     bin_method: str = 'MiTo', 
     binarization_kwargs: Dict[str,Any] = {}, 
@@ -287,7 +288,7 @@ def filter_afm(
         Default is MiTo.
     filtering_kwargs : dict, optional
         Additional keyword arguments for the selected filtering method. Default is {}.
-    filter_moransI : bool, optional
+    filter_moran : bool, optional
         Whether to remove MT-SNVs that are not spatially auto-correlated. Default is True.
     max_AD_counts : int, optional
         Retain an MT-SNV if at least one cell has this number of alternative allele counts.
@@ -300,10 +301,8 @@ def filter_afm(
         Whether to fit MQuad (Kwock et al., 2022) binomial mixtures. Default is False.
     only_positive_deltaBIC : bool, optional
         Retain only MT-SNVs with positive deltaBIC (from MQuad). Default is False.
-    filter_dbSNP : bool, optional
-        Filter MT-SNVs from dbSNP database. Default is True.
-    filter_REDIdb : bool, optional
-        Filter MT-SNVs from REDIdb database. Default is True.
+    filter_dbs : bool, optional
+        Filter MT-SNVs from dbSNP and REDIdb database. Default is True.
     compute_enrichment : bool, optional
         Whether to compute MT-SNVs enrichment in the lineage_column. Default is True.
     bin_method : str, optional
@@ -388,44 +387,17 @@ def filter_afm(
     logging.info(f'afm after {filtering} filter: n cells={afm.shape[0]}, n features={afm.shape[1]}')
 
     # Filter common SNVs and possible RNA-edits
-    if filter_dbSNP:
-        afm, n_dbSNP = filter_dbSNP(afm)
-    else:
-        n_dbSNP = np.nan
-
-    # n_dbSNP = np.nan
-    # if path_dbSNP not in [None, 'null']:
-    #     if os.path.exists(path_dbSNP):
-    #         common = pd.read_csv(path_dbSNP, index_col=0, sep='\t')
-    #         common = common['pos'].astype('str') + '_' + common['REF'] + '>' + common['ALT'].map(lambda x: x.split('|')[0])
-    #         common = common.to_list()
-    #         n_dbSNP = afm.var_names.isin(common).sum()
-    #         logging.info(f'Exclude {n_dbSNP} common SNVs events (dbSNP)')
-    #         variants = afm.var_names[~afm.var_names.isin(common)]
-    #         afm = afm[:,variants].copy() 
-
-    # Filter possible RNA-edits 
-    if filter_REDIdb: 
-        afm, n_REDIdb = filter_REDIdb(afm)
+    if filter_dbs:
+        afm, n_dbSNP = filter_dbSNP_common(afm)
+        afm, n_REDIdb = filter_REDIdb_edits(afm)
     else:
         n_REDIdb = np.nan
-
-    # n_REDIdb = np.nan     
-    # if path_REDIdb not in [None, 'null']:
-    #     if os.path.exists(path_REDIdb):
-    #         edits = pd.read_csv(path_REDIdb, index_col=0, sep='\t')
-    #         edits = edits.query('nSamples>100')
-    #         edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']
-    #         edits = edits.to_list()
-    #         n_REDIdb = afm.var_names.isin(edits).sum()
-    #         logging.info(f'Exclude {n_REDIdb} common RNA editing events (REDIdb)')
-    #         variants = afm.var_names[~afm.var_names.isin(edits)]
-    #         afm = afm[:,variants].copy()
+        n_dbSNP = np.nan
 
     # Genotype cells, and filter the one with less than min_n_var mutations
     logging.info(f'Assign MT-genotypes with {bin_method} method')
     call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
-    afm = afm[np.sum(afm.layers['bin'].A>0, axis=1)>=min_n_var,:].copy()
+    afm = afm[(afm.layers['bin']>0).sum(axis=1).A1>=min_n_var,:].copy()
     logging.info(f'Retain only cells with at least {min_n_var} MT-SNVs: {afm.shape[0]}')
  
     # Bimodal mixture modelling: deltaBIC (MQuad-like) and max AD in at least one cell (Weng et al., 2024)
@@ -435,17 +407,22 @@ def filter_afm(
             afm = afm[:,afm.var['deltaBIC']>0].copy()
             logging.info(f'Remove MT-SNVs with MQuad deltaBIC<0')
     if max_AD_counts>1:
-        afm = afm[:,np.max(afm.layers['AD'].A, axis=0)>=max_AD_counts].copy()
+        afm = afm[:,afm.layers['AD'].max(axis=0).toarray()>=max_AD_counts].copy()
         logging.info(f'Remove MT-SNVs with no +cells having at least {max_AD_counts} AD counts')
 
     # Compute cell-cell distances and filter variants significantly auto-correlated.
     compute_distances(afm, precomputed=True, metric=metric, ncores=ncores)
-    if filter_moransI:
+    if filter_moran:
+        logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
+        n0 = afm.shape[1]
         afm = filter_variant_moransI(afm)
-    logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
+        n1 = afm.shape[1]
+        n_not_autocorrelated = n0-n1
+    else:
+        n_not_autocorrelated = np.nan
     
     # Final cell removal
-    afm = afm[np.sum(afm.layers['bin'].A>0, axis=1)>=min_n_var,:].copy()
+    afm = afm[(afm.layers['bin']>0).sum(axis=1).A1>=min_n_var,:].copy()
     annotate_vars(afm, overwrite=True)
     logging.info(f'Retain cells with at least {min_n_var} MT-SNVs: {afm.shape[0]}')
     logging.info(f'Final afm after all filters: n cells={afm.shape[0]}, n features={afm.shape[1]}')
@@ -474,13 +451,16 @@ def filter_afm(
     afm.uns['char_filter'] = {
         'lineage_column' : lineage_column, 
         'min_cell_number' : min_cell_number,
-        'filtering' : filtering if (cells is not None) or (variants is not None) else 'predefined_sets',
+        'filtering' : filtering if not((cells is not None) or (variants is not None)) else 'predefined_sets',
         'max_AD_counts' : max_AD_counts,
         'only_positive_deltaBIC' : only_positive_deltaBIC,
         'compute_enrichment' : compute_enrichment,
+        'filter_dbs' : filter_dbs,
+        'filter_moran' : filter_moran,
         'spatial_metrics' : spatial_metrics,
         'n_dbSNP' : n_dbSNP,
         'n_REDIdb' : n_REDIdb,
+        'n_not_autocorrelated' : n_not_autocorrelated,
         'min_n_var' : min_n_var
     }
     afm.uns['char_filter'].update(filtering_kwargs)

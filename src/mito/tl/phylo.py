@@ -9,6 +9,7 @@ from anndata import AnnData
 import cassiopeia as cs
 from typing import Dict, Any
 from cassiopeia.data import CassiopeiaTree
+from scipy.sparse import csr_matrix
 from ..pp.distances import call_genotypes, compute_distances
 
 
@@ -47,12 +48,12 @@ def _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, m
     assert distance_key in afm.obsp
 
     layer = 'bin' if 'bin' in afm.layers else 'scaled'
-    D = afm.obsp[distance_key].A.copy()
+    D = afm.obsp[distance_key].toarray()
     D[np.isnan(D)] = 0
     D = pd.DataFrame(D, index=afm.obs_names, columns=afm.obs_names)
-    M = pd.DataFrame(afm.layers[layer].A, index=afm.obs_names, columns=afm.var_names)
+    M = pd.DataFrame(afm.layers[layer].toarray(), index=afm.obs_names, columns=afm.var_names)
     if afm.X is not None:
-        M_raw = pd.DataFrame(afm.X.A, index=afm.obs_names, columns=afm.var_names)
+        M_raw = pd.DataFrame(afm.X.toarray(), index=afm.obs_names, columns=afm.var_names)
     else:
         M_raw = M.copy()
 
@@ -66,26 +67,6 @@ def _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, m
         M = M.loc[:,test].copy()
 
     return M_raw, M, D
-
-
-##
-
-
-def get_clades(tree, with_root=True, with_singletons=False):
-    """
-    Find all clades in a tree, from top to bottom
-    """
-    clades = { x : frozenset(tree.leaves_in_subtree(x)) for x in tree.internal_nodes }
-
-    if not with_root:
-        if 'root' in clades:
-            del clades['root']
-
-    if with_singletons:
-        for x in tree.leaves:
-            clades[x] = frozenset([x])
-
-    return clades
 
 
 ##
@@ -109,7 +90,7 @@ def AFM_to_seqs(
         call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
 
     # Convert to a dict of strings
-    X_bin = afm.layers['bin'].A.copy()
+    X_bin = afm.layers['bin'].toarray()
     d = {}
     for i, cell in enumerate(afm.obs_names):
         m_ = X_bin[i,:]
@@ -124,53 +105,6 @@ def AFM_to_seqs(
         d[cell] = ''.join(seq)
 
     return d
-
-
-##
-
-
-def get_internal_node_feature(tree: CassiopeiaTree, feature: str) -> np.array:
-    """
-    Extract internal node feature `feature`.
-    """
-
-    L = []
-    for node in tree.internal_nodes:
-        try:
-            s = tree.get_attribute(node, feature)
-            s = s if s is not None else np.nan
-            L.append(s)
-        except:
-            L.append(np.nan)
-
-    return np.array(L)
-
-
-##
-
-
-def get_internal_node_stats(tree: CassiopeiaTree):
-    """
-    Get internal nodes stats (i.e, time, clade_size, support, expansion_pvalue, 
-    fitness scores and average cell similarity).
-    """
-
-    clades = get_clades(tree)
-    df = pd.DataFrame({ 
-            'time' : [ tree.get_time(node) for node in tree.internal_nodes ],
-            'clade_size' : [ len(clades[node]) for node in tree.internal_nodes ],
-            'support' : get_internal_node_feature(tree, 'support'),
-            'expansion_pvalue' : get_internal_node_feature(tree, 'expansion_pvalue'),
-            'fitness' : get_internal_node_feature(tree, 'fitness'),
-            'similarity' : get_internal_node_feature(tree, 'similarity'),
-        }, 
-        index=tree.internal_nodes
-    )
-    if 'lca' in tree.cell_meta:
-        clades = tree.cell_meta['lca'].loc[lambda x: ~x.isna()].unique()
-        df['clonal_node'] = [ True if node in clades else False for node in tree.internal_nodes ]
-    
-    return df 
 
 
 ##
@@ -263,6 +197,47 @@ def build_tree(
     tree.layers['transformed'] = M
 
     return tree
+
+
+##
+
+
+def coarse_grained_tree(tree: CassiopeiaTree, groupby: str) -> CassiopeiaTree:
+    """
+    Take a full cell phylogeny and coarse-grained it into a clone or
+    "groupby" phylogeny.
+    """
+
+    meta = tree.cell_meta.copy()
+    X_raw = tree.layers['raw'].copy()
+    X_raw_agg = X_raw.join(meta[[groupby]]).groupby(groupby).median()
+    X_bin_agg = (X_raw_agg>0).astype(int)
+    muts = X_bin_agg.sum(axis=0).loc[lambda x: x>0].index
+    X_raw_agg = X_raw_agg[muts].copy()
+    X_bin_agg = X_bin_agg[muts].copy()
+
+    afm_agg = AnnData(
+        X=csr_matrix(X_raw_agg.values), 
+        obs=pd.DataFrame(index=X_raw_agg.index),
+        layers={'bin':csr_matrix(X_bin_agg.values)},
+        uns={'genotyping':{'bin_method':'vanilla', 'binarization_kwargs':{}}, 
+             'scLT_system':'MAESTER'}
+    )
+    compute_distances(afm_agg, precomputed=True, bin_method='vanilla')
+    tree_agg = build_tree(afm_agg, precomputed=True)
+
+    return tree_agg
+
+
+##
+
+
+def _get_leaves_order(tree):
+    order = []
+    for node in tree.depth_first_traverse_nodes():
+        if node in tree.leaves:
+            order.append(node)
+    return order
 
 
 ##

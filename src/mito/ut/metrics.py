@@ -135,7 +135,19 @@ def NN_entropy(index: np.array, labels: np.array) -> float:
     """
     Calculate the median (over cells) lentiviral-labels Shannon Entropy,
     given an index matrix of a KNN graph.
+
+    Parameters
+    ----------
+    index : np.array
+        Array of shape (n_cells, k-neighbors) containing cell neighbors indeces.
+    labels : pd.Series
+        Discrete-valued batch annotation for each cell (length n_cells).
+
+    Returns
+    -------
+    float : NN Shannon Entropy score.
     """
+
     SH = []
     for i in range(index.shape[0]):
         freqs = labels[index[i,:]].value_counts(normalize=True).values
@@ -150,7 +162,20 @@ def NN_entropy(index: np.array, labels: np.array) -> float:
 def NN_purity(index: np.array, labels: np.array) -> float:
     """
     Calculate the median purity of cells neighborhoods.
+
+    Parameters
+    ----------
+    index : np.array
+        Array of shape (n_cells, k-neighbors) containing cell neighbors indeces.
+    labels : pd.Series
+        Discrete-valued batch annotation for each cell (length n_cells).
+
+    Returns
+    -------
+    float : NN purity score.
+
     """
+
     kNN_purities = []
     n_cells = index.shape[0]
     k = index.shape[1]-1
@@ -200,7 +225,18 @@ def distance_AUPRC(D: np.array, labels: Iterable[Any]) -> float:
     """
     Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
     Reports Area Under Precision Recall Curve. Used in Ludwig et al., 2019.
-    """
+   
+    Parameters
+    ----------
+    D : np.array
+        Array of shape (n_cells, n_cells) containing cell-cell distances.
+    labels : pd.Series
+        Discrete-valued batch annotation for each cell (length n_cells).
+
+    Returns
+    -------
+    float : AUPRC score.
+    """    
 
     labels = pd.Categorical(labels) 
 

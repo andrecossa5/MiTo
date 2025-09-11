@@ -84,10 +84,10 @@ def _get_X(afm, layer):
 
     if layer in afm.layers:
         logging.info(f'Use {layer} layer')
-        X = afm.layers[layer].A
+        X = afm.layers[layer].toarray()
     else:
         logging.info(f'{layer} layer not found. Fall back to scaled .X raw AF...')
-        X = pp.scale(afm.X.A)
+        X = pp.scale(afm.X.toarray())
 
     return X
 
@@ -101,11 +101,11 @@ def _get_D(afm, distance_key, **kwargs):
         if distance_key in afm.uns['distance_calculations']:
             if afm.uns['distance_calculations'][distance_key]['metric'] == kwargs['metric']:
                 logging.info(f'Use precomputed {distance_key}')
-                D = afm.obsp[distance_key].A
+                D = afm.obsp[distance_key].toarray()
                 return D
             
     compute_distances(afm, distance_key=distance_key, **kwargs)
-    D = afm.obsp[distance_key].A
+    D = afm.obsp[distance_key].toarray()
 
     return D
 
@@ -169,6 +169,9 @@ def reduce_dimensions(
         D = _get_D(afm, distance_key, **kwargs)
         P_prime, _,_,_, D_left = find_diffusion_matrix(D)
         afm.obsm['X_diffmap'] = find_diffusion_map(P_prime, D_left, n_eign=n_comps)
+    
+    else:
+        raise ValueError(f'Method {method} not recognized. Please use "PCA", "UMAP" or "diffmap".')
 
     return
 

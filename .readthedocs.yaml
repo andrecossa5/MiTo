@@ -7,11 +7,7 @@ build:
   os: ubuntu-24.04
   tools:
     python: "mambaforge-22.9"
-  jobs:
-      post_create_environment:
-      - echo "Manual install of cassiopeia..."
-      - pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
-
+    
 sphinx:
    configuration: docs/source/conf.py
 

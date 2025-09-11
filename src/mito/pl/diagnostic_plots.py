@@ -8,10 +8,10 @@ import pandas as pd
 import scanpy as sc
 import matplotlib
 import matplotlib.pyplot as plt
-from typing import Dict, Iterable, Tuple, List, Any
+import plotting_utils as plu
+from typing import Dict, Iterable, Tuple, Any
 from anndata import AnnData
 from matplotlib.ticker import FixedLocator, FuncFormatter
-from .plotting_base import format_ax, add_legend, bar
 from ..ut.utils import load_mut_spectrum_ref
 from ..ut.positions import MAESTER_genes_positions
 from ..pp.filters import mask_mt_sites
@@ -22,19 +22,22 @@ from ..pp.preprocessing import annotate_vars
 
 
 def vars_AF_spectrum(
-    afm: AnnData, ax: matplotlib.axes.Axes = None, color: str = 'b', **kwargs
+    afm: AnnData, 
+    ax: matplotlib.axes.Axes = None, 
+    color: str = 'b', 
+    **kwargs
     ) ->  matplotlib.axes.Axes:
     """
     Ranked AF distributions (as in Miller et al., 2022).
     """
 
-    X = afm.X.A
+    X = afm.X.toarray()
     for i in range(X.shape[1]):
         x = X[:,i]
         x = np.sort(x)
         ax.plot(x, '-', color=color, **kwargs)
 
-    format_ax(ax=ax, xlabel='Cells (ranked)', ylabel='Allelic Frequency (AF)')
+    plu.format_ax(ax=ax, xlabel='Cells (ranked)', ylabel='Allelic Frequency')
 
     return ax
 
@@ -43,9 +46,14 @@ def vars_AF_spectrum(
 
 
 def plot_ncells_nAD(
-    afm: AnnData, ax: matplotlib.axes.Axes = None, 
-    title: str = None, xticks: Iterable[Any] = None, 
-    yticks: str = None, s: float = 5, c: Any = 'k', alpha: float = .7, 
+    afm: AnnData, 
+    ax: matplotlib.axes.Axes = None, 
+    title: str = None, 
+    xticks: Iterable[Any] = None, 
+    yticks: str = None, 
+    s: float = 5, 
+    color: Any = 'k', 
+    alpha: float = .7, 
     **kwargs
     ) ->  matplotlib.axes.Axes:
     """
@@ -55,7 +63,7 @@ def plot_ncells_nAD(
     """
 
     annotate_vars(afm, overwrite=True)
-    ax.plot(afm.var['Variant_CellN'], afm.var['mean_AD_in_positives'], 'o', c=c, markersize=s, alpha=alpha, **kwargs)
+    ax.plot(afm.var['Variant_CellN'], afm.var['mean_AD_in_positives'], 'o', c=color, markersize=s, alpha=alpha, **kwargs)
     ax.set_yscale('log', base=2)
     ax.set_xscale('log', base=2)
     xticks = [0,1,2,5,10,20,40,80,160,320,640] if xticks is None else xticks
@@ -68,7 +76,7 @@ def plot_ncells_nAD(
     
     ax.xaxis.set_major_formatter(FuncFormatter(integer_formatter))
     ax.yaxis.set_major_formatter(FuncFormatter(integer_formatter))
-    ax.set(xlabel='n +cells', ylabel='Mean n ALT UMI / +cell', title='' if title is None else title)
+    ax.set(xlabel='n +cells', ylabel='n ALT UMI / +cell', title='' if title is None else title)
 
     return ax
 
@@ -77,7 +85,9 @@ def plot_ncells_nAD(
 
 
 def mut_profile(
-    mut_list: Iterable[str], figsize: Tuple[float,float] = (6,3)
+    mut_list: Iterable[str], 
+    figsize: Tuple[float,float] = (6,3),
+    legend_kwargs: Dict[str,Any] = {}
     ) ->  matplotlib.figure.Figure:
     """
     Re-implementation of MutationProfile_bulk, from Weng et al., 2024).
@@ -102,18 +112,38 @@ def mut_profile(
     prop_df = prop_df.set_index('three_plot')
     prop_df['group_change'] = prop_df['group_change'].map(lambda x: '>'.join(list(x)))
 
-
-    fig, axs = plt.subplots(1, prop_df['group_change'].unique().size, figsize=figsize, sharey=True, gridspec_kw={'wspace': 0.1},
-                            constrained_layout=True)
+    n = prop_df['group_change'].unique().size
+    fig, axs = plt.subplots(
+        1, n, figsize=figsize, sharey=True, 
+        gridspec_kw={'wspace': 0.1}, constrained_layout=True
+    )
     strand_palette = {'H': '#05A8B3', 'L': '#D76706'}
 
     for i,x in enumerate(prop_df['group_change'].unique()):
         ax = axs.ravel()[i]
         df_ = prop_df.query('group_change==@x')
-        bar(df_, 'n_obs', by='strand', c=strand_palette, ax=ax, s=1, a=.8, annot=False)
-        format_ax(ax, xticks=[], xlabel=x, ylabel='Substitution rate' if i==0 else '', title=f'n: {df_["n_obs"].sum()}')
+        for strand in df_['strand'].unique():
+            plu.bar(
+                df_.query('strand==@strand').reset_index(), 
+                x='three_plot',
+                y='n_obs',
+                color=strand_palette[strand], 
+                categorical_cmap = None,
+                width=1, alpha=.5, edgecolor=None, 
+                with_label=False,
+                ax=ax
+            )
+        plu.format_ax(
+            ax, xticks=[], xlabel=x, 
+            ylabel='Substitution rate' if i==0 else '', 
+            title=f'n: {df_["n_obs"].sum()}'
+        )
 
-    add_legend(ax=axs.ravel()[0], colors=strand_palette, ncols=1, loc='upper left', bbox_to_anchor=(0,1), label='Strand', ticks_size=6)
+    plu.add_legend(
+        ax=axs.ravel()[0], colors=strand_palette, ncols=1, 
+        loc='upper left', bbox_to_anchor=(0,1), label='Strand', 
+        **legend_kwargs
+    )
     fig.tight_layout()
 
     return fig
@@ -123,12 +153,16 @@ def mut_profile(
 
 
 def MT_coverage_polar(
-    df: pd.DataFrame, 
+    cov: pd.DataFrame, 
     var_subset: Iterable[str] = None, 
     ax: matplotlib.axes.Axes = None, 
-    n_xticks: int = 6, xticks_size: float = 7, yticks_size: float = 2,
-    xlabel_size: float = 6, ylabel_size: float = 9, 
-    kwargs_main: Dict[str,Any] = {}, kwargs_subset: Dict[str,Any] = {}
+    n_xticks: int = 6, 
+    xticks_size: float = 7, 
+    yticks_size: float = 2,
+    xlabel_size: float = 6, 
+    ylabel_size: float = 9, 
+    kwargs_main: Dict[str,Any] = {}, 
+    kwargs_subset: Dict[str,Any] = {}
     ) ->  matplotlib.axes.Axes:
     """
     Plot coverage and muts across MT-genome positions.
@@ -139,12 +173,12 @@ def MT_coverage_polar(
     kwargs_main_.update(kwargs_main)
     kwargs_subset_.update(kwargs_subset)
 
-    x = df.mean(axis=0)
+    x = cov.mean(axis=0)
 
     theta = np.linspace(0, 2*np.pi, len(x))
     ticks = [ 
         int(round(x)) \
-        for x in np.linspace(1, df.shape[1], n_xticks) 
+        for x in np.linspace(1, cov.shape[1], n_xticks) 
     ][:7]
 
     ax.plot(theta, np.log10(x), **kwargs_main_)

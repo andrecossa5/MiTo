@@ -7,26 +7,27 @@ A preliminary documentation of key functionalitites and APIs is available at [Mi
 
 ## Installation
 1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)
-2. Reproduce the environment with all needed dependencies at once, with:
+2. Clone this repo:
 
 ```bash
+git clone https://github.com/andrecossa5/MiTo.git
+```
+
+3. Reproduce MiTo conda environment:
+
+```bash
+cd MiTo
 mamba env create -f ./envs/environment.yml -n MiTo
 ```
 
-3. Activate the environment, and manually install cassiopeia-lineage (no dependencies: it is all already present in the environment):
+3. Activate the environment, and install MiTo via pypi:
 
 ```bash
 mamba activate MiTo
-pip install --no-deps git+https://github.com/YosefLab/Cassiopeia.git@e7606afd10035a75f718ffb988666264e721700e
+pip install .
 ```
 
-4. Install `MiTo`:
-
-```bash
-pip install mito-utils
-```
-
-5. Verify successfull installation:
+4. Verify successfull installation:
 
 ```python
 import mito as mt

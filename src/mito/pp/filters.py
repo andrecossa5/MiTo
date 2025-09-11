@@ -9,7 +9,8 @@ from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
 from .distances import *
-from ..io.format_afm import mask_mt_sites
+from ..ut.positions import mask_mt_sites
+from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
 
 
 ##
@@ -60,7 +61,7 @@ def filter_cells_with_at_least_one(
     Filter cells with at least one variant (genotypes from `bin_method`).
     """
     X = call_genotypes(a=afm.copy(), bin_method=bin_method, **binarization_kwargs)
-    afm = afm[afm.obs_names[X.sum(axis=1)>=1],:]
+    afm = afm[afm.obs_names[X.sum(axis=1).A1>=1],:]
     afm.uns['per_position_coverage'] = afm.uns['per_position_coverage'].loc[afm.obs_names,:]
     afm.uns['per_position_quality'] = afm.uns['per_position_quality'].loc[afm.obs_names,:]
 
@@ -117,12 +118,14 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
     #                    mean_cov = rowMeans(assays(maegtk)[["coverage"]])[as.numeric(cutf(rownames(af.dm), d = "_"))],
     #                    quality = qual.num)
 
-    afm.var['mean_af'] = afm.X.A.mean(axis=0)
+    afm.var['mean_af'] = afm.X.mean(axis=0).A1
 
     if 'site_coverage' in afm.layers:
-        afm.var['mean_cov'] = afm.layers['site_coverage'].A.mean(axis=0)
+        afm.var['mean_cov'] = afm.layers['site_coverage'].mean(axis=0).A1
     if 'qual' in afm.layers:    # NB: not computed for redeem data
-        afm.var['quality'] = np.nanmean(np.where(afm.layers['qual'].A>0, afm.layers['qual'].A, np.nan), axis=0)
+        qual = afm.layers['qual'].toarray()
+        afm.var['quality'] = np.nanmean(np.where(qual>0, qual, np.nan), axis=0)
+        del qual
 
     # Calculate the number of cells that exceed VAF thresholds 0, 1, 5, 10, 50 as in Weng et al., 2024
 
@@ -135,22 +138,24 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
     # Variant_CellN<-apply(af.dm,1,function(x){length(which(x>0))})
     # vars.tib<-cbind(vars.tib,Variant_CellN)
 
-    afm.var['n0'] = np.sum(afm.X.A==0, axis=0)              # NEGATIVE CELLS
-    afm.var['n1'] = np.sum(afm.X.A>.01, axis=0)
-    afm.var['n2'] = np.sum(afm.X.A>.02, axis=0)
-    afm.var['n5'] = np.sum(afm.X.A>.05, axis=0)
-    afm.var['n10'] = np.sum(afm.X.A>.1, axis=0)
-    afm.var['n50'] = np.sum(afm.X.A>.5, axis=0)
-    afm.var['Variant_CellN'] = np.sum(afm.X.A>0, axis=0)
+    afm.var['n0'] = (afm.X==0).sum(axis=0).A1       # NEGATIVE CELLS
+    afm.var['n1'] = (afm.X>.01).sum(axis=0).A1           
+    afm.var['n2'] = (afm.X>.02).sum(axis=0).A1           
+    afm.var['n5'] = (afm.X>.05).sum(axis=0).A1           
+    afm.var['n10'] = (afm.X>.1).sum(axis=0).A1           
+    afm.var['n50'] = (afm.X>.5).sum(axis=0).A1           
+    afm.var['Variant_CellN'] = (afm.X>0).sum(axis=0).A1
 
     # Add mean AF, AD and DP in +cells
-    afm.var['median_af_in_positives'] = np.nanmean(np.where(afm.X.A>0, afm.X.A, np.nan), axis=0)
+    X = afm.X.toarray()>0
+    afm.var['median_af_in_positives'] = np.nanmean(np.where(X>0, X, np.nan), axis=0)
     afm.var['mean_AD_in_positives'] = np.nanmean(
-        np.where(afm.X.A>0, afm.layers['AD'].A, np.nan), axis=0
+        np.where(X>0, afm.layers['AD'].toarray(), np.nan), axis=0
     )
     afm.var['mean_DP_in_positives'] = np.nanmean(
-        np.where(afm.X.A>0, afm.layers['DP'].A, np.nan), axis=0
+        np.where(X>0, afm.layers['DP'].toarray(), np.nan), axis=0
     )
+    del X
 
 
 ##
@@ -200,8 +205,8 @@ def filter_baseline(
     afm = afm[:,afm.var_names[test]].copy()
 
     # Exclude variants sites not observed in any cells and vice versa
-    afm = afm[np.sum(afm.X.A>0, axis=1)>0,:].copy()
-    afm = afm[:,np.sum(afm.X.A>0, axis=0)>0].copy()
+    afm = afm[(afm.X>0).sum(axis=1).A1>0,:].copy()
+    afm = afm[:,(afm.X>0).sum(axis=0).A1>0].copy()
 
     return afm
 
@@ -209,7 +214,7 @@ def filter_baseline(
 ##
 
 
-def filter_CV(afm: AnnData, n_top: int = 1000) -> AnnData:
+def filter_CV(afm: AnnData, n_top: int = 100) -> AnnData:
     """
     Filter top `n_top` MT-SNVs (MAESTER, redeem), ranked by coefficient of variation (CV).
     """
@@ -222,9 +227,11 @@ def filter_CV(afm: AnnData, n_top: int = 1000) -> AnnData:
     else:
         raise ValueError(f'CV filter not available for scLT_system {scLT_system} and pp_method {pp_method}')
 
-    CV = (np.std(afm.X.A, axis=0)**2 / np.mean(afm.X.A, axis=0))
+    X = afm.X.toarray()
+    CV = (np.std(X, axis=0)**2 / np.mean(X, axis=0))
     idx_vars = np.argsort(CV)[::-1][:n_top]
     afm = afm[:,idx_vars].copy()
+    del X
 
     return afm
 
@@ -253,11 +260,12 @@ def filter_miller2022(
     else:
         raise ValueError(f'miller2022 filter not available for scLT_system {scLT_system} and pp_method {pp_method}')
 
+    X = afm.X.toarray()
     test = (
         (afm.var['mean_cov']>=min_site_cov) & \
         (afm.var['quality']>=min_var_quality) & \
-        ((np.percentile(afm.X.A, q=p1, axis=0) < perc1) & \
-         (np.percentile(afm.X.A, q=p2, axis=0) > perc2))
+        ((np.percentile(X, q=p1, axis=0) < perc1) & \
+         (np.percentile(X, q=p2, axis=0) > perc2))
     )
     afm = afm[:,test].copy()
 
@@ -454,8 +462,8 @@ def filter_weng2024(
     # }
     # Variability<-apply(af.dm,1,IsInfo) %>% data.frame(Info=.)
 
-    t1 = (afm.X.A<low_confidence_af).sum(axis=0)/afm.shape[0] > min_prevalence_low_confidence_af
-    t2 = (afm.X.A>high_confidence_af).sum(axis=0) > min_cells_high_confidence_af
+    t1 = (afm.X<low_confidence_af).sum(axis=0).A1 / afm.shape[0] > min_prevalence_low_confidence_af
+    t2 = (afm.X>high_confidence_af).sum(axis=0).A1 > min_cells_high_confidence_af
     test = t1 & t2
     afm = afm[:,test].copy() 
 
@@ -467,13 +475,13 @@ def filter_weng2024(
 
 def filter_MiTo(
     afm: AnnData, 
-    min_cov: float = 10,
+    min_cov: float = 5,
     min_var_quality: float = 30,
     min_frac_negative: float = 0.2,
     min_n_positive: int = 5,
-    af_confident_detection: float = .01,
+    af_confident_detection: float = .02,
     min_n_confidently_detected: int = 2,
-    min_mean_AD_in_positives: float = 1.5,
+    min_mean_AD_in_positives: float = 1.25,
     min_mean_DP_in_positives: float = 25
     ) -> AnnData:
     """
@@ -491,22 +499,22 @@ def filter_MiTo(
     afm : AnnData
         Allele Frequency Matrix.
     min_cov : float
-        Minimum mean site coverage (across cells).
+        Minimum mean site coverage (across cells). Default is 5.
     min_var_quality : float
-        Minimum mean variant allele basecall quality (across cells).
+        Minimum mean variant allele basecall quality (across cells). Default is 30.
     min_frac_negative : float
-        Minimum fraction of negative cells (expressed as a fraction of total cells).
+        Minimum fraction of negative cells (expressed as a fraction of total cells). Default is 0.2.
     min_n_positive : int
-        Minimum number of cells with AF > 0.
+        Minimum number of cells with AF > 0. Default is 5.
     min_n_confidently_detected : int
         Minimum number of cells in which the variant has been detected with an AF greater than
-        `af_confident_detection`.
+        `af_confident_detection`. Default is 2.
     af_confident_detection : float
-        Allele frequency threshold for confident detection.
+        Allele frequency threshold for confident detection. Default is 0.02.
     min_mean_AD_in_positives : float
-        Minimum mean alternative allele count (AD) in positive cells.
+        Minimum mean alternative allele count (AD) in positive cells. Default is 1.25.
     min_mean_DP_in_positives : float
-        Minimum mean total UMI counts (DP) in positive cells.
+        Minimum mean total UMI counts (DP) in positive cells. Default is 25.
 
     Returns
     -------
@@ -518,7 +526,7 @@ def filter_MiTo(
     pp_method = afm.uns['pp_method']
 
     annotate_vars(afm, overwrite=True)
-    afm.var['n_confidently_detected'] = np.sum(afm.X.A>=af_confident_detection, axis=0)
+    afm.var['n_confidently_detected'] = (afm.X>=af_confident_detection).sum(axis=0).A1
 
     if scLT_system == 'MAESTER':
 
@@ -602,7 +610,7 @@ def compute_lineage_biases(
         call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
 
     # Here we go
-    G = afm.layers['bin'].A.copy()
+    G = afm.layers['bin'].toarray()
     for i in range(muts.size):
 
         test_mut = G[:,i] == 1
@@ -707,7 +715,7 @@ def filter_GT_enriched(
 ##
 
 
-def moran_I(W, x, num_permutations=1000):
+def moran_I(W, x, num_permutations=100):
     """
     Calculate normalized Moran's I statistics and permutation-based pvalue.
     """
@@ -717,7 +725,6 @@ def moran_I(W, x, num_permutations=1000):
     I_obs = x_stdzd.T @ W @ x_stdzd
 
     # Perform permutation test
-    num_permutations = 100
     permuted_Is = np.zeros(num_permutations)
     for i in range(num_permutations):
         x_perm = np.random.permutation(x_stdzd)
@@ -741,12 +748,13 @@ def filter_variant_moransI(
     """
     
     assert 'distances' in afm.obsp
-    W = 1-afm.obsp['distances'].A
+    W = 1-afm.obsp['distances'].toarray()
+    X = afm.X.toarray()
 
     I = []
     P = []
-    for var in afm.var_names:
-        i, p = moran_I(W, afm[:,var].X.A.flatten(), num_permutations=num_permutations)
+    for i in range(afm.shape[1]):
+        i, p = moran_I(W, X[:,i], num_permutations=num_permutations)
         I.append(i)
         P.append(p)
     
@@ -757,6 +765,40 @@ def filter_variant_moransI(
     afm = afm[:,var_to_retain].copy()
 
     return afm
+
+
+##
+
+
+def filter_dbSNP_common(afm: AnnData):
+    """
+    Filter Allele Frequency Matrix from "COMMON" MT-SNVs (annotated dbSNP database).
+    """
+
+    common = load_common_dbSNP()    
+    n_dbSNP = afm.var_names.isin(common).sum()
+    logging.info(f'Exclude {n_dbSNP} common SNVs events (dbSNP)')
+    variants = afm.var_names[~afm.var_names.isin(common)]
+    afm = afm[:,variants].copy() 
+
+    return afm, n_dbSNP
+
+
+##
+
+
+def filter_REDIdb_edits(afm: AnnData):
+    """
+    Filter Allele Frequency Matrix from previously annotated RNA-edits (REDIdb database).
+    """
+    
+    edits = load_edits_REDIdb()
+    n_REDIdb = afm.var_names.isin(edits).sum()
+    logging.info(f'Exclude {n_REDIdb} common RNA editing events (REDIdb)')
+    variants = afm.var_names[~afm.var_names.isin(edits)]
+    afm = afm[:,variants].copy()
+
+    return afm, n_REDIdb
 
 
 ##

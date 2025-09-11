@@ -4,18 +4,20 @@ Tree plotting utils.
 
 import logging
 import pandas as pd
+import scanpy as sc
+import plotting_utils as plu
 from typing import Iterable, Dict, Any
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.plotting.local import utilities as ut
 from cassiopeia.plotting.local import *
-from .colors import *
-from .plotting_base import *
+from matplotlib.patches import Polygon
+from .other_plots import *
 
 
 ##
 
 
-_categorical_cmaps = [sc.pl.palettes.vega_20_scanpy, sc.pl.palettes.default_20, ten_godisnot, 'set1', 'dark']
+_categorical_cmaps = [sc.pl.palettes.vega_20_scanpy, sc.pl.palettes.default_20, plu.ten_godisnot, 'set1', 'dark']
 _continuous_cmaps = ['viridis', 'inferno', 'magma']
 _cont_character_cmap = 'mako'
 _bin_character_cmap = { 1 : 'r', 0 : 'b', -1 : 'lightgrey', np.nan : 'lightgrey' }
@@ -76,6 +78,8 @@ def _place_tree_and_annotations(
     layer='raw', 
     colorstrip_width=None, 
     colorstrip_spacing=None,
+    vmin=None,
+    vmax=None,
     vmin_characters=None,
     vmax_characters=None
     ):
@@ -132,8 +136,8 @@ def _place_tree_and_annotations(
         if pd.api.types.is_numeric_dtype(x):
 
             if cov in features:
-                vmin_annot = np.percentile(x, 25)
-                vmax_annot = np.percentile(x, 75)
+                vmin_annot = np.percentile(x, 10) if vmin is None else vmin 
+                vmax_annot = np.percentile(x, 90) if vmax is None else vmax 
                 if continuous_cmaps is None:
                     continuous_cmap = _continuous_cmaps[0]
                 elif cov in continuous_cmaps:
@@ -158,17 +162,19 @@ def _place_tree_and_annotations(
                 vmax_annot
             )
 
-        elif pd.api.types.is_string_dtype(x) or x.dtype == 'category':
+        elif pd.api.types.is_string_dtype(x) or pd.api.types.is_categorical_dtype(x):
 
+            x = x.astype('category')
             if cov in features:
                 if categorical_cmaps is None or cov not in categorical_cmaps:
-                    categorical_cmap = create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat])
+                    categorical_cmap = plu.create_palette(tree.cell_meta, cov, _categorical_cmaps[n_cat], add_na=True)
                 elif cov in categorical_cmaps:
                     _cmap = categorical_cmaps[cov]
                     if isinstance(_cmap, str) or isinstance(_cmap, list):
-                        categorical_cmap = create_palette(tree.cell_meta, cov, _cmap)
+                        categorical_cmap = plu.create_palette(tree.cell_meta, cov, _cmap, add_na=True)
                     elif isinstance(_cmap, dict):
                         categorical_cmap = _cmap
+                        categorical_cmap[np.nan] = 'lightgrey'
                     else:
                         raise ValueError(f'''Adjust categorical_cmaps. {cov}: 
                                          categorical_cmaps is nor a str, a list or a dict...''')
@@ -185,8 +191,8 @@ def _place_tree_and_annotations(
                 for i,missing in enumerate(missing_cats):
                     categorical_cmap[missing] = sc.pl.palettes.godsnot_102[i]
 
-            categorical_cmap.update({'unassigned':'lightgrey', np.nan:'lightgrey'})
-            assert(all([ cat in categorical_cmap.keys() for cat in x.unique() ]))
+            assert (all([ cat in categorical_cmap.keys() for cat in x.unique() ]))
+            assert categorical_cmap[np.nan] == 'lightgrey'
 
             # Place
             boxes, anchor_coords = ut.place_colorstrip(
@@ -194,9 +200,8 @@ def _place_tree_and_annotations(
             )
             
             colorstrip = {}
-            for leaf in x.index:
-                cat = x.loc[leaf]
-                colorstrip[leaf] = boxes[leaf] + (categorical_cmap[cat], f"{leaf}\n{cat}")
+            for leaf,value in zip(x.index, x.values):
+                colorstrip[leaf] = boxes[leaf] + (categorical_cmap[value], f"{leaf}\n{value}")
 
             n_cat += 1
 
@@ -241,12 +246,12 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
                 elif pd.api.types.is_string_dtype(x):
                     colors = (
                         meta[cov]
-                        .map(create_palette(meta, cov, cmap))
+                        .map(plu.create_palette(meta, cov, cmap))
                         .to_dict()
                     )
             elif isinstance(cmap, dict):
                 print('User-provided colors dictionary...')
-                colors = meta[cov].map(cmap).to_dict()
+                colors = meta[cov].astype('str').map(cmap).to_dict()
             else:
                 raise KeyError(f'{cov} You can either specify a string cmap or an element:color dictionary.')
         else:
@@ -288,8 +293,12 @@ def plot_tree(
     cmap_leaves: str|Dict[str,Any] = 'tab20', 
     feature_internal_nodes: str = None, 
     cmap_internal_nodes: str|Dict[str,Any] ='Spectral_r', 
+    vmin: float = None, 
+    vmax: float = None,
     vmin_internal_nodes: float = .2, 
     vmax_internal_nodes: float = .8,
+    vmin_leaves: float = None, 
+    vmax_leaves: float = None,
     internal_node_labels: bool = False, 
     internal_node_subset: Iterable[str] = None, 
     internal_node_label_size: float = 7, 
@@ -358,6 +367,10 @@ def plot_tree(
         Leaf feature to plot. Default is None.
     cmap_leaves : str or dict, optional
         Color map for leaves feature. Default is "tab20".
+    vmin_leaves : float, optional
+        Min value for leaves cmap.
+    vmax_leaves : float, optional
+        Max value for leaves cmap.
     feature_internal_nodes : str, optional
         Internal node feature to plot. Default is None.
     cmap_internal_nodes : str or dict, optional
@@ -416,6 +429,8 @@ def plot_tree(
         layer=layer, 
         colorstrip_width=colorstrip_width, 
         colorstrip_spacing=colorstrip_spacing,
+        vmin=vmin,
+        vmax=vmax,
         vmin_characters=vmin_characters,
         vmax_characters=vmax_characters
     )
@@ -438,15 +453,17 @@ def plot_tree(
     ##
     
     # Colorstrips
-    _colorstrip_kwargs = {'linewidth':0}
+    _colorstrip_kwargs = {'linewidth':0, 'alpha':1}
     _colorstrip_kwargs.update(colorstrip_kwargs or {})
     for colorstrip, feat in colorstrips:
         y_positions = []
         x_positions = []
         for xs, ys, c, _ in colorstrip.values():
             _dict = _colorstrip_kwargs.copy()
-            _dict["c"] = c
-            ax.fill(xs, ys, **_dict)
+            _dict["facecolor"] = c
+            polygon = Polygon(xy=list(zip(xs, ys)), closed=True, **_dict)
+            polygon.set_rasterized(True) 
+            ax.add_patch(polygon)
             y_positions.extend(ys)
             x_positions.extend(xs)
         if orient == 'down' and labels:
@@ -468,7 +485,8 @@ def plot_tree(
     leaves = { node : node_coords[node] for node in node_coords if tree.is_leaf(node) }
     colors = _set_colors(
         leaves, meta=tree.cell_meta, cov=cov_leaves, 
-        cmap=cmap_leaves, kwargs=_leaf_kwargs
+        cmap=cmap_leaves, kwargs=_leaf_kwargs, 
+        vmin=vmin_leaves, vmax=vmax_leaves
     )     
     for node in leaves:
         _dict = _leaf_kwargs.copy()

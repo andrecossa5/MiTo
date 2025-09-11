@@ -54,3 +54,23 @@ n_target_sites_maester = np.sum(df_[2]-df_[1])
 
 
 ##
+
+
+def mask_mt_sites(site_list):
+    """
+    Function to mask all sites outside of known MT-genes bodies.
+    """
+
+    mask = []
+    for pos in site_list:
+        pos = int(pos)
+        t = [ pos>=start and pos<=end for _, start, end in MAESTER_genes_positions ]
+        if any(t):
+            mask.append(True)
+        else:
+            mask.append(False)
+
+    return np.array(mask)
+
+
+##

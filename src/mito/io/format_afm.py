@@ -12,28 +12,8 @@ from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
 from ..ut.utils import Timer
-from ..ut.positions import MAESTER_genes_positions
+from ..ut.positions import MAESTER_genes_positions, mask_mt_sites
 warnings.filterwarnings("ignore")
-
-
-##
-
-
-def mask_mt_sites(site_list):
-    """
-    Function to mask all sites outside of known MT-genes bodies.
-    """
-
-    mask = []
-    for pos in site_list:
-        pos = int(pos)
-        t = [ pos>=start and pos<=end for _, start, end in MAESTER_genes_positions ]
-        if any(t):
-            mask.append(True)
-        else:
-            mask.append(False)
-
-    return np.array(mask)
 
 
 ##
@@ -124,8 +104,8 @@ def read_from_cellsnp(
 
     vcf = pd.read_csv(path_vcf, sep='\t', skiprows=1)
     variants = vcf['POS'].astype(str) + '_' + vcf['REF'] + '>' + vcf['ALT']
-    AD = pd.DataFrame(mmread(path_AD).A.T, index=cells, columns=variants)
-    DP = pd.DataFrame(mmread(path_DP).A.T, index=cells, columns=variants)
+    AD = pd.DataFrame(mmread(path_AD).toarray().T, index=cells, columns=variants)
+    DP = pd.DataFrame(mmread(path_DP).toarray().T, index=cells, columns=variants)
     
     if path_meta is not None and os.path.exists(path_meta):
         cell_meta = pd.read_csv(path_meta, index_col=0)
@@ -636,6 +616,24 @@ def make_afm(
 
     else:
         raise ValueError('Specify a valid path_ch_matrix!')
+
+
+##
+
+
+def read_coverage(afm_raw: AnnData, path_coverage: str, sample: str) -> pd.DataFrame:
+    """
+    Read coverage table from mito_preprocessing/maegatk output.
+    """
+    cov = pd.read_csv(path_coverage, header=None)
+    cov.columns = ['pos', 'cell', 'n'] 
+    cov['cell'] = cov['cell'].map(lambda x: f'{x}_{sample}')
+    cov = cov.query('cell in @afm_raw.obs_names')
+    cov['cell'] = pd.Categorical(cov['cell'], categories=afm_raw.obs_names)
+    cov['pos'] = pd.Categorical(cov['pos'], categories=range(1,16569+1))
+    cov = cov.pivot_table(index='cell', columns='pos', values='n', fill_value=0)
+
+    return cov
 
 
 ##

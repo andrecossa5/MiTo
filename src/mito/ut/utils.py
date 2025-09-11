@@ -5,10 +5,12 @@ Miscellaneous utilities.
 import os 
 import sys
 import time 
+import pickle
 from shutil import rmtree
 import logging
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 
 
 
@@ -68,26 +70,31 @@ class Timer:
             raise TimerError(f"Timer is running. Use .stop() to stop it")
         self._start_time = time.perf_counter()
 
-    def stop(self):
+    def stop(self, pretty=True):
         """
         Stop the timer, and report the elapsed time.
         """
         if self._start_time is None:
             raise TimerError(f"Timer is not running. Use .start() to start it")
+        
         elapsed_time = time.perf_counter() - self._start_time
-
-        if elapsed_time > 100:
-            unit = 'min'
-            elapsed_time = elapsed_time / 60
-        elif elapsed_time > 1000:
-            unit = 'h'
-            elapsed_time = elapsed_time / 3600
-        else:
-            unit = 's'
-
         self._start_time = None
 
-        return f'{round(elapsed_time, 2)} {unit}'
+        if pretty:
+            if elapsed_time > 100:
+                unit = 'min'
+                elapsed_time = elapsed_time / 60
+            elif elapsed_time > 1000:
+                unit = 'h'
+                elapsed_time = elapsed_time / 3600
+            else:
+                unit = 's'
+            formatted_time = f'{round(elapsed_time, 2)} {unit}'
+
+        else:
+            formatted_time = round(elapsed_time, 2)
+        
+        return formatted_time
 
 
 ##
@@ -224,18 +231,20 @@ def extract_kwargs(args, only_tree=False):
                 lineage_column = d['lineage_column']
                 filtering = d['filtering']
                 bin_method = d['bin_method']
+                metric = d['metric']
                 min_n_var = int(d['min_n_var'])
+                filter_dbs = d['filter_dbs']
+                filter_moran = d['filter_moran']
                 kwargs = {
                     'min_cell_number' : min_cell_number,
                     'lineage_column' : lineage_column,
                     'filtering' : filtering,
                     'bin_method' : bin_method,
                     'min_n_var' : min_n_var,
-                    'path_dbSNP' : args.path_dbSNP, 
-                    'path_REDIdb' : args.path_REDIdb,
                     'ncores' : args.ncores,
+                    'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
-                    'filter_moransI' : args.filter_moransI
+                    'filter_moran' : filter_moran
                 }
                 filtering_kwargs = {
                     'min_cov' : int(d['min_cov']),
@@ -272,18 +281,18 @@ def extract_kwargs(args, only_tree=False):
 
         if not only_tree:
 
-            cell_filter = args.cell_filter if args.cell_filter != _cell_filters else None
+            cell_filter = args.cell_filter
             kwargs = {
                 'min_cell_number' : args.min_cell_number,
                 'lineage_column' : args.lineage_column,
                 'filtering' : args.filtering if args.filtering in _var_filters else None,
                 'bin_method' : args.bin_method,
                 'min_n_var' : args.min_n_var,
-                'path_dbSNP' : args.path_dbSNP, 
-                'path_REDIdb' : args.path_REDIdb,
+                'filter_dbs' : True if args.filter_dbs == 'true' else False,
                 'ncores' : args.ncores,
-                'spatial_metrics' : args.spatial_metrics,
-                'filter_moransI' : args.filter_moransI
+                'metric' : args.metric,
+                'spatial_metrics' : True if args.spatial_metrics == 'true' else False,
+                'filter_moran' : True if args.filter_moran == 'true' else False,
             }
             filtering_kwargs = {
                 'min_cov' : args.min_cov,
@@ -362,6 +371,27 @@ def load_mt_gene_annot():
 ##
 
 
+def load_common_dbSNP():
+    common = pd.read_csv(os.path.join(path_assets, 'dbSNP_MT.txt'), index_col=0, sep='\t')
+    common = common['pos'].astype('str') + '_' + common['REF'] + '>' + common['ALT'].map(lambda x: x.split('|')[0])
+    common = common.to_list()
+    return common
+
+
+##
+
+
+def load_edits_REDIdb():
+    edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt'), index_col=0, sep='\t')
+    edits = edits.query('nSamples>100')
+    edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']
+    edits = edits.to_list()
+    return edits
+
+
+##
+
+
 def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
 
     assert 1-np.array(freqs).sum() <= .05
@@ -373,8 +403,8 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
     cells = []
     for clone, f in zip(clones, freqs):
         afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
-        afm_clone = afm_clone[np.sum(afm_clone.layers['bin'].A>0, axis=1)>2,
-                              np.sum(afm_clone.layers['bin'].A>0, axis=0)>=2]
+        afm_clone = afm_clone[(afm_clone.layers['bin']>0).sum(axis=1).flatten()>2,
+                              (afm_clone.layers['bin']>0).sum(axis=0).flatten()>=2]
         n_cells_clone = min(round(ncells*f), afm_clone.shape[0])
         cells.extend(
             np.random.choice(afm_clone.obs_names, n_cells_clone, replace=False).tolist()
@@ -383,6 +413,81 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
     afm_subsample = afm[cells].copy()
     
     return afm_subsample
+
+
+##
+
+
+def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
+    """
+    Select jobs, and choose one for clonal inference benchmarking
+    """
+    df_selected = (
+        df.loc[
+            (df['sample'] == sample) & \
+            (df['n_cells'] >= n_cells) & \
+            (df['n_GBC_groups'] >= n_GBC_groups) & \
+            (df['frac_unassigned'] <= frac_unassigned)  
+        ]
+    )
+    df_selected = (
+        df_selected[[
+            'job_id', 'pp_method', 'bin_method', 'af_confident_detection', 'min_cell_number', 'metric',
+            'ARI', 'corr', 'NMI', 'AUPRC', 'n_cells', 'unassigned', 'n_vars', 'n_GBC_groups', 'n MiTo clone',
+        ]]
+    )
+    df_final = df_selected.sort_values('ARI', ascending=False).head(5)
+
+    return df_selected, df_final
+
+
+##
+
+
+def extract_bench_df(path):
+
+    L = []
+    for folder,_,files in os.walk(path):
+        for file in files:
+            if file.endswith('pickle'):
+                with open(os.path.join(folder, file), 'rb') as f:
+                    d = pickle.load(f)
+                d['n_inferred'] = d['labels'].loc[lambda x: ~x.isna()].unique().size
+                del d['labels']
+                L.append(d)
+    df_bench = pd.DataFrame(L)
+
+    return df_bench
+
+
+def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
+    """
+    Perturb AD and .X layers of afm.
+    """
+    afm = a.copy()
+    AD_new = afm.layers['AD'].copy()
+
+    n_vars = AD_new.shape[1]
+    n_sites = int(np.round(n_vars * perc_sites))
+    idx = np.random.choice(np.arange(n_vars), n_sites)
+
+    for i in idx:
+        ad = afm.layers['AD'][:,i].toarray().flatten()
+        dp = afm.layers['site_coverage'][:,i].toarray().flatten()
+        p_fit = np.sum(ad) / np.sum(dp)
+        p_noise = theta * p_fit
+        if add:
+            new_ad = ad + (dp * p_noise)
+        else:
+            new_ad = ad - (dp * p_noise)
+
+        AD_new[:,i] = new_ad
+
+    corr = np.corrcoef(afm.layers['AD'].toarray().flatten(), AD_new.toarray().flatten())[0,1]
+    afm.layers['AD'] = AD_new
+    afm.X = AD_new / (afm.layers['DP'].toarray() + .000001)
+
+    return afm, corr
 
 
 ##

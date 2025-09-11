@@ -7,7 +7,39 @@ from typing import Tuple, Dict, Any
 from umap.umap_ import nearest_neighbors  
 from umap.umap_ import fuzzy_simplicial_set 
 from scipy.sparse import coo_matrix, csr_matrix, issparse
-from scanpy.neighbors import _get_sparse_matrix_from_indices_distances_umap
+
+
+##
+
+
+
+def _get_sparse_matrix_from_indices_distances_umap(
+    knn_indices, knn_dists, n_obs, n_neighbors
+    ):
+    """
+    Legacy function from scanpy neighbors.
+    """
+    rows = np.zeros((n_obs * n_neighbors), dtype=np.int64)
+    cols = np.zeros((n_obs * n_neighbors), dtype=np.int64)
+    vals = np.zeros((n_obs * n_neighbors), dtype=np.float64)
+
+    for i in range(knn_indices.shape[0]):
+        for j in range(n_neighbors):
+            if knn_indices[i, j] == -1:
+                continue
+            if knn_indices[i, j] == i:
+                val = 0.0
+            else:
+                val = knn_dists[i, j]
+
+            rows[i * n_neighbors + j] = i
+            cols[i * n_neighbors + j] = knn_indices[i, j]
+            vals[i * n_neighbors + j] = val
+
+    result = coo_matrix((vals, (rows, cols)), shape=(n_obs, n_obs))
+    result.eliminate_zeros()
+
+    return result.tocsr()
 
 
 ##

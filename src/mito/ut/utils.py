@@ -62,12 +62,6 @@ def _find_assets_path():
     
     # If nothing found, return the development path anyway
     return dev_path
-    user_assets = os.path.join(site.getusersitepackages(), 'assets')
-    if os.path.exists(user_assets):
-        return user_assets
-    
-    # If nothing found, return the development path anyway
-    return dev_path
 
 path_assets = _find_assets_path()
 

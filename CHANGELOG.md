@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.5] - 2025-09-12
+### Fixed
+- Fixed asset path detection for conda environments
+- Assets now properly accessible via sys.prefix location
+- Improved _find_assets_path() function to check conda environment directory
+
 ## [0.0.4] - 2025-09-12
 ### Fixed
 - Fixed asset files inclusion in package distribution (PyPI release)

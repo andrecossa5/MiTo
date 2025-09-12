@@ -41,7 +41,14 @@ def _find_assets_path():
     if os.path.exists(dev_path):
         return dev_path
     
-    # Then try installed package location
+    # Try conda environment assets directory
+    import sys
+    if hasattr(sys, 'prefix'):
+        conda_assets = os.path.join(sys.prefix, 'assets')
+        if os.path.exists(conda_assets):
+            return conda_assets
+    
+    # Try installed package location in site-packages
     import site
     for site_dir in site.getsitepackages():
         assets_path = os.path.join(site_dir, 'assets')
@@ -49,6 +56,12 @@ def _find_assets_path():
             return assets_path
     
     # Fallback to user site directory
+    user_assets = os.path.join(site.getusersitepackages(), 'assets')
+    if os.path.exists(user_assets):
+        return user_assets
+    
+    # If nothing found, return the development path anyway
+    return dev_path
     user_assets = os.path.join(site.getusersitepackages(), 'assets')
     if os.path.exists(user_assets):
         return user_assets

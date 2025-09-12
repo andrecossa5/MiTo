@@ -1,8 +1,19 @@
 # Setup.py
+import os
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+# Get all files from assets directory
+def get_asset_files():
+    asset_files = []
+    assets_dir = "assets"
+    if os.path.exists(assets_dir):
+        for root, dirs, files in os.walk(assets_dir):
+            for file in files:
+                asset_files.append(os.path.join(root, file))
+    return asset_files
 
 setup(
     name="mito-utils",
@@ -15,6 +26,7 @@ setup(
     url="https://github.com/andrecossa5/MiTo",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    data_files=[("assets", get_asset_files())],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

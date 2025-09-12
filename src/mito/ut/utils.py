@@ -13,7 +13,6 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 
 
-
 ##
 
 
@@ -34,7 +33,30 @@ _var_filters = [
     # 'density',
     # 'GT_stringent'
 ]
-path_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
+
+# Try to find assets directory in multiple locations
+def _find_assets_path():
+    # First try relative path for development
+    dev_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
+    if os.path.exists(dev_path):
+        return dev_path
+    
+    # Then try installed package location
+    import site
+    for site_dir in site.getsitepackages():
+        assets_path = os.path.join(site_dir, 'assets')
+        if os.path.exists(assets_path):
+            return assets_path
+    
+    # Fallback to user site directory
+    user_assets = os.path.join(site.getusersitepackages(), 'assets')
+    if os.path.exists(user_assets):
+        return user_assets
+    
+    # If nothing found, return the development path anyway
+    return dev_path
+
+path_assets = _find_assets_path()
 
 
 ##

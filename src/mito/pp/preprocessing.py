@@ -120,7 +120,7 @@ def compute_metrics_raw(afm):
 
         if afm.uns['pp_method'] in ['mito_preprocessing', 'maegatk']:
             d['median_site_cov'] = afm.obs['median_target_site_coverage'].median()
-            d['median_target/untarget_coverage_logratio'] = np.median(
+            d['median_target_untarget_coverage_logratio'] = np.median(
                 np.log10(
                     afm.obs['median_target_site_coverage'] / \
                     (afm.obs['median_untarget_site_coverage']+0.000001)

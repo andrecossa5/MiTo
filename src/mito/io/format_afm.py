@@ -603,7 +603,7 @@ def make_afm(
             elif pp_method == 'cellsnp-lite':
                 afm = read_from_cellsnp(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif pp_method in ['mito_preprocessing', 'maegatk']:
-                afm = read_from_scmito(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_from_scmito(path_ch_matrix, path_meta, sample, pp_method, scLT_system, ref)
         
         else:
             

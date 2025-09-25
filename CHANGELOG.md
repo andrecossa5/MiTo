@@ -2,7 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.5] - 2025-09-12
+## [0.0.7] - 2025-09-25
+### Fixed
+- Add chrM.fa to assets
+- Change mt.io.make_afm behavior
+
+## [0.0.6] - 2025-09-17
 ### Fixed
 - Fixed asset path detection for conda environments
 - Assets now properly accessible via sys.prefix location

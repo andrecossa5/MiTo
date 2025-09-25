@@ -1,5 +1,5 @@
 include README.md
 include LICENSE
 include CHANGELOG.md
-recursive-include assets *.txt *.csv
+recursive-include assets *.txt *.csv *.fa
 recursive-include src *.py

@@ -186,8 +186,9 @@ def read_from_scmito(
     path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')              
 
     # Get ref dictionary
-    assert 'chrM.fa' in os.listdir()
-    with open('chrM.fa', 'r') as f:
+    import pkg_resources
+    chrM_path = pkg_resources.resource_filename('mito', 'assets/chrM.fa')
+    with open(chrM_path, 'r') as f:
         _ = f.readlines()
     seq = ''.join([ x.strip() for x in _[1:] ])
     ref = { pos+1:ref for pos,ref in enumerate(seq) }

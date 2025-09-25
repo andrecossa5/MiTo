@@ -160,7 +160,7 @@ def sparse_from_long(df, covariate, nrow, ncol, cell_order):
 
 def read_from_scmito(
     path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = None, scLT_system: str = 'MAESTER'
+    pp_method: str = None, scLT_system: str = 'MAESTER', ref='rCRS'
     ) -> AnnData :
     
     """
@@ -185,9 +185,15 @@ def read_from_scmito(
     path_G = os.path.join(path_ch_matrix, 'G.txt.gz')
     path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')              
 
-    # Get ref dictionary
-    import pkg_resources
-    chrM_path = pkg_resources.resource_filename('mito', 'assets/chrM.fa')
+    # Get ref
+    if ref == 'rCRS':
+        import pkg_resources
+        chrM_path = pkg_resources.resource_filename('mito', 'assets/chrM.fa')
+    elif os.path.exists(ref) and ref.endswith('.fa'):
+        chrM_path = ref
+    else:
+        raise ValueError('Provide a path to your custom genome ref (FASTA file).')
+
     with open(chrM_path, 'r') as f:
         _ = f.readlines()
     seq = ''.join([ x.strip() for x in _[1:] ])

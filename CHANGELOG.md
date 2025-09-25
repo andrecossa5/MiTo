@@ -2,10 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.8] - 2025-09-25
+### Fixed
+- Add mt.io.make_afm behavior
+
 ## [0.0.7] - 2025-09-25
 ### Fixed
 - Add chrM.fa to assets
-- Change mt.io.make_afm behavior
 
 ## [0.0.6] - 2025-09-17
 ### Fixed

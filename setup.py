@@ -17,7 +17,7 @@ def get_asset_files():
 
 setup(
     name="mito-utils",
-    version="0.0.7",
+    version="0.0.8",
     author="Andrea Cossa",
     author_email="your.email@example.com",
     description="Utilities for MT-based single cell Lineage Tracing (scLT).",

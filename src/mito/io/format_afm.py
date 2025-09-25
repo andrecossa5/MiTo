@@ -11,7 +11,7 @@ import cassiopeia as cs
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
 from anndata import AnnData
-from ..ut.utils import Timer
+from ..ut.utils import Timer, path_assets
 from ..ut.positions import MAESTER_genes_positions, mask_mt_sites
 warnings.filterwarnings("ignore")
 
@@ -187,8 +187,7 @@ def read_from_scmito(
 
     # Get ref
     if ref == 'rCRS':
-        import pkg_resources
-        chrM_path = pkg_resources.resource_filename('mito', 'assets/chrM.fa')
+        chrM_path = os.path.join(path_assets, 'chrM.fa')
     elif os.path.exists(ref) and ref.endswith('.fa'):
         chrM_path = ref
     else:
@@ -549,7 +548,7 @@ def read_scwgs(
 
 def make_afm(
     path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = 'maegatk', scLT_system: str = 'MAESTER'
+    pp_method: str = 'maegatk', scLT_system: str = 'MAESTER', ref: str ='rCRS'
     ) -> AnnData :
     """
     Creates an annotated Allele Frequency Matrix from different 
@@ -571,6 +570,9 @@ def make_afm(
         scLT system (i.e., marker) used for tracing. Available options:
         MAESTER, RedeeM, Cas9, scWGS.
         Default is 'MAESTER'.
+    ref : str, optional
+        Path to MT-reference genome. THe user can provide a custom FASTA file.
+        Default is 'rCRS'.
 
     Returns
     -------

@@ -42,6 +42,7 @@ autodoc_docstring_signature = False
 nbsphinx_execute = 'never'  # Don't execute notebooks during build (use pre-executed notebooks)
 nbsphinx_allow_errors = True
 nbsphinx_timeout = 600
+nbsphinx_assume_equations = True  # Enable equation support
 
 # -- Options for HTML output -------------------------------------------------
 exclude_patterns = ['_build', '**.ipynb_checkpoints']

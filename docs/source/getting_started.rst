@@ -6,9 +6,6 @@ This tutorial gives a complete overview of MiTo's core functionalities for **sin
 .. note::
    A properly configured MiTo environment is a necessary prerequisite for running this tutorial. Follow :doc:`installation` to install MiTo and its dependencies on your machine.
 
-Interactive Tutorial
---------------------
-
 The following interactive notebook provides a comprehensive walkthrough of MiTo's functionality, including all code examples with their outputs and visualizations.
 
 This tutorial showcases the basics of MiTo APIs, which not only backs up nf-MiTo main processes, but also enable interactive exploration of MT-scLT data (after raw sequencing data pre-processing, see `nf-MiTo <https://github.com/andrecossa5/nf-MiTo>`_ documentation). In particular, we will see how to:

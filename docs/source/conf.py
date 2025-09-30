@@ -1,5 +1,5 @@
 # Configuration file for the Sphinx documentation builder.
-# Updated for MiTo v0.0.9
+# Updated for MiTo v0.0.9 - Auto-build test
 
 import os
 import sys

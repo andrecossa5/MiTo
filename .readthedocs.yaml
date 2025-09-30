@@ -7,10 +7,13 @@ build:
   os: ubuntu-24.04
   tools:
     python: "mambaforge-22.9"
+
+# Explicitly specify branch  
+git:
+  branch: master
     
 sphinx:
    configuration: docs/source/conf.py
 
 conda:
     environment: envs/environment.yml
-        

@@ -24,6 +24,8 @@ dependencies:
   - yaml
   - pysam
   - lightgbm
+  - sphinx
+  - sphinx_rtd_theme
   - pip:
       - moscot
       - MQuad

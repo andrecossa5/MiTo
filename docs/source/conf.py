@@ -14,7 +14,9 @@ release = '0.0.9'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode'
+    'sphinx.ext.viewcode',
+    'nbsphinx',
+    'sphinx.ext.mathjax'
 ]
 
 autodoc_default_options = {
@@ -36,8 +38,13 @@ napoleon_use_ivar = True
 # Disable the duplicated signature in the docstring
 autodoc_docstring_signature = False
 
+# -- nbsphinx configuration --------------------------------------------------
+nbsphinx_execute = 'never'  # Don't execute notebooks during build (use pre-executed notebooks)
+nbsphinx_allow_errors = True
+nbsphinx_timeout = 600
+
 # -- Options for HTML output -------------------------------------------------
-exclude_patterns = []
+exclude_patterns = ['_build', '**.ipynb_checkpoints']
 html_theme = 'sphinx_rtd_theme'
 # html_static_path = ['_static']
 # templates_path = ['_templates']

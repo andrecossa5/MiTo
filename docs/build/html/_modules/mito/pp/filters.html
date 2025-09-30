@@ -1,0 +1,928 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mito.pp.filters &mdash; MiTo 0.0.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=f7cdbf68"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../../../about.html" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mito.pp.filters</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mito.pp.filters</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">All filters: variants/cells.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">fisher_exact</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">statsmodels.sandbox.stats.multicomp</span><span class="w"> </span><span class="kn">import</span> <span class="n">multipletests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mquad.mquad</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.distances</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..ut.positions</span><span class="w"> </span><span class="kn">import</span> <span class="n">mask_mt_sites</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..ut.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_edits_REDIdb</span><span class="p">,</span> <span class="n">load_common_dbSNP</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="n">filtering_options</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;baseline&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;CV&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;miller2022&#39;</span><span class="p">,</span> 
+    <span class="s1">&#39;weng2024&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;MQuad&#39;</span><span class="p">,</span> 
+    <span class="s1">&#39;MiTo&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;GT_enriched&#39;</span>
+
+    <span class="c1"># DEPRECATED</span>
+    <span class="c1"># &#39;ludwig2019&#39;, </span>
+    <span class="c1"># &#39;velten2021&#39;, </span>
+    <span class="c1"># &#39;seurat&#39;, </span>
+    <span class="c1"># &#39;MQuad_optimized&#39;,</span>
+    <span class="c1"># &#39;density&#39;,</span>
+    <span class="c1"># &#39;GT_stringent&#39;</span>
+<span class="p">]</span>
+
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">nans_as_zeros</span><span class="p">(</span><span class="n">afm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fill nans with zeros.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">X_copy</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">X_copy</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">X_copy</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">X</span> <span class="o">=</span> <span class="n">X_copy</span>
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_cells_with_at_least_one</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;vanilla&#39;</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter cells with at least one variant (genotypes from `bin_method`).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">call_genotypes</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="o">**</span><span class="n">binarization_kwargs</span><span class="p">)</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">[</span><span class="n">X</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span><span class="o">&gt;=</span><span class="mi">1</span><span class="p">],:]</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;per_position_coverage&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;per_position_coverage&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,:]</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;per_position_quality&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;per_position_quality&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,:]</span>
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="filter_cell_clones">
+<a class="viewcode-back" href="../../../api.html#mito.pp.filter_cell_clones">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_cell_clones</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;GBC&#39;</span><span class="p">,</span> 
+    <span class="n">min_cell_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter only cells from groups in afm.obs[`column`] with more </span>
+<span class="sd">    than `min_cell_number` cells.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Filtering cells from </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s1"> groups with &gt;=</span><span class="si">{</span><span class="n">min_cell_number</span><span class="si">}</span><span class="s1"> cells&#39;</span><span class="p">)</span>
+    
+    <span class="n">n0</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">cell_counts</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">column</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+    <span class="n">clones_to_retain</span> <span class="o">=</span> <span class="n">cell_counts</span><span class="p">[</span><span class="n">cell_counts</span><span class="o">&gt;=</span><span class="n">min_cell_number</span><span class="p">]</span><span class="o">.</span><span class="n">index</span> 
+    <span class="n">test</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">clones_to_retain</span><span class="p">)</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[</span><span class="n">test</span><span class="p">,:]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Removed other </span><span class="si">{</span><span class="n">n0</span><span class="o">-</span><span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1"> cells&#39;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Retaining </span><span class="si">{</span><span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s1"> discrete categories (i.e., </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s1">) for the analysis.&#39;</span><span class="p">)</span>
+          
+    <span class="k">return</span> <span class="n">afm</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="annotate_vars">
+<a class="viewcode-back" href="../../../api.html#mito.pp.annotate_vars">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">annotate_vars</span><span class="p">(</span><span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Annotate MT-SNVs properties as in in Weng et al., 2024, and Miller et al. 2022 before.</span>
+<span class="sd">    Create vars_df and update .var.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="s1">&#39;mean_af&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Re-annotate variants in afm&#39;</span><span class="p">)</span>
+            <span class="n">afm</span><span class="o">.</span><span class="n">var</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Initialize vars_df</span>
+
+    <span class="c1"># vars.tib &lt;- tibble(var = rownames(af.dm),</span>
+    <span class="c1">#                    mean_af = rowMeans(af.dm),</span>
+    <span class="c1">#                    mean_cov = rowMeans(assays(maegtk)[[&quot;coverage&quot;]])[as.numeric(cutf(rownames(af.dm), d = &quot;_&quot;))],</span>
+    <span class="c1">#                    quality = qual.num)</span>
+
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_af&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>
+
+    <span class="k">if</span> <span class="s1">&#39;site_coverage&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+        <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;site_coverage&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>
+    <span class="k">if</span> <span class="s1">&#39;qual&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>    <span class="c1"># NB: not computed for redeem data</span>
+        <span class="n">qual</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;qual&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+        <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">qual</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">,</span> <span class="n">qual</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">qual</span>
+
+    <span class="c1"># Calculate the number of cells that exceed VAF thresholds 0, 1, 5, 10, 50 as in Weng et al., 2024</span>
+
+    <span class="c1"># vars.tib &lt;- vars.tib %&gt;%</span>
+    <span class="c1">#     mutate(n0 = apply(af.dm, 1, function(x) sum(x == 0))) %&gt;%  # NEGATIVE CELLS</span>
+    <span class="c1">#     mutate(n1 = apply(af.dm, 1, function(x) sum(x &gt; 1))) %&gt;%</span>
+    <span class="c1">#     mutate(n5 = apply(af.dm, 1, function(x) sum(x &gt; 5))) %&gt;%</span>
+    <span class="c1">#     mutate(n10 = apply(af.dm, 1, function(x) sum(x &gt; 10))) %&gt;%</span>
+    <span class="c1">#     mutate(n50 = apply(af.dm, 1, function(x) sum(x &gt; 50)))</span>
+    <span class="c1"># Variant_CellN&lt;-apply(af.dm,1,function(x){length(which(x&gt;0))})</span>
+    <span class="c1"># vars.tib&lt;-cbind(vars.tib,Variant_CellN)</span>
+
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n0&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>       <span class="c1"># NEGATIVE CELLS</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mf">.01</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>           
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mf">.02</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>           
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n5&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mf">.05</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>           
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n10&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mf">.1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>           
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n50&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mf">.5</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>           
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>
+
+    <span class="c1"># Add mean AF, AD and DP in +cells</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span><span class="o">&gt;</span><span class="mi">0</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;median_af_in_positives&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_AD_in_positives&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">,</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;AD&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">(),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_DP_in_positives&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">,</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;DP&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">(),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="k">del</span> <span class="n">X</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="filter_baseline">
+<a class="viewcode-back" href="../../../api.html#mito.pp.filter_baseline">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_baseline</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">min_site_cov</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span> 
+    <span class="n">min_var_quality</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> 
+    <span class="n">min_n_positive</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">only_genes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute summary stats and baseline filter MT-SNVs (MAESTER, redeem).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="n">only_genes</span><span class="p">:</span>
+            <span class="n">test_sites</span> <span class="o">=</span> <span class="n">mask_mt_sites</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;pos&#39;</span><span class="p">])</span>
+            <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test_sites</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># Basic filter as in Weng et al., 2024</span>
+        <span class="k">if</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">]:</span>
+            <span class="n">test_baseline</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_site_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_var_quality</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_positive</span><span class="p">)</span> 
+            <span class="p">)</span>
+            <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test_baseline</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Baseline filter only exlcudes MT-SNVs in un-targeted sites.&#39;</span><span class="p">)</span>
+    
+    <span class="k">elif</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;RedeeM&#39;</span><span class="p">:</span>
+        <span class="n">test_baseline</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_site_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_positive</span><span class="p">)</span> 
+        <span class="p">)</span>
+        <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test_baseline</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Baseline filter not available for scLT_system current scLT_system and pp_method&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Exclude sites with more than one alt alleles observed</span>
+    <span class="n">var_sites</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">test</span> <span class="o">=</span> <span class="n">var_sites</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()[</span><span class="n">var_sites</span><span class="p">]</span><span class="o">==</span><span class="mi">1</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">[</span><span class="n">test</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Exclude variants sites not observed in any cells and vice versa</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">,:]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">afm</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_CV</span><span class="p">(</span><span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> <span class="n">n_top</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter top `n_top` MT-SNVs (MAESTER, redeem), ranked by coefficient of variation (CV).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">scLT_system</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span>
+    <span class="n">pp_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span> <span class="ow">and</span> <span class="n">pp_method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">]:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CV filter not available for scLT_system </span><span class="si">{</span><span class="n">scLT_system</span><span class="si">}</span><span class="s1"> and pp_method </span><span class="si">{</span><span class="n">pp_method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">X</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="n">CV</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">idx_vars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">CV</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="n">n_top</span><span class="p">]</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">idx_vars</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">del</span> <span class="n">X</span>
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_miller2022</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">min_site_cov</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> 
+    <span class="n">min_var_quality</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> 
+    <span class="n">p1</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
+    <span class="n">p2</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">99</span><span class="p">,</span> 
+    <span class="n">perc1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span> 
+    <span class="n">perc2</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span> 
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter MT-SNVs (MAESTER only) based on adaptive tresholds adopted in Miller et al., 2022.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">scLT_system</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span>
+    <span class="n">pp_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span> <span class="ow">and</span> <span class="n">pp_method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">]:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;miller2022 filter not available for scLT_system </span><span class="si">{</span><span class="n">scLT_system</span><span class="si">}</span><span class="s1"> and pp_method </span><span class="si">{</span><span class="n">pp_method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">X</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="n">test</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_site_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_var_quality</span><span class="p">)</span> <span class="o">&amp;</span> \
+        <span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="n">p1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">perc1</span><span class="p">)</span> <span class="o">&amp;</span> \
+         <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="n">p2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">perc2</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_MQuad_mixtures</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">n_top</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">path_</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ncores</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">minDP</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">minAD</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">with_M</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">n_top</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>    
+        <span class="n">afm</span> <span class="o">=</span> <span class="n">filter_CV</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">n_top</span><span class="o">=</span><span class="n">n_top</span><span class="p">)</span> <span class="c1"># Prefilter again, if still too much MT-SNVs</span>
+
+    <span class="c1"># Fit models</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">Mquad</span><span class="p">(</span><span class="n">AD</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;AD&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">DP</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;DP&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">path_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span> <span class="k">if</span> <span class="n">path_</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">path_</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">fit_deltaBIC</span><span class="p">(</span><span class="n">out_dir</span><span class="o">=</span><span class="n">path_</span><span class="p">,</span> <span class="n">nproc</span><span class="o">=</span><span class="n">ncores</span><span class="p">,</span> <span class="n">minDP</span><span class="o">=</span><span class="n">minDP</span><span class="p">,</span> <span class="n">minAD</span><span class="o">=</span><span class="n">minAD</span><span class="p">)</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;deltaBIC_rank&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;deltaBIC&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">with_M</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;deltaBIC&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">M</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;deltaBIC&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_MQuad</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">ncores</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span> 
+    <span class="n">minDP</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span> 
+    <span class="n">minAD</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">minCell</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">path_</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
+    <span class="n">n_top</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        The Allele Frequency Matrix.</span>
+<span class="sd">    ncores : int, optional</span>
+<span class="sd">        Number of cores to use for computation. Default is 8.</span>
+<span class="sd">    minDP : int, optional</span>
+<span class="sd">        Minimum depth (DP) required. Default is 5.</span>
+<span class="sd">    minAD : int, optional</span>
+<span class="sd">        Minimum alternative allele (AD) count required. Default is 1.</span>
+<span class="sd">    minCell : int, optional</span>
+<span class="sd">        Minimum number of cells required. Default is 2.</span>
+<span class="sd">    path_ : str, optional</span>
+<span class="sd">        Path for saving output or intermediate results. Default is None.</span>
+<span class="sd">    n_top : int, optional</span>
+<span class="sd">        Number of top MT-SNVs to select. Default is None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Filtered Allele Frequency Matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">scLT_system</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span>
+    <span class="n">pp_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span> <span class="ow">and</span> <span class="n">pp_method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">,</span> <span class="s1">&#39;cellsnp-lite&#39;</span><span class="p">]:</span>
+        <span class="k">pass</span>
+    <span class="k">elif</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;redeem&#39;</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;MQuad filter not available for scLT_system </span><span class="si">{</span><span class="n">scLT_system</span><span class="si">}</span><span class="s1"> and pp_method </span><span class="si">{</span><span class="n">pp_method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    
+    <span class="n">_</span><span class="p">,</span> <span class="n">M</span> <span class="o">=</span> <span class="n">fit_MQuad_mixtures</span><span class="p">(</span>
+        <span class="n">afm</span><span class="p">,</span> <span class="n">n_top</span><span class="o">=</span><span class="n">n_top</span><span class="p">,</span> <span class="n">path_</span><span class="o">=</span><span class="n">path_</span><span class="p">,</span> <span class="n">ncores</span><span class="o">=</span><span class="n">ncores</span><span class="p">,</span> <span class="n">minDP</span><span class="o">=</span><span class="n">minDP</span><span class="p">,</span> <span class="n">minAD</span><span class="o">=</span><span class="n">minAD</span><span class="p">,</span> <span class="n">with_M</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">selectInformativeVariants</span><span class="p">(</span>
+        <span class="n">min_cells</span><span class="o">=</span><span class="n">minCell</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="n">path_</span><span class="p">,</span> <span class="n">tenx_cutoff</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">export_heatmap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">export_mtx</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">final_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="p">[</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span> <span class="p">]</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">selected</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;deltaBIC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">final_df</span><span class="p">[</span><span class="s1">&#39;deltaBIC&#39;</span><span class="p">]</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;rm </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;*BIC*&quot;</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_weng2024</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">min_site_cov</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span> 
+    <span class="n">min_var_quality</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> 
+    <span class="n">min_frac_negative</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.9</span><span class="p">,</span>
+    <span class="n">min_n_positive</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">low_confidence_af</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.1</span><span class="p">,</span> 
+    <span class="n">high_confidence_af</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.5</span><span class="p">,</span> 
+    <span class="n">min_prevalence_low_confidence_af</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.1</span><span class="p">,</span> 
+    <span class="n">min_cells_high_confidence_af</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter MT-SNVs (MAESTER only) as in Weng et al., 2024, and Miller et al. 2022.</span>
+
+<span class="sd">    Filters variants using the following criteria:</span>
+<span class="sd">    - At least `min_site_cov` mean site coverage (across cells)</span>
+<span class="sd">    - At least `min_var_quality` mean variant allele basecall quality (across cells)</span>
+<span class="sd">    - At least n cells * `min_frac_negative` negative cells </span>
+<span class="sd">    - At least `min_n_positive` (AF &gt; 0) cells</span>
+<span class="sd">    - At least `min_prevalence_low_confidence_af` prevalence at AF less than `low_confidence_af`</span>
+<span class="sd">    - At least `min_cells_high_confidence_af` cells with AF greater than `high_confidence_af`</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    min_site_cov : float</span>
+<span class="sd">        Minimum mean site coverage across cells.</span>
+<span class="sd">    min_var_quality : float</span>
+<span class="sd">        Minimum mean variant allele basecall quality across cells.</span>
+<span class="sd">    min_frac_negative : float</span>
+<span class="sd">        Fraction of cells that must be negative.</span>
+<span class="sd">    min_n_positive : int</span>
+<span class="sd">        Minimum number of cells with AF &gt; 0.</span>
+<span class="sd">    min_prevalence_low_confidence_af : float</span>
+<span class="sd">        Minimum prevalence (fraction of cells) with AF less than low_confidence_af.</span>
+<span class="sd">    low_confidence_af : float</span>
+<span class="sd">        Threshold for low confidence allele frequency.</span>
+<span class="sd">    min_cells_high_confidence_af : int</span>
+<span class="sd">        Minimum number of cells required with AF greater than high_confidence_af.</span>
+<span class="sd">    high_confidence_af : float</span>
+<span class="sd">        Threshold for high confidence allele frequency.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Filtered Allele Frequency Matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">scLT_system</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span>
+    <span class="n">pp_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span> <span class="ow">and</span> <span class="n">pp_method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">]:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;weng2024 filter not available for scLT_system </span><span class="si">{</span><span class="n">scLT_system</span><span class="si">}</span><span class="s1"> and pp_method </span><span class="si">{</span><span class="n">pp_method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Filter Weng et al., 2024</span>
+
+    <span class="c1"># vars_filter.tib &lt;- vars.tib %&gt;% filter(mean_cov &gt; 5, quality &gt;= 30, n0 &gt; 0.9*ncol(af.dm),Variant_CellN&gt;=2)</span>
+
+    <span class="c1">## Apply the same filter as in MAESTER</span>
+    <span class="c1"># IsInfo&lt;-function(x){</span>
+    <span class="c1"># total&lt;-length(x)</span>
+    <span class="c1"># if(length(which(x&lt;10))/total&gt;0.1 &amp; length(which(x&gt;50))&gt;10){</span>
+    <span class="c1">#     return(&quot;Variable&quot;)</span>
+    <span class="c1"># }else{</span>
+    <span class="c1">#     return(&quot;Non&quot;)</span>
+    <span class="c1"># }</span>
+    <span class="c1"># }</span>
+    <span class="c1"># Variability&lt;-apply(af.dm,1,IsInfo) %&gt;% data.frame(Info=.)</span>
+    <span class="c1"># vars_filter.tib&lt;-Tomerge_v2(vars_filter.tib,Variability) </span>
+    
+    <span class="n">annotate_vars</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">test</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;</span><span class="n">min_site_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_var_quality</span><span class="p">)</span> <span class="o">&amp;</span> \
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n0&#39;</span><span class="p">]</span><span class="o">&gt;</span><span class="n">min_frac_negative</span><span class="o">*</span><span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&amp;</span> \
+        <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_positive</span><span class="p">)</span> 
+    <span class="p">)</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Detect &quot;Variable&quot; variants as in MAESTER</span>
+
+    <span class="c1"># IsInfo&lt;-function(x){</span>
+    <span class="c1"># total&lt;-length(x)</span>
+    <span class="c1"># if(length(</span>
+        <span class="c1"># which(x&lt;10))/total&gt;0.1        # Test1 : low prevalence of minimal detection.</span>
+        <span class="c1"># &amp; </span>
+        <span class="c1"># length(which(x&gt;50))&gt;10)       # Test2 : enough cells with confident detection.</span>
+        <span class="c1"># {</span>
+    <span class="c1">#     return(&quot;Variable&quot;)            </span>
+    <span class="c1"># }else{</span>
+    <span class="c1">#     return(&quot;Non&quot;)</span>
+    <span class="c1"># }</span>
+    <span class="c1"># }</span>
+    <span class="c1"># Variability&lt;-apply(af.dm,1,IsInfo) %&gt;% data.frame(Info=.)</span>
+
+    <span class="n">t1</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&lt;</span><span class="n">low_confidence_af</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span> <span class="o">/</span> <span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">min_prevalence_low_confidence_af</span>
+    <span class="n">t2</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;</span><span class="n">high_confidence_af</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span> <span class="o">&gt;</span> <span class="n">min_cells_high_confidence_af</span>
+    <span class="n">test</span> <span class="o">=</span> <span class="n">t1</span> <span class="o">&amp;</span> <span class="n">t2</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> 
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="filter_MiTo">
+<a class="viewcode-back" href="../../../api.html#mito.pp.filter_MiTo">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_MiTo</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">min_cov</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">min_var_quality</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span>
+    <span class="n">min_frac_negative</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span>
+    <span class="n">min_n_positive</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">af_confident_detection</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.02</span><span class="p">,</span>
+    <span class="n">min_n_confidently_detected</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">min_mean_AD_in_positives</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.25</span><span class="p">,</span>
+    <span class="n">min_mean_DP_in_positives</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">25</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    MiTo custom filter. Filter variants with:</span>
+<span class="sd">    - At least `min_cov` mean site coverage (across cells)</span>
+<span class="sd">    - At least `min_var_quality` mean variant allele basecall quality (across cells)</span>
+<span class="sd">    - At least n cells * `min_frac_negative` negative cells </span>
+<span class="sd">    - At least `min_n_positive` (AF &gt; 0) cells</span>
+<span class="sd">    - At least `min_n_confidently_detected` cells in which the variant has been detected with AF greater than `af_confident_detection`</span>
+<span class="sd">    - At least `min_mean_AD_in_positives` mean AD in positive cells</span>
+<span class="sd">    - At least `min_mean_DP_in_positives` mean DP in positive cells</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    min_cov : float</span>
+<span class="sd">        Minimum mean site coverage (across cells). Default is 5.</span>
+<span class="sd">    min_var_quality : float</span>
+<span class="sd">        Minimum mean variant allele basecall quality (across cells). Default is 30.</span>
+<span class="sd">    min_frac_negative : float</span>
+<span class="sd">        Minimum fraction of negative cells (expressed as a fraction of total cells). Default is 0.2.</span>
+<span class="sd">    min_n_positive : int</span>
+<span class="sd">        Minimum number of cells with AF &gt; 0. Default is 5.</span>
+<span class="sd">    min_n_confidently_detected : int</span>
+<span class="sd">        Minimum number of cells in which the variant has been detected with an AF greater than</span>
+<span class="sd">        `af_confident_detection`. Default is 2.</span>
+<span class="sd">    af_confident_detection : float</span>
+<span class="sd">        Allele frequency threshold for confident detection. Default is 0.02.</span>
+<span class="sd">    min_mean_AD_in_positives : float</span>
+<span class="sd">        Minimum mean alternative allele count (AD) in positive cells. Default is 1.25.</span>
+<span class="sd">    min_mean_DP_in_positives : float</span>
+<span class="sd">        Minimum mean total UMI counts (DP) in positive cells. Default is 25.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Filtered Allele Frequency Matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">scLT_system</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span>
+    <span class="n">pp_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;pp_method&#39;</span><span class="p">]</span>
+
+    <span class="n">annotate_vars</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n_confidently_detected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">&gt;=</span><span class="n">af_confident_detection</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">A1</span>
+
+    <span class="k">if</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;MAESTER&#39;</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="n">pp_method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mito_preprocessing&#39;</span><span class="p">,</span> <span class="s1">&#39;maegatk&#39;</span><span class="p">]:</span>
+            <span class="n">test</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;quality&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_var_quality</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n0&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_frac_negative</span><span class="o">*</span><span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_positive</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n_confidently_detected&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_confidently_detected</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_AD_in_positives&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_mean_AD_in_positives</span><span class="p">)</span> <span class="o">&amp;</span> \
+                <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_DP_in_positives&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_mean_DP_in_positives</span><span class="p">)</span> 
+            <span class="p">)</span>
+            <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;MiTo filter not available for pp_method: </span><span class="si">{</span><span class="n">pp_method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        
+    <span class="k">elif</span> <span class="n">scLT_system</span> <span class="o">==</span> <span class="s1">&#39;redeem&#39;</span><span class="p">:</span>
+        <span class="n">test</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_cov&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_cov</span><span class="p">)</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n0&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_frac_negative</span><span class="o">*</span><span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Variant_CellN&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_positive</span><span class="p">)</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;n_confidently_detected&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_n_confidently_detected</span><span class="p">)</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_AD_in_positives&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_mean_AD_in_positives</span><span class="p">)</span> <span class="o">&amp;</span> \
+            <span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mean_DP_in_positives&#39;</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">min_mean_DP_in_positives</span><span class="p">)</span> 
+        <span class="p">)</span>
+        <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;MiTo filter not available for scLT_system: </span><span class="si">{</span><span class="n">scLT_system</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">afm</span></div>
+
+
+    
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="compute_lineage_biases">
+<a class="viewcode-back" href="../../../api.html#mito.pp.compute_lineage_biases">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_lineage_biases</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">lineage_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+    <span class="n">target_lineage</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;MiTo&#39;</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span> 
+    <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.05</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute MT-SNVs enrichment scores for a given lineage category using Fisher&#39;s exact test.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    lineage_column : str</span>
+<span class="sd">        Field in afm.obs containing the &#39;lineage&#39; categorical variable.</span>
+<span class="sd">    target_lineage : str</span>
+<span class="sd">        The category in afm.obs[lineage_column] to test for MT-SNV enrichment.</span>
+<span class="sd">    bin_method : str, optional</span>
+<span class="sd">        Genotyping method. Default is &quot;MiTo&quot;.</span>
+<span class="sd">    binarization_kwargs : dict, optional</span>
+<span class="sd">        Additional keyword arguments for genotyping. Default is {}.</span>
+<span class="sd">    alpha : float, optional</span>
+<span class="sd">        Family-wise error rate for p-value correction. Default is 0.05.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    results : pd.DataFrame</span>
+<span class="sd">        DataFrame containing computed statistics (e.g., -log10(FDR) from Fisher&#39;s exact test).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">lineage_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lineage_column</span><span class="si">}</span><span class="s1"> not present in cell metadata!&#39;</span><span class="p">)</span>
+        
+    <span class="n">muts</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span>
+    <span class="n">prevalences_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">muts</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">target_ratio_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">muts</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">oddsratio_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">muts</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">pvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">muts</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s1">&#39;bin&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+        <span class="n">call_genotypes</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="o">**</span><span class="n">binarization_kwargs</span><span class="p">)</span>
+
+    <span class="c1"># Here we go</span>
+    <span class="n">G</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">muts</span><span class="o">.</span><span class="n">size</span><span class="p">):</span>
+
+        <span class="n">test_mut</span> <span class="o">=</span> <span class="n">G</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="n">test_lineage</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">lineage_column</span><span class="p">]</span> <span class="o">==</span> <span class="n">target_lineage</span>
+        <span class="n">n_mut_lineage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">test_mut</span> <span class="o">&amp;</span> <span class="n">test_lineage</span><span class="p">)</span>
+        <span class="n">n_mut_no_lineage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">test_mut</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">test_lineage</span><span class="p">)</span>
+        <span class="n">n_no_mut_lineage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">test_mut</span> <span class="o">&amp;</span> <span class="n">test_lineage</span><span class="p">)</span>
+        <span class="n">n_no_mut_no_lineage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">test_mut</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">test_lineage</span><span class="p">)</span>
+        <span class="n">prevalences_array</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">n_mut_lineage</span> <span class="o">/</span> <span class="n">test_lineage</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">target_ratio_array</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">n_mut_lineage</span> <span class="o">/</span> <span class="n">test_mut</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+        <span class="c1"># Fisher</span>
+        <span class="n">oddsratio</span><span class="p">,</span> <span class="n">pvalue</span> <span class="o">=</span> <span class="n">fisher_exact</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">[</span><span class="n">n_mut_lineage</span><span class="p">,</span> <span class="n">n_mut_no_lineage</span><span class="p">],</span>
+                <span class="p">[</span><span class="n">n_no_mut_lineage</span><span class="p">,</span> <span class="n">n_no_mut_no_lineage</span><span class="p">],</span> 
+            <span class="p">],</span>
+            <span class="n">alternative</span><span class="o">=</span><span class="s1">&#39;greater&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">oddsratio_array</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">oddsratio</span>
+        <span class="n">pvals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pvalue</span>
+
+    <span class="c1"># Correct pvals --&gt; FDR</span>
+    <span class="n">pvals</span> <span class="o">=</span> <span class="n">multipletests</span><span class="p">(</span><span class="n">pvals</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;fdr_bh&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># Results</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s1">&#39;prevalence&#39;</span> <span class="p">:</span> <span class="n">prevalences_array</span><span class="p">,</span>
+            <span class="s1">&#39;perc_in_target_lineage&#39;</span> <span class="p">:</span> <span class="n">target_ratio_array</span><span class="p">,</span>
+            <span class="s1">&#39;odds_ratio&#39;</span> <span class="p">:</span> <span class="n">oddsratio_array</span><span class="p">,</span>
+            <span class="s1">&#39;FDR&#39;</span> <span class="p">:</span> <span class="n">pvals</span><span class="p">,</span>
+            <span class="s1">&#39;lineage_bias&#39;</span> <span class="p">:</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">pvals</span><span class="p">)</span> 
+        <span class="p">},</span> <span class="n">index</span><span class="o">=</span><span class="n">muts</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;lineage_bias&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_GT_enriched</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">lineage_column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
+    <span class="n">fdr_treshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.1</span><span class="p">,</span>
+    <span class="n">n_enriched_groups</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;MiTo&#39;</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute MT-SNVs enrichment scores for a given lineage category using </span>
+<span class="sd">    -log10(FDR) from Fisher&#39;s exact test.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    lineage_column : str</span>
+<span class="sd">        Field in afm.obs that contains the &#39;lineage&#39; categorical variable.</span>
+<span class="sd">    target_lineage : str</span>
+<span class="sd">        The category in afm.obs[lineage_column] to test for MT-SNV enrichment.</span>
+<span class="sd">    bin_method : str, optional</span>
+<span class="sd">        Genotyping method. Default is &quot;MiTo&quot;.</span>
+<span class="sd">    binarization_kwargs : dict, optional</span>
+<span class="sd">        Additional keyword arguments for genotyping. Default is {}.</span>
+<span class="sd">    alpha : float, optional</span>
+<span class="sd">        Family-wise error rate for p-value correction. Default is 0.05.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    results : pd.DataFrame</span>
+<span class="sd">        Computed statistics.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">lineage_column</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">lineage_column</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lineage_column</span><span class="si">}</span><span class="s1"> not available in afm.obs!&#39;</span><span class="p">)</span>
+    
+    <span class="n">L</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">lineages</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">lineage_column</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">target_lineage</span> <span class="ow">in</span> <span class="n">lineages</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Computing variants enrichment for lineage </span><span class="si">{</span><span class="n">target_lineage</span><span class="si">}</span><span class="s1">...&#39;</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">compute_lineage_biases</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">lineage_column</span><span class="p">,</span> <span class="n">target_lineage</span><span class="p">,</span> 
+                                    <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="n">binarization_kwargs</span><span class="o">=</span><span class="n">binarization_kwargs</span><span class="p">)</span>
+        <span class="n">L</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;FDR&#39;</span><span class="p">]</span><span class="o">&lt;=</span><span class="n">fdr_treshold</span><span class="p">)</span>
+    
+    <span class="n">df_enrich</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">df_enrich</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="n">lineages</span>
+    <span class="n">test</span> <span class="o">=</span> <span class="n">df_enrich</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">0</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">&lt;=</span><span class="n">n_enriched_groups</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">vois</span> <span class="o">=</span> <span class="n">df_enrich</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+    <span class="n">id_lineages</span> <span class="o">=</span> <span class="n">df_enrich</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+    <span class="n">cells</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">lineage_column</span><span class="p">]</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">id_lineages</span><span class="p">)]</span><span class="o">.</span><span class="n">index</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[</span><span class="n">cells</span><span class="p">,</span> <span class="n">vois</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">afm</span> 
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">moran_I</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">num_permutations</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate normalized Moran&#39;s I statistics and permutation-based pvalue.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">W</span> <span class="o">=</span> <span class="n">W</span> <span class="o">/</span> <span class="n">W</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">x_stdzd</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">ddof</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">I_obs</span> <span class="o">=</span> <span class="n">x_stdzd</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">W</span> <span class="o">@</span> <span class="n">x_stdzd</span>
+
+    <span class="c1"># Perform permutation test</span>
+    <span class="n">permuted_Is</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_permutations</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_permutations</span><span class="p">):</span>
+        <span class="n">x_perm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">x_stdzd</span><span class="p">)</span>
+        <span class="n">permuted_Is</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_perm</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">W</span> <span class="o">@</span> <span class="n">x_perm</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">permuted_Is</span> <span class="o">&gt;=</span> <span class="n">I_obs</span><span class="p">)</span> <span class="o">/</span> <span class="n">num_permutations</span>
+
+    <span class="k">return</span> <span class="n">I_obs</span><span class="p">,</span> <span class="n">p_value</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_variant_moransI</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">num_permutations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> 
+    <span class="n">pval_treshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span><span class="mf">.01</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span><span class="p">:</span>
+
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter MT-SNVs if not significantly auto-correlated.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">assert</span> <span class="s1">&#39;distances&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span>
+    <span class="n">W</span> <span class="o">=</span> <span class="mi">1</span><span class="o">-</span><span class="n">afm</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="s1">&#39;distances&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+
+    <span class="n">I</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">moran_I</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="p">[:,</span><span class="n">i</span><span class="p">],</span> <span class="n">num_permutations</span><span class="o">=</span><span class="n">num_permutations</span><span class="p">)</span>
+        <span class="n">I</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">P</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Moran I &#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">I</span>
+    <span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Moran I pvalue&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">P</span>
+
+    <span class="n">var_to_retain</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">afm</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;Moran I pvalue&#39;</span><span class="p">]</span><span class="o">&lt;=</span><span class="n">pval_treshold</span><span class="p">]</span><span class="o">.</span><span class="n">var_names</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">var_to_retain</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">afm</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_dbSNP_common</span><span class="p">(</span><span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter Allele Frequency Matrix from &quot;COMMON&quot; MT-SNVs (annotated dbSNP database).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">common</span> <span class="o">=</span> <span class="n">load_common_dbSNP</span><span class="p">()</span>    
+    <span class="n">n_dbSNP</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">common</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Exclude </span><span class="si">{</span><span class="n">n_dbSNP</span><span class="si">}</span><span class="s1"> common SNVs events (dbSNP)&#39;</span><span class="p">)</span>
+    <span class="n">variants</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">[</span><span class="o">~</span><span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">common</span><span class="p">)]</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">variants</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> 
+
+    <span class="k">return</span> <span class="n">afm</span><span class="p">,</span> <span class="n">n_dbSNP</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_REDIdb_edits</span><span class="p">(</span><span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filter Allele Frequency Matrix from previously annotated RNA-edits (REDIdb database).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">edits</span> <span class="o">=</span> <span class="n">load_edits_REDIdb</span><span class="p">()</span>
+    <span class="n">n_REDIdb</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">edits</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Exclude </span><span class="si">{</span><span class="n">n_REDIdb</span><span class="si">}</span><span class="s1"> common RNA editing events (REDIdb)&#39;</span><span class="p">)</span>
+    <span class="n">variants</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">[</span><span class="o">~</span><span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">edits</span><span class="p">)]</span>
+    <span class="n">afm</span> <span class="o">=</span> <span class="n">afm</span><span class="p">[:,</span><span class="n">variants</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">afm</span><span class="p">,</span> <span class="n">n_REDIdb</span>
+
+
+<span class="c1">##</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

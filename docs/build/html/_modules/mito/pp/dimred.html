@@ -1,0 +1,290 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mito.pp.dimred &mdash; MiTo 0.0.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=f7cdbf68"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../../../about.html" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mito.pp.dimred</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mito.pp.dimred</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Dimensionality reduction utils to reduce a (pre-filtered) AFMs.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.linalg</span><span class="w"> </span><span class="kn">import</span> <span class="n">eigh</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.decomposition</span><span class="w"> </span><span class="kn">import</span> <span class="n">PCA</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">umap.umap_</span><span class="w"> </span><span class="kn">import</span> <span class="n">simplicial_set_embedding</span><span class="p">,</span> <span class="n">find_ab_params</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.kNN</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.distances</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">find_diffusion_matrix</span><span class="p">(</span><span class="n">D</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function to find the diffusion matrix P.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="n">D</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">D</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">alpha</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="c1"># alpha is the variance of the distance matrix, here</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">Di</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">r</span><span class="p">)</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Di</span><span class="p">,</span> <span class="n">K</span><span class="p">)</span>
+    <span class="n">D_right</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">((</span><span class="n">r</span><span class="p">)</span><span class="o">**</span><span class="mf">0.5</span><span class="p">)</span>
+    <span class="n">D_left</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">((</span><span class="n">r</span><span class="p">)</span><span class="o">**-</span><span class="mf">0.5</span><span class="p">)</span>
+    <span class="n">P_prime</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">D_right</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="n">D_left</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">P_prime</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">Di</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">D_left</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">find_diffusion_map</span><span class="p">(</span><span class="n">P_prime</span><span class="p">,</span> <span class="n">D_left</span><span class="p">,</span> <span class="n">n_eign</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function to find the diffusion coordinates in the diffusion space.</span>
+<span class="sd">    &quot;&quot;&quot;</span>   
+    <span class="n">eigenValues</span><span class="p">,</span> <span class="n">eigenVectors</span> <span class="o">=</span> <span class="n">eigh</span><span class="p">(</span><span class="n">P_prime</span><span class="p">)</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">eigenValues</span><span class="o">.</span><span class="n">argsort</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">eigenValues</span> <span class="o">=</span> <span class="n">eigenValues</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+    <span class="n">eigenVectors</span> <span class="o">=</span> <span class="n">eigenVectors</span><span class="p">[:,</span><span class="n">idx</span><span class="p">]</span>
+    <span class="n">diffusion_coordinates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">D_left</span><span class="p">,</span> <span class="n">eigenVectors</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">diffusion_coordinates</span><span class="p">[:,:</span><span class="n">n_eign</span><span class="p">]</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">find_pca</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1234</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get PCA embeddings with fbpca.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">PCA</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_pcs</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
+    <span class="n">X_pca</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">X_pca</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_umap_from_X_conn</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">conn</span><span class="p">,</span> <span class="n">ncomps</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;cosine&#39;</span><span class="p">,</span> <span class="n">metric_kwargs</span><span class="o">=</span><span class="p">{},</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1234</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper around umap.umap_.simplicial_set_embedding() to create a umap embedding of the </span>
+<span class="sd">    feature matrix X using a precomputed fuzzy graph.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">find_ab_params</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+    <span class="n">X_umap</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">simplicial_set_embedding</span><span class="p">(</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">conn</span><span class="p">,</span> <span class="n">ncomps</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="s1">&#39;spectral&#39;</span><span class="p">,</span> 
+        <span class="n">random_state</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="n">seed</span><span class="p">),</span> <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span> <span class="n">metric_kwds</span><span class="o">=</span><span class="n">metric_kwargs</span><span class="p">,</span>
+        <span class="n">densmap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">densmap_kwds</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output_dens</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">X_umap</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_X</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">layer</span><span class="p">):</span>
+
+    <span class="k">if</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Use </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s1"> layer&#39;</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="n">layer</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s1"> layer not found. Fall back to scaled .X raw AF...&#39;</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">X</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_D</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+
+    <span class="k">if</span> <span class="s1">&#39;distance_calculations&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">distance_key</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;distance_calculations&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;distance_calculations&#39;</span><span class="p">][</span><span class="n">distance_key</span><span class="p">][</span><span class="s1">&#39;metric&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;metric&#39;</span><span class="p">]:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Use precomputed </span><span class="si">{</span><span class="n">distance_key</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">D</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="n">distance_key</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">D</span>
+            
+    <span class="n">compute_distances</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="o">=</span><span class="n">distance_key</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="n">distance_key</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">D</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="reduce_dimensions">
+<a class="viewcode-back" href="../../../api.html#mito.pp.reduce_dimensions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">reduce_dimensions</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;bin&#39;</span><span class="p">,</span>
+    <span class="n">distance_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;distances&#39;</span><span class="p">,</span> 
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1234</span><span class="p">,</span> 
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;UMAP&#39;</span><span class="p">,</span> 
+    <span class="n">k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> 
+    <span class="n">n_comps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">ncores</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+    <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;weighted_jaccard&#39;</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;MiTo&#39;</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Dimensionality reduction for an Allele Frequency Matrix.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    layer : str, optional</span>
+<span class="sd">        Layer to use. Default is &quot;bin&quot;.</span>
+<span class="sd">    distance_key : str, optional</span>
+<span class="sd">        afm.obsp key to append distances. Default is &quot;distances&quot;.</span>
+<span class="sd">    seed : int, optional</span>
+<span class="sd">        Random seed. Default is 1234.</span>
+<span class="sd">    method : str, optional</span>
+<span class="sd">        Dimensionality reduction method. Default is &quot;UMAP&quot;.</span>
+<span class="sd">    k : int, optional</span>
+<span class="sd">        Number of neighbors to use for kNN search. Default is 10.</span>
+<span class="sd">    n_comps : int, optional</span>
+<span class="sd">        Number of dimensions of the output embedding. Default is 2.</span>
+<span class="sd">    metric : str, optional</span>
+<span class="sd">        Dissimilarity metric to use. Default is &quot;weightde_jaccard&quot;.</span>
+<span class="sd">    bin_method : str, optional</span>
+<span class="sd">        Genotyping method. Default is &quot;MiTo&quot;.</span>
+<span class="sd">    binarization_kwargs : dict, optional</span>
+<span class="sd">        Keyword arguments for binarization. Default is {}.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span> <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="n">ncores</span><span class="o">=</span><span class="n">ncores</span><span class="p">,</span> <span class="n">binarization_kwargs</span><span class="o">=</span><span class="n">binarization_kwargs</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;PCA&#39;</span><span class="p">:</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">_get_X</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">layer</span><span class="p">)</span>
+        <span class="n">afm</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;X_pca&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">find_pca</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="n">n_comps</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;UMAP&#39;</span><span class="p">:</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">_get_X</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">layer</span><span class="p">)</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">_get_D</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">conn</span> <span class="o">=</span> <span class="n">kNN_graph</span><span class="p">(</span><span class="n">D</span><span class="o">=</span><span class="n">D</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">from_distances</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">afm</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;X_umap&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_umap_from_X_conn</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">conn</span><span class="p">,</span> <span class="n">ncomps</span><span class="o">=</span><span class="n">n_comps</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;diffmap&#39;</span><span class="p">:</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">_get_D</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">P_prime</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span><span class="n">_</span><span class="p">,</span><span class="n">_</span><span class="p">,</span> <span class="n">D_left</span> <span class="o">=</span> <span class="n">find_diffusion_matrix</span><span class="p">(</span><span class="n">D</span><span class="p">)</span>
+        <span class="n">afm</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;X_diffmap&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">find_diffusion_map</span><span class="p">(</span><span class="n">P_prime</span><span class="p">,</span> <span class="n">D_left</span><span class="p">,</span> <span class="n">n_eign</span><span class="o">=</span><span class="n">n_comps</span><span class="p">)</span>
+    
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Method </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s1"> not recognized. Please use &quot;PCA&quot;, &quot;UMAP&quot; or &quot;diffmap&quot;.&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span></div>
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

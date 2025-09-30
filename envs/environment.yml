@@ -26,6 +26,7 @@ dependencies:
   - lightgbm
   - sphinx
   - sphinx_rtd_theme
+  - nbsphinx
   - pip:
       - moscot
       - MQuad

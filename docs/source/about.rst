@@ -5,7 +5,7 @@ MiTo is a user-friendly Python package enabling interactive, single-cell, lineag
 
 MiTo capabilities include:
 
-1. Preprocessing of MT-SNVs data (MAESTER/RedeeM/scmtATAC-seq protocols)
+1. Preprocessing of scLT data (particular focus on MAESTER [ref here] technology)
 2. Phylogeny and clonal inference
 3. Downstream analysis and visualization
 

@@ -1,0 +1,357 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mito.tl.phylo &mdash; MiTo 0.0.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=f7cdbf68"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../../../about.html" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mito.tl.phylo</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mito.tl.phylo</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Phylogenetic inference.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnData</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cassiopeia</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cassiopeia.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">CassiopeiaTree</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.sparse</span><span class="w"> </span><span class="kn">import</span> <span class="n">csr_matrix</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..pp.distances</span><span class="w"> </span><span class="kn">import</span> <span class="n">call_genotypes</span><span class="p">,</span> <span class="n">compute_distances</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="n">solver_d</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;UPMGA&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">UPGMASolver</span><span class="p">,</span>
+    <span class="s1">&#39;NJ&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">NeighborJoiningSolver</span><span class="p">,</span>
+    <span class="s1">&#39;spectral&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">SpectralSolver</span><span class="p">,</span>
+    <span class="s1">&#39;shared_muts&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">SharedMutationJoiningSolver</span><span class="p">,</span>
+    <span class="s1">&#39;greedy&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">SpectralGreedySolver</span><span class="p">,</span>
+    <span class="s1">&#39;max_cut&#39;</span> <span class="p">:</span> <span class="n">cs</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">MaxCutGreedySolver</span><span class="p">,</span>
+<span class="p">}</span>
+    
+<span class="c1">##</span>
+
+<span class="n">_solver_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;UPMGA&#39;</span> <span class="p">:</span> <span class="p">{},</span>
+    <span class="s1">&#39;NJ&#39;</span> <span class="p">:</span> <span class="p">{</span><span class="s1">&#39;add_root&#39;</span><span class="p">:</span><span class="kc">True</span><span class="p">},</span>
+    <span class="s1">&#39;spectral&#39;</span> <span class="p">:</span> <span class="p">{},</span>
+    <span class="s1">&#39;shared_muts&#39;</span> <span class="p">:</span> <span class="p">{},</span>
+    <span class="s1">&#39;greedy&#39;</span> <span class="p">:</span> <span class="p">{},</span>
+    <span class="s1">&#39;max_cut&#39;</span> <span class="p">:</span> <span class="p">{}</span>
+<span class="p">}</span>
+
+
+<span class="c1">##</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_initialize_CassiopeiaTree_kwargs</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="p">,</span> <span class="n">min_n_positive_cells</span><span class="p">,</span> <span class="n">max_frac_positive</span><span class="p">,</span> <span class="n">filter_muts</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract afm slots for CassiopeiaTree instantiation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">assert</span> <span class="s1">&#39;bin&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span> <span class="ow">or</span> <span class="s1">&#39;scaled&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span>
+    <span class="k">assert</span> <span class="n">distance_key</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span>
+
+    <span class="n">layer</span> <span class="o">=</span> <span class="s1">&#39;bin&#39;</span> <span class="k">if</span> <span class="s1">&#39;bin&#39;</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span> <span class="k">else</span> <span class="s1">&#39;scaled&#39;</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span><span class="p">[</span><span class="n">distance_key</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="n">D</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">D</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">)</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="n">layer</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">(),</span> <span class="n">index</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">afm</span><span class="o">.</span><span class="n">X</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">M_raw</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">toarray</span><span class="p">(),</span> <span class="n">index</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">var_names</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">M_raw</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Remove variants from char matrix i) they are called in less than min_n_positive_cells or ii) &gt; max_frac_positive </span>
+    <span class="c1"># We avoid recomputing distances as their contribution to the average pairwise cell-cell distance is minimal</span>
+    <span class="k">if</span> <span class="n">filter_muts</span> <span class="ow">and</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;scLT_system&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;Cas9&#39;</span><span class="p">:</span>
+        <span class="n">test_germline</span> <span class="o">=</span> <span class="p">((</span><span class="n">M</span><span class="o">==</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="n">max_frac_positive</span>
+        <span class="n">test_too_rare</span> <span class="o">=</span> <span class="p">(</span><span class="n">M</span><span class="o">==</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">min_n_positive_cells</span>
+        <span class="n">test</span> <span class="o">=</span> <span class="p">(</span><span class="n">test_germline</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">test_too_rare</span><span class="p">)</span>
+        <span class="n">M_raw</span> <span class="o">=</span> <span class="n">M_raw</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">M</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span><span class="n">test</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">M_raw</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">D</span>
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">AFM_to_seqs</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;MiTo&#39;</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert an AFM to a dictionary of sequences.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Extract ref and alt character sequences</span>
+    <span class="n">L</span> <span class="o">=</span> <span class="p">[</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">var_names</span> <span class="p">]</span>
+    <span class="n">ref</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">L</span><span class="p">])</span>
+    <span class="n">alt</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">L</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="s1">&#39;bin&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+        <span class="n">call_genotypes</span><span class="p">(</span><span class="n">afm</span><span class="p">,</span> <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="o">**</span><span class="n">binarization_kwargs</span><span class="p">)</span>
+
+    <span class="c1"># Convert to a dict of strings</span>
+    <span class="n">X_bin</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">obs_names</span><span class="p">):</span>
+        <span class="n">m_</span> <span class="o">=</span> <span class="n">X_bin</span><span class="p">[</span><span class="n">i</span><span class="p">,:]</span>
+        <span class="n">seq</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">char</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">m_</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">char</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">seq</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">alt</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> 
+            <span class="k">elif</span> <span class="n">char</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">seq</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ref</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">seq</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;N&#39;</span><span class="p">)</span>
+        <span class="n">d</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">d</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="build_tree">
+<a class="viewcode-back" href="../../../api.html#mito.tl.build_tree">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_tree</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">precomputed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> 
+    <span class="n">distance_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;distances&#39;</span><span class="p">,</span> 
+    <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;weighted_jaccard&#39;</span><span class="p">,</span> 
+    <span class="n">bin_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span><span class="s1">&#39;MiTo&#39;</span><span class="p">,</span> 
+    <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;UPMGA&#39;</span><span class="p">,</span> 
+    <span class="n">ncores</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
+    <span class="n">min_n_positive_cells</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">filter_muts</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">max_frac_positive</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">.95</span><span class="p">,</span> 
+    <span class="n">binarization_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span> 
+    <span class="n">solver_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span> 
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CassiopeiaTree</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wrapper around cassiopeia lineage solvers. MW Jones et al., 2020.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix.</span>
+<span class="sd">    precomputed : bool, optional</span>
+<span class="sd">        Whether to use precomputed data. Default is False.</span>
+<span class="sd">    distance_key : str, optional</span>
+<span class="sd">        Key in afm.obsp where distances are stored. Default is &quot;distances&quot;.</span>
+<span class="sd">    metric : str, optional</span>
+<span class="sd">        Distance metric to use. Default is &quot;weighted_jaccard&quot;.</span>
+<span class="sd">    bin_method : str, optional</span>
+<span class="sd">        Genotyping method. Default is &quot;MiTo&quot;.</span>
+<span class="sd">    solver : str, optional</span>
+<span class="sd">        Lineage solver to use. Default is &quot;UPMGA&quot;.</span>
+<span class="sd">    ncores : int, optional</span>
+<span class="sd">        Number of cores to use for computation. Default is 1.</span>
+<span class="sd">    min_n_positive_cells : int, optional</span>
+<span class="sd">        Minimum number of positive cells required. Default is 2.</span>
+<span class="sd">    filter_muts : bool, optional</span>
+<span class="sd">        Whether to filter mutations. Default is False.</span>
+<span class="sd">    max_frac_positive : float, optional</span>
+<span class="sd">        Maximum fraction of positive cells allowed. Default is 0.95.</span>
+<span class="sd">    binarization_kwargs : dict, optional</span>
+<span class="sd">        Additional keyword arguments for genotyping. Default is {}.</span>
+<span class="sd">    solver_kwargs : dict, optional</span>
+<span class="sd">        Additional keyword arguments for the solver. Default is {}.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    CassiopeiaTree</span>
+<span class="sd">        Solved single-cell phylogeny.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Compute (if necessary, cell-cell distances, and retrieve necessary afm .slots)</span>
+    <span class="k">if</span> <span class="n">precomputed</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">distance_key</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obsp</span> <span class="ow">and</span> <span class="n">precomputed</span><span class="p">:</span>
+            <span class="n">metric</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;distance_calculations&#39;</span><span class="p">][</span><span class="n">distance_key</span><span class="p">][</span><span class="s1">&#39;metric&#39;</span><span class="p">]</span>
+            <span class="n">layer</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;distance_calculations&#39;</span><span class="p">][</span><span class="n">distance_key</span><span class="p">][</span><span class="s1">&#39;layer&#39;</span><span class="p">]</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Use precomputed distances: metric=</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s1">, layer=</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">layer</span> <span class="o">==</span> <span class="s1">&#39;bin&#39;</span><span class="p">:</span>
+                <span class="n">bin_method</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;genotyping&#39;</span><span class="p">][</span><span class="s1">&#39;bin_method&#39;</span><span class="p">]</span>
+                <span class="n">binarization_kwargs</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;genotyping&#39;</span><span class="p">][</span><span class="s1">&#39;binarization_kwargs&#39;</span><span class="p">]</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Precomputed bin layer: bin_method=</span><span class="si">{</span><span class="n">bin_method</span><span class="si">}</span><span class="s1"> and binarization_kwargs=</span><span class="si">{</span><span class="n">binarization_kwargs</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">compute_distances</span><span class="p">(</span>
+            <span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="o">=</span><span class="n">distance_key</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span> 
+            <span class="n">bin_method</span><span class="o">=</span><span class="n">bin_method</span><span class="p">,</span> <span class="n">ncores</span><span class="o">=</span><span class="n">ncores</span><span class="p">,</span> <span class="n">binarization_kwargs</span><span class="o">=</span><span class="n">binarization_kwargs</span>
+        <span class="p">)</span>
+    
+    <span class="c1"># Init</span>
+    <span class="n">M_raw</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">D</span> <span class="o">=</span> <span class="n">_initialize_CassiopeiaTree_kwargs</span><span class="p">(</span>
+        <span class="n">afm</span><span class="p">,</span> <span class="n">distance_key</span><span class="p">,</span> <span class="n">min_n_positive_cells</span><span class="p">,</span> <span class="n">max_frac_positive</span><span class="p">,</span> <span class="n">filter_muts</span><span class="o">=</span><span class="n">filter_muts</span>
+    <span class="p">)</span>
+ 
+    <span class="c1"># Solve cell phylogeny</span>
+    <span class="n">metric</span> <span class="o">=</span> <span class="n">afm</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;distance_calculations&#39;</span><span class="p">][</span><span class="n">distance_key</span><span class="p">][</span><span class="s1">&#39;metric&#39;</span><span class="p">]</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Build tree: metric=</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s1">, solver=</span><span class="si">{</span><span class="n">solver</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">cs</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">CassiopeiaTree</span><span class="p">(</span><span class="n">character_matrix</span><span class="o">=</span><span class="n">M</span><span class="p">,</span> <span class="n">dissimilarity_map</span><span class="o">=</span><span class="n">D</span><span class="p">,</span> <span class="n">cell_meta</span><span class="o">=</span><span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">)</span>
+    <span class="n">_solver</span> <span class="o">=</span> <span class="n">solver_d</span><span class="p">[</span><span class="n">solver</span><span class="p">]</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="n">_solver_kwargs</span><span class="p">[</span><span class="n">solver</span><span class="p">]</span>
+    <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">solver_kwargs</span><span class="p">)</span>
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">_solver</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span>
+
+    <span class="c1"># Add layers to CassiopeiaTree</span>
+    <span class="n">tree</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">M_raw</span>
+    <span class="n">tree</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;transformed&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">M</span>
+
+    <span class="k">return</span> <span class="n">tree</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="coarse_grained_tree">
+<a class="viewcode-back" href="../../../api.html#mito.tl.coarse_grained_tree">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">coarse_grained_tree</span><span class="p">(</span><span class="n">tree</span><span class="p">:</span> <span class="n">CassiopeiaTree</span><span class="p">,</span> <span class="n">groupby</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CassiopeiaTree</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Take a full cell phylogeny and coarse-grained it into a clone or</span>
+<span class="sd">    &quot;groupby&quot; phylogeny.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">meta</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">cell_meta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">X_raw</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s1">&#39;raw&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">X_raw_agg</span> <span class="o">=</span> <span class="n">X_raw</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">meta</span><span class="p">[[</span><span class="n">groupby</span><span class="p">]])</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+    <span class="n">X_bin_agg</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_raw_agg</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">muts</span> <span class="o">=</span> <span class="n">X_bin_agg</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">index</span>
+    <span class="n">X_raw_agg</span> <span class="o">=</span> <span class="n">X_raw_agg</span><span class="p">[</span><span class="n">muts</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">X_bin_agg</span> <span class="o">=</span> <span class="n">X_bin_agg</span><span class="p">[</span><span class="n">muts</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">afm_agg</span> <span class="o">=</span> <span class="n">AnnData</span><span class="p">(</span>
+        <span class="n">X</span><span class="o">=</span><span class="n">csr_matrix</span><span class="p">(</span><span class="n">X_raw_agg</span><span class="o">.</span><span class="n">values</span><span class="p">),</span> 
+        <span class="n">obs</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">X_raw_agg</span><span class="o">.</span><span class="n">index</span><span class="p">),</span>
+        <span class="n">layers</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;bin&#39;</span><span class="p">:</span><span class="n">csr_matrix</span><span class="p">(</span><span class="n">X_bin_agg</span><span class="o">.</span><span class="n">values</span><span class="p">)},</span>
+        <span class="n">uns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;genotyping&#39;</span><span class="p">:{</span><span class="s1">&#39;bin_method&#39;</span><span class="p">:</span><span class="s1">&#39;vanilla&#39;</span><span class="p">,</span> <span class="s1">&#39;binarization_kwargs&#39;</span><span class="p">:{}},</span> 
+             <span class="s1">&#39;scLT_system&#39;</span><span class="p">:</span><span class="s1">&#39;MAESTER&#39;</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">compute_distances</span><span class="p">(</span><span class="n">afm_agg</span><span class="p">,</span> <span class="n">precomputed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bin_method</span><span class="o">=</span><span class="s1">&#39;vanilla&#39;</span><span class="p">)</span>
+    <span class="n">tree_agg</span> <span class="o">=</span> <span class="n">build_tree</span><span class="p">(</span><span class="n">afm_agg</span><span class="p">,</span> <span class="n">precomputed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">tree_agg</span></div>
+
+
+
+<span class="c1">##</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_leaves_order</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">depth_first_traverse_nodes</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">leaves</span><span class="p">:</span>
+            <span class="n">order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">order</span>
+
+
+<span class="c1">##</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

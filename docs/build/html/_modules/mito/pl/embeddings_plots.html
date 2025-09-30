@@ -1,0 +1,228 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mito.pl.embeddings_plots &mdash; MiTo 0.0.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=f7cdbf68"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../../../about.html" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mito.pl.embeddings_plots</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mito.pl.embeddings_plots</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Custom plotting function for embeddings.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnData</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">plotting_utils</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plu</span>
+
+
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="draw_embedding">
+<a class="viewcode-back" href="../../../api.html#mito.pl.draw_embedding">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">draw_embedding</span><span class="p">(</span>
+    <span class="n">afm</span><span class="p">:</span> <span class="n">AnnData</span><span class="p">,</span> 
+    <span class="n">basis</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;X_umap&#39;</span><span class="p">,</span> 
+    <span class="n">feature</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ax</span><span class="p">:</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">Axes</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">categorical_cmap</span><span class="p">:</span> <span class="nb">str</span><span class="o">|</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">palettes</span><span class="o">.</span><span class="n">vega_20_scanpy</span><span class="p">,</span>
+    <span class="n">continuous_cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;viridis&#39;</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">frameon</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">outline</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">legend</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">loc</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;center left&#39;</span><span class="p">,</span>
+    <span class="n">bbox_to_anchor</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mf">.5</span><span class="p">),</span>
+    <span class="n">artists_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">label_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">ticks_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">Axes</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    sc.pl.embedding, with some defaults and a custom legend.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    afm : AnnData</span>
+<span class="sd">        Allele Frequency Matrix with some basis to plot in afm.obsm.</span>
+<span class="sd">    basis : str, optional</span>
+<span class="sd">        Key in afm.obsm. Default is &quot;X_umap&quot;.</span>
+<span class="sd">    feature : Iterable[str], optional</span>
+<span class="sd">        Features to plot. Default is an empty list.</span>
+<span class="sd">    ax : matplotlib.axes.Axes, optional</span>
+<span class="sd">        Axes object to populate. Default is None.</span>
+<span class="sd">    categorical_cmap : str or dict, optional</span>
+<span class="sd">        Color palette for categoricals. Default is sc.pl.palettes.vega_20_scanpy.</span>
+<span class="sd">    continuous_cmap : str, optional</span>
+<span class="sd">        Color palette for continuous data. Default is &quot;viridis&quot;.</span>
+<span class="sd">    size : float, optional</span>
+<span class="sd">        Point size. Default is None.</span>
+<span class="sd">    frameon : bool, optional</span>
+<span class="sd">        Whether to draw a frame around the axes. Default is False.</span>
+<span class="sd">    outline : bool, optional</span>
+<span class="sd">        Whether to draw a fancy outline around dots. Default is False.</span>
+<span class="sd">    legend : bool, optional</span>
+<span class="sd">        Whether to automatically draw a legend. Default is False.</span>
+<span class="sd">    loc : str, optional</span>
+<span class="sd">        Which corner of the legend to anchor. Default is &quot;center left&quot;.</span>
+<span class="sd">    bbox_to_anchor : tuple of float, optional</span>
+<span class="sd">        Anchor &#39;loc&#39; legend corner to ax.transformed coordinates. Default is (1, 0.5).</span>
+<span class="sd">    artists_size : float, optional</span>
+<span class="sd">        Size of legend artists. Default is 10.</span>
+<span class="sd">    label_size : float, optional</span>
+<span class="sd">        Size of legend labels. Default is 10.</span>
+<span class="sd">    ticks_size : float, optional</span>
+<span class="sd">        Size of legend ticks. Default is 10.</span>
+<span class="sd">    kwargs: dict, optional</span>
+<span class="sd">        Kwargs to sc.pl.embedding. Default is {}</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ax : matplotlib.axes.Axes</span>
+<span class="sd">        Axes object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">categorical_cmap</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">_cmap</span> <span class="o">=</span> <span class="n">plu</span><span class="o">.</span><span class="n">create_palette</span><span class="p">(</span><span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">,</span> <span class="n">feature</span><span class="p">,</span> <span class="n">_cmap</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">categorical_cmap</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">x</span> <span class="ow">in</span> <span class="n">categorical_cmap</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">afm</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+        <span class="n">_cmap</span> <span class="o">=</span> <span class="n">categorical_cmap</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_cmap</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+        <span class="n">afm</span><span class="p">,</span> 
+        <span class="n">basis</span><span class="o">=</span><span class="n">basis</span><span class="p">,</span> 
+        <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> 
+        <span class="n">color</span><span class="o">=</span><span class="n">feature</span><span class="p">,</span> 
+        <span class="n">palette</span><span class="o">=</span><span class="n">_cmap</span><span class="p">,</span>
+        <span class="n">color_map</span><span class="o">=</span><span class="n">continuous_cmap</span><span class="p">,</span> 
+        <span class="n">legend_loc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">size</span><span class="o">=</span><span class="n">size</span><span class="p">,</span> 
+        <span class="n">frameon</span><span class="o">=</span><span class="n">frameon</span><span class="p">,</span> 
+        <span class="n">add_outline</span><span class="o">=</span><span class="n">outline</span><span class="p">,</span>
+        <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">legend</span><span class="p">:</span>
+        <span class="n">plu</span><span class="o">.</span><span class="n">add_legend</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> 
+            <span class="n">label</span><span class="o">=</span><span class="n">feature</span><span class="p">,</span> 
+            <span class="n">colors</span><span class="o">=</span><span class="n">categorical_cmap</span><span class="p">,</span>
+            <span class="n">loc</span><span class="o">=</span><span class="n">loc</span><span class="p">,</span> 
+            <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="n">bbox_to_anchor</span><span class="p">,</span>
+            <span class="n">artists_size</span><span class="o">=</span><span class="n">artists_size</span><span class="p">,</span> 
+            <span class="n">label_size</span><span class="o">=</span><span class="n">label_size</span><span class="p">,</span> 
+            <span class="n">ticks_size</span><span class="o">=</span><span class="n">ticks_size</span>
+        <span class="p">)</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+
+
+<span class="c1">##</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

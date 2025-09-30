@@ -1,0 +1,164 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation &mdash; MiTo 0.0.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f7cdbf68"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting Started" href="getting_started.html" />
+    <link rel="prev" title="APIs" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MiTo
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Main</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="about.html">MiTo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorial</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#step-1-install-mamba-or-conda">Step 1: Install mamba (or conda)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-clone-mito-repository">Step 2: Clone MiTo repository</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-3-reproduce-mito-conda-environment">Step 3: Reproduce MiTo conda environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-4-activate-environment-and-install-mito">Step 4: Activate environment and install MiTo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-5-verify-installation">Step 5: Verify installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#additional-notes">Additional Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MiTo</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Installation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<p>This guide will walk you through installing MiTo, including setting up the necessary environment.</p>
+<section id="step-1-install-mamba-or-conda">
+<h2>Step 1: Install mamba (or conda)<a class="headerlink" href="#step-1-install-mamba-or-conda" title="Link to this heading"></a></h2>
+<p>First, install mamba for fast and reliable package management:</p>
+<p>Install <a class="reference external" href="https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html">mamba</a> (or conda)</p>
+</section>
+<section id="step-2-clone-mito-repository">
+<h2>Step 2: Clone MiTo repository<a class="headerlink" href="#step-2-clone-mito-repository" title="Link to this heading"></a></h2>
+<p>Clone the MiTo repository from GitHub:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/andrecossa5/MiTo.git
+</pre></div>
+</div>
+</section>
+<section id="step-3-reproduce-mito-conda-environment">
+<h2>Step 3: Reproduce MiTo conda environment<a class="headerlink" href="#step-3-reproduce-mito-conda-environment" title="Link to this heading"></a></h2>
+<p>Navigate to the MiTo directory and create the conda environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>MiTo
+mamba<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>envs/environment.yml<span class="w"> </span>-n<span class="w"> </span>MiTo
+</pre></div>
+</div>
+</section>
+<section id="step-4-activate-environment-and-install-mito">
+<h2>Step 4: Activate environment and install MiTo<a class="headerlink" href="#step-4-activate-environment-and-install-mito" title="Link to this heading"></a></h2>
+<p>Activate the environment and install MiTo via PyPI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mamba<span class="w"> </span>activate<span class="w"> </span>MiTo
+pip<span class="w"> </span>install<span class="w"> </span>mito_utils
+</pre></div>
+</div>
+</section>
+<section id="step-5-verify-installation">
+<h2>Step 5: Verify installation<a class="headerlink" href="#step-5-verify-installation" title="Link to this heading"></a></h2>
+<p>To verify a successful installation, import MiTo in Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mito</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mt</span>
+</pre></div>
+</div>
+</section>
+<section id="additional-notes">
+<h2>Additional Notes<a class="headerlink" href="#additional-notes" title="Link to this heading"></a></h2>
+<p>For further assistance, please refer to our documentation or open an issue on GitHub.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-left" title="APIs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="getting_started.html" class="btn btn-neutral float-right" title="Getting Started" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

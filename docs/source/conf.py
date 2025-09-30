@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 # -- Project information -----------------------------------------------------
 project = 'MiTo'
 author = 'Andrea Cossa'
-release = '0.0.1'
+release = '0.0.9'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

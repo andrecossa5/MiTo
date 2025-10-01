@@ -33,6 +33,9 @@ __pycache__/
 # Data files from tutorials
 /docs/notebooks/*.fcs
 /docs/notebooks/*.h5ad
+/docs/source/data_test/
+/docs/source/**/*.h5ad
+/docs/source/**/*.fcs
 
 */__pycache__
 scratch/

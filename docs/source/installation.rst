@@ -3,13 +3,15 @@ Installation
 
 This guide will walk you through installing MiTo, including setting up the necessary environment.
 
-**Install mamba (or conda)**
+Install mamba (or conda)
+-------------------------
 
 First, install mamba for fast and reliable package management:
 
 Install `mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_ (or conda)
 
-**Clone MiTo repository**
+Clone MiTo repository
+----------------------
 
 Clone the MiTo repository from GitHub:
 
@@ -17,7 +19,8 @@ Clone the MiTo repository from GitHub:
 
    git clone https://github.com/andrecossa5/MiTo.git
 
-**Reproduce MiTo conda environment**
+Reproduce MiTo conda environment
+---------------------------------
 
 Navigate to the MiTo directory and create the conda environment:
 
@@ -26,7 +29,8 @@ Navigate to the MiTo directory and create the conda environment:
    cd MiTo
    mamba env create -f envs/environment.yml -n MiTo
 
-**Activate environment and install MiTo**
+Activate environment and install MiTo
+--------------------------------------
 
 Activate the environment and install MiTo via PyPI:
 
@@ -35,15 +39,11 @@ Activate the environment and install MiTo via PyPI:
    mamba activate MiTo
    pip install mito_utils
 
-**Verify installation**
+Verify installation
+-------------------
 
 To verify a successful installation, import MiTo in Python:
 
 .. code-block:: python
 
    import mito as mt
-
-Additional Notes
-----------------
-
-For further assistance, please refer to our documentation or open an issue on GitHub.

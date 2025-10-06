@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] - 2025-10-06
+### Added
+- Complete documentation overhaul with nbsphinx integration
+- Interactive Jupyter notebook tutorial with full cell outputs and visualizations
+- Comprehensive getting started guide with MiTo workflow examples
+- Hierarchical documentation structure for better navigation
+- ReadTheDocs integration with automated builds
+
+### Improved
+- Streamlined installation guide with clear step-by-step instructions
+- Enhanced plotting library examples and demonstrations
+- Better code organization and documentation structure
+- Cleaner repository structure with proper .gitignore rules
+
+### Fixed
+- nbsphinx configuration for proper notebook rendering
+- Image generation and display in documentation
+- Documentation build process for ReadTheDocs compatibility
+- File size issues with test data exclusion
+
 ## [0.0.8] - 2025-09-25
 ### Fixed
 - Add mt.io.make_afm behavior

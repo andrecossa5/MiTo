@@ -513,8 +513,8 @@ def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
         AD_new[:,i] = new_ad
 
     corr = np.corrcoef(afm.layers['AD'].toarray().flatten(), AD_new.toarray().flatten())[0,1]
-    afm.layers['AD'] = AD_new
-    afm.X = AD_new / (afm.layers['DP'].toarray() + .000001)
+    afm.layers['AD'] = csr_matrix(AD_new)
+    afm.X = csr_matrix(AD_new / (afm.layers['DP'].toarray() + .000001))
 
     return afm, corr
 

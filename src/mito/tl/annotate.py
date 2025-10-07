@@ -256,9 +256,9 @@ class MiToTreeAnnotator():
     def resolve_ambiguous_clones(
         self, 
         df_predict: pd.DataFrame, 
-        s_treshold: float = .7, 
+        merging_treshold: float = .7, 
+        af_treshold: float = .0,
         add_to_meta: bool = False, 
-        verbose: float = False
         ) -> Tuple[pd.Series,pd.Series]:
         """
         Final clonal resolution process. 
@@ -272,7 +272,7 @@ class MiToTreeAnnotator():
         `self.tree.cell_meta`.
         """
 
-        self.params['merging_treshold'] = s_treshold
+        self.params['merging_treshold'] = merging_treshold
         remained_unresolved = []
         try_merge = True
         n_trials = 0
@@ -287,11 +287,11 @@ class MiToTreeAnnotator():
                 .groupby('MiTo clone')
                 .median()
             )
-            X_agg = X_agg.loc[:,np.any(X_agg>0, axis=0)]
+            X_agg = X_agg.loc[:,np.any(X_agg>af_treshold, axis=0)]
 
             # Compute similarity of putative clones (i.e., aggregated profiles)
-            w = np.nanmedian(np.where(X_agg>0, X_agg, np.nan), axis=0)
-            S_agg = 1-weighted_jaccard((X_agg>0).astype(int), w=w)
+            w = np.nanmedian(np.where(X_agg>af_treshold, X_agg, np.nan), axis=0)
+            S_agg = 1-weighted_jaccard((X_agg>af_treshold).astype(int), w=w)
             self.S_aggregate = pd.DataFrame(S_agg, index=X_agg.index, columns=X_agg.index)
 
             # Spot interacting clones 
@@ -307,7 +307,7 @@ class MiToTreeAnnotator():
             S_agg_long.columns = ['clone1', 'clone2', 'similarity']
             S_agg_long = (
                 S_agg_long
-                .query('clone1!=clone2 and similarity>=@s_treshold')
+                .query('clone1!=clone2 and similarity>=@merging_treshold')
                 .reset_index(drop=True).drop_duplicates()
             )
             if S_agg_long.shape[0] == 0:
@@ -493,13 +493,7 @@ class MiToTreeAnnotator():
 
     ##
 
-    def infer_clones(
-        self, 
-        similarity_percentile: float = 85, 
-        mut_enrichment_treshold: int = 5, 
-        merging_treshold: float = .7, 
-        add_to_meta: bool = False
-        ) -> Tuple[pd.Series,pd.Series]:
+    def infer_clones(self, similarity_percentile: float = 85, mut_enrichment_treshold: int = 5) -> pd.DataFrame:
         """
         A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper 
         (... et al., 2025).
@@ -671,12 +665,7 @@ class MiToTreeAnnotator():
         df_predict = df_predict.set_index('cell')
         df_predict.loc[df_predict['muts'].isna(), 'MiTo clone'] = np.nan
 
-        # Resolve over-clustering
-        labels, similarities = self.resolve_ambiguous_clones(
-            df_predict, s_treshold=merging_treshold, add_to_meta=add_to_meta
-        )
-
-        return labels, similarities
+        return df_predict
     
     ##
 
@@ -685,10 +674,11 @@ class MiToTreeAnnotator():
         similarity_tresholds: Iterable[int] = [ 85, 90, 95, 99 ],
         mut_enrichment_tresholds: Iterable[int] = [ 3, 5, 10 ],
         merging_treshold: Iterable[float] = [ .25, .5, .75 ],
-        max_fraction_unassigned: float = .05,
+        af_treshold: float = .0,
         weight_silhouette: float =.3,
-        weight_n_clones: float =.4,
-        weight_similarity: float =.3
+        weight_n_clones: float = .4,
+        weight_similarity: float = .3,
+        max_fraction_unassigned: float = .05
         ):
         """
         Optimize tresholds for `self.infer_clones` and pick clonal labels with
@@ -715,17 +705,15 @@ class MiToTreeAnnotator():
         # Grid search
         for i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
             try:
-                labels, sim = self.infer_clones(
-                    similarity_percentile=s, 
-                    mut_enrichment_treshold=m, 
-                    merging_treshold=j, 
-                    add_to_meta=False
+                df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)
+                labels, sim = self.resolve_ambiguous_clones(
+                    df_predict, merging_treshold=j, af_treshold=af_treshold, add_to_meta=False
                 )
                 test = labels.isna()
                 labels = labels.loc[~test]
                 D = self.tree.get_dissimilarity_map().loc[labels.index,labels.index]
                 assert (D.index == labels.index).all()
-                sil = silhouette_score(X=D.values, labels=labels.values, metric='precomputed') if labels.unique().size>2 else 0
+                sil = silhouette_score(X=D.values, labels=labels.values, metric='precomputed') if labels.unique().size>=2 else 0
                 silhouettes.append(sil)
                 unassigned.append(test.sum()/labels.size)
                 n_clones.append(labels.unique().size)
@@ -766,11 +754,9 @@ class MiToTreeAnnotator():
         
         # Final round
         logging.info(f'Hyper-params chosen: similarity_percentile={s}, mut_enrichment_treshold={m}, merging_treshold={j}')
-        _,_ = self.infer_clones(
-            similarity_percentile=s, 
-            mut_enrichment_treshold=m, 
-            merging_treshold=j, 
-            add_to_meta=True
+        df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)
+        _, _ = self.resolve_ambiguous_clones(
+            df_predict, merging_treshold=j, af_treshold=af_treshold, add_to_meta=True
         )
 
         # Calculate clonal expansions

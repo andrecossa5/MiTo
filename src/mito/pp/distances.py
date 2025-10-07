@@ -443,7 +443,7 @@ def preprocess_feature_matrix(
     else:
         afm.uns['distance_calculations'][distance_key] = {}
 
-    if scLT_system in ['RedeeM', 'scWGS', 'MAESTER']:
+    if scLT_system in ['RedeeM', 'scWGS', 'MAESTER', 'Smart-seq2']:
 
         if metric in continuous_metrics:
             layer = 'scaled'

@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2025-10-08
+### Enhanced
+- Improved clonal inference algorithm with edge case handling for small phylogenies
+- Added `af_treshold` parameter to `resolve_ambiguous_clones` for better clone merging control
+- Split `infer_clones` and `resolve_ambiguous_clones` methods for better modularity
+- Enhanced grid search optimization with better parameter handling
+- Fixed root node exclusion in `_find_clones` to prevent single-clone edge cases
+
+### Fixed
+- Resolved issue where very small phylogenies would only return root as single clone
+- Improved silhouette score calculation for edge cases with minimal clones
+- Better parameter validation and error handling in clonal inference pipeline
+
+### Refactored
+- Cleaner separation between clone detection and clone resolution phases
+- Improved code organization in `MiToTreeAnnotator` class
+- Better debugging support with modular function structure
+
 ## [0.1.0] - 2025-10-06
 ### Added
 - Complete documentation overhaul with nbsphinx integration

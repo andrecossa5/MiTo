@@ -1,5 +1,5 @@
 # Configuration file for the Sphinx documentation builder.
-# Updated for MiTo v0.1.0 - First stable release with complete documentation
+# Updated for MiTo v0.1.1 - Enhanced clonal inference with edge case handling
 
 import os
 import sys
@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 # -- Project information -----------------------------------------------------
 project = 'MiTo'
 author = 'Andrea Cossa'
-release = '0.1.0'
+release = '0.1.1'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

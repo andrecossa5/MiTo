@@ -167,9 +167,13 @@ def build_tree(
             layer = afm.uns['distance_calculations'][distance_key]['layer']
             logging.info(f'Use precomputed distances: metric={metric}, layer={layer}')
             if layer == 'bin':
-                bin_method = afm.uns['genotyping']['bin_method']
-                binarization_kwargs = afm.uns['genotyping']['binarization_kwargs']
-                logging.info(f'Precomputed bin layer: bin_method={bin_method} and binarization_kwargs={binarization_kwargs}')
+                if 'genotyping' in afm.uns: 
+                    bin_method = afm.uns['genotyping']['bin_method']
+                    binarization_kwargs = afm.uns['genotyping']['binarization_kwargs']
+                    logging.info(f'Precomputed bin layer: bin_method={bin_method} and binarization_kwargs={binarization_kwargs}')
+                else:
+                    assert 'bin' in afm.layers
+                    logging.info(f'Precomputed bin layer from scLT system: {afm.uns["scLT_system"]}')
     else:
         compute_distances(
             afm, distance_key=distance_key, metric=metric, 

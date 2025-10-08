@@ -443,7 +443,7 @@ def preprocess_feature_matrix(
     else:
         afm.uns['distance_calculations'][distance_key] = {}
 
-    if scLT_system in ['RedeeM', 'scWGS', 'MAESTER', 'Smart-seq2']:
+    if scLT_system in ['RedeeM', 'MAESTER', 'Smart-seq2']:
 
         if metric in continuous_metrics:
             layer = 'scaled'
@@ -469,7 +469,7 @@ def preprocess_feature_matrix(
         else:
             raise ValueError(f'{metric} is not a valid metric! Specify for a valid metric in {continuous_metrics} or {discrete_metrics}')
 
-    elif scLT_system == 'Cas9':
+    elif scLT_system in ['scWGS', 'Cas9', 'EPI-clone']:
 
         if metric in continuous_metrics:
             raise ValueError(f'For {scLT_system} only discrete metrics are available!')
@@ -479,11 +479,11 @@ def preprocess_feature_matrix(
                 if verbose:
                     logging.info(f'Use precomputed bin layer.')
             else:
-                raise ValueError(f'With the {scLT_system} system, provide an AFM with Cas9 INDELS character matrix in afm.layers, under the "bin" key!')
+                raise ValueError(f'With the {scLT_system} system, provide an AFM with binary character matrix in afm.layers, under the "bin" key!')
         else:
             raise ValueError(f'{metric} is not a valid metric! Specify for a valid metric in {discrete_metrics}')
     else:
-        raise ValueError(f'{scLT_system} is not a valid scLT system. Choose one between MAESTER, scWGS, RedeeM, and Cas9.')
+        raise ValueError(f'{scLT_system} is not a valid scLT system. Choose one between MAESTER, scWGS, RedeeM, Cas9, and EPI-clone.')
 
     afm.uns['distance_calculations'][distance_key]['metric'] = metric
     afm.uns['distance_calculations'][distance_key]['layer'] = layer

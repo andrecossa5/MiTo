@@ -546,6 +546,58 @@ def read_scwgs(
 ##
 
 
+def read_epiclone(
+    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    pp_method: str = None, scLT_system: str = 'EPI-clone'
+    ) -> AnnData :
+    """
+    Utility to assemble an AFM from EPI-clone data (Scherer et al., 2025) DNA-methylation data.
+    """
+
+    # Check path_ch_matrix folder contents
+    required_files = ['DNAm_binary.csv', 'panel_info_dropout_pwm.tsv', 'cpg_selection.csv']
+    for f in required_files:
+        if not os.path.exists(os.path.join(path_ch_matrix, f)):
+            raise FileNotFoundError(f'{f} not found in {path_ch_matrix}. Check your inputs...')
+        
+    # Read data
+    char_matrix = pd.read_csv(os.path.join(path_ch_matrix, 'DNAm_binary.csv'), index_col=0)
+    vars_meta = pd.read_csv(os.path.join(path_ch_matrix, 'panel_info_dropout_pwm.tsv'), sep='\t', index_col=0)
+    variant_selection = pd.read_csv(os.path.join(path_ch_matrix, 'cpg_selection.csv'), index_col=0)
+
+    # Handle cell meta, if present
+    if path_meta is not None and os.path.exists(path_meta):
+      cell_meta = pd.read_csv(path_meta, index_col=0)
+      cell_meta = cell_meta.query('ProcessingBatch==@sample').copy()
+      cells = list( set(cell_meta.index) & set(char_matrix.index) )
+      char_matrix = char_matrix.loc[cells,:].copy()
+      cell_meta = cell_meta.loc[cells,:].copy()
+    else:
+        logging.info('No cell cell metadata present...')
+        cell_meta = pd.DataFrame(index=char_matrix.index)
+    
+    # Select DNAm features
+    VOIs = variant_selection.query('Type=="Static"').index
+    char_matrix = char_matrix[VOIs].copy()
+    char_matrix = csr_matrix(char_matrix.values).astype(np.int16)
+    vars_meta = vars_meta.loc[VOIs].copy()
+
+    # Assemble AFM
+    afm = AnnData(X=char_matrix, 
+                  layers={'bin':char_matrix},
+                  uns={'pp_method':pp_method,'scLT_system':scLT_system})
+
+    # Check cells and vars
+    cells = afm.obs_names[(afm.layers['bin']==1).sum(axis=1).A1>0]
+    variants = afm.var_names[(afm.layers['bin']==1).sum(axis=0).A1>0]
+    afm = afm[cells,variants].copy()
+
+    return afm
+
+
+##
+
+
 def make_afm(
     path_ch_matrix: str, path_meta: str = None, sample: str = None, 
     pp_method: str = 'maegatk', scLT_system: str = 'MAESTER', ref: str ='rCRS'
@@ -608,14 +660,17 @@ def make_afm(
         else:
             
             logging.info('Public dataset. Character matrix already pre-processed. Just assembling the AFM...')
-            logging.info('TODO: include (mito_preprocessing Nextflow pipeline) preprocessing entry-points for other scLT methods...')
+            logging.info('#TODO: include preprocessing entry-points for other scLT methods in nf-MiTo pipeline.')
 
+            pp_method = 'public dataset pre-processed'
             if scLT_system == 'RedeeM':
                 afm = read_redeem(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif scLT_system == 'Cas9':
                 afm = read_cas9(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif scLT_system == 'scWGS':
                 afm = read_scwgs(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+            elif scLT_system == 'EPI-clone':
+                afm = read_epiclone(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             else:
                 raise ValueError(f'Unknown {scLT_system}. Check your inputs...')
         

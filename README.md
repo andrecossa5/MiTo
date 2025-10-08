@@ -24,7 +24,7 @@
 </div>
 
 ## Documentation
-An extensive documentation of MiTo's key functionalitites and APIs is available at [MiTo Docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
+An extensive documentation of MiTo's key functionalitites is available at [MiTo Docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
 
 ## Installation
 1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)

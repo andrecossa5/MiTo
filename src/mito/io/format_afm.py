@@ -457,27 +457,30 @@ def _add_priors(afm, priors, key='priors'):
 
 def read_cas9(
     path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = None, scLT_system: str = 'Cas9'
+    pp_method: str = None, scLT_system: str = 'Cas9', 
+    priors_groupby: str = 'MetFamily',
+    sample_col: str = 'Tumor'
     ) -> AnnData :
     """
-    Utility to assemble an AFM from Cas9 (e.g. KP tracer mice data from Yang et al., 2022) data.
+    Utility to assemble an AFM from Cas9, output from Cassiopeia.
+    e.g. KP tracer mice data from Yang et al., 2022.
     https://www.sc-best-practices.org/trajectories/lineage_tracing.html#
     """
 
-    # Read KP-tracer allele table
-    allele_table = pd.read_csv(path_ch_matrix, sep='\t', index_col=0)
+    # Read allele table from Cassiopeia
+    allele_table = pd.read_csv(path_ch_matrix, sep='\t', index_col=0).dropna()
     # Compute priors
     indel_priors = cs.pp.compute_empirical_indel_priors(
-        allele_table, grouping_variables=["intBC", "MetFamily"]
+        allele_table, grouping_variables=["intBC", priors_groupby]
     )
-    tumor_allele_table = allele_table[allele_table["Tumor"] == sample]
+    allele_table = allele_table[allele_table[sample_col] == sample]
     # Conver to character matrix
     (
         char_matrix,
         priors,
         _,
     ) = cs.pp.convert_alleletable_to_character_matrix(
-        tumor_allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
+        allele_table, allele_rep_thresh=0.9, mutation_priors=indel_priors
     )
 
     # Handle cell meta, if present
@@ -491,6 +494,7 @@ def read_cas9(
         logging.info('No cell-metadata present...')
         cell_meta = pd.DataFrame(index=char_matrix.index)
 
+    # Build AFM
     afm = AnnData(
         X=csr_matrix(char_matrix.values), 
         obs=cell_meta, 
@@ -514,7 +518,7 @@ def read_scwgs(
     pp_method: str = None, scLT_system: str = 'scWGS'
     ) -> AnnData :
     """
-    Utility to assemble an AFM from scWGS data (Weng et al., 2024) MT-SNVs data.
+    Utility to assemble an AFM from scWGS data (Fabre et al., 2022) single-colony WGS data.
     """
 
     # Read ch matrix
@@ -599,8 +603,13 @@ def read_epiclone(
 
 
 def make_afm(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = 'maegatk', scLT_system: str = 'MAESTER', ref: str ='rCRS'
+    path_ch_matrix: str, 
+    path_meta: str = None, 
+    sample: str = None, 
+    pp_method: str = 'maegatk', 
+    scLT_system: str = 'MAESTER', 
+    ref: str ='rCRS',
+    kwargs: dict = {}
     ) -> AnnData :
     """
     Creates an annotated Allele Frequency Matrix from different 
@@ -625,6 +634,9 @@ def make_afm(
     ref : str, optional
         Path to MT-reference genome. THe user can provide a custom FASTA file.
         Default is 'rCRS'.
+    kwargs : dict, optional
+        Optional arguments for specific scLT_system readers.
+        Default is {}.
 
     Returns
     -------
@@ -664,9 +676,9 @@ def make_afm(
 
             pp_method = 'public dataset pre-processed'
             if scLT_system == 'RedeeM':
-                afm = read_redeem(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_redeem(path_ch_matrix, path_meta, sample, pp_method, scLT_system, **kwargs)
             elif scLT_system == 'Cas9':
-                afm = read_cas9(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_cas9(path_ch_matrix, path_meta, sample, pp_method, scLT_system, **kwargs)
             elif scLT_system == 'scWGS':
                 afm = read_scwgs(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif scLT_system == 'EPI-clone':

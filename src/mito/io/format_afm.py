@@ -342,53 +342,140 @@ def read_from_scmito(
 
 
 def read_redeem(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = None, scLT_system: str = 'RedeeM'
+    path_ch_matrix: str, 
+    path_meta: str = None, 
+    sample: str = None, 
+    pp_method: str = None, 
+    scLT_system: str = 'RedeeM',
+    edge_trim: int = 4, 
+    treshold: str = 'Sensitive'
     ) -> AnnData :
     """
-    Utility to assemble an AFM from RedeeM (Weng et al., 2024) MT-SNVs data.
+    Utility to assemble an AFM from RedeeM (see Weng et al., 2024) MT-SNVs data.
     """
 
-    # Check presence of all data tables in path_ch_matrix
-    files = ['QualifiedTotalCts.gz', 'filtered_basecalls.csv']
-    if any([ f not in os.listdir(path_ch_matrix) for f in files ]):
-        raise ValueError(f'Missing files! Check {path_ch_matrix} structure...')
+    # Intantiate metrics dictionary
+    metrics = {}
 
-    # Filtered basecalls (redeemR v2: trimming, V4 filter and binomial modeling, cells with mean MT-genome coverage>=10)
-    basecalls = pd.read_csv(os.path.join(path_ch_matrix, 'filtered_basecalls.csv'), index_col=0)
-    basecalls.columns = ['genotype', 'cell', 'mut', 'AD', 'DP', 'type', 'context', 'AD_before_trim', 'AF']
-    basecalls['pos'] = basecalls['mut'].map(lambda x: x.split('_')[0])
-    basecalls['type'] = basecalls['type'].map(lambda x: x.replace('_', '>'))
-    basecalls = basecalls.drop(columns=['genotype']).assign(mut=lambda x: x['pos']+'_'+x['type'])
-    basecalls = basecalls[['cell', 'mut', 'AD', 'DP', 'AF']]
+    ##
 
-    ## Raw cell-MT_genome position consensus UMI counts
-    cov = pd.read_csv(os.path.join(path_ch_matrix, 'QualifiedTotalCts.gz'), sep='\t', header=None)
-    cov.columns = ['cell', 'pos', 'total', 'less stringent', 'stringent', 'very stringent']
-    cov = (
-        ## Retain total coverage consensus UMI counts for DP values,
-        ## as in https://github.com/chenweng1991/redeemR/blob/master/R/VariantSummary.R
-        cov[['cell', 'pos', 'total']].rename(columns={'total':'DP'})        
+    if pp_method == 'RedeemV' or pp_method is None:
+
+        # Read basecalls
+        path_basecalls = os.path.join(path_ch_matrix, f"RawGenotypes.{treshold}.StrandBalance")
+        logging.info(f'Process RedeemV basecalls from: {path_basecalls}')
+        cols = [
+            "UMI","Cell","Pos","Variants","Call","Ref","FamSize",
+            "GT_Cts","CSS","DB_Cts","SG_Cts","Plus","Minus","Depth"
+        ]
+        basecalls = pd.read_csv(path_basecalls, sep='\t', header=None, names=cols)
+
+        # Fix variants names
+        basecalls['Variants'] = basecalls['Pos'].astype(str) + '_' + \
+                                basecalls['Ref'] + '>' + \
+                                basecalls['Call']
+
+        # AD counts, before trimming
+        logging.info(f'Count AD before edge-trimming')
+        long = (
+            basecalls.groupby(['Cell','Variants'])
+            ['UMI'].nunique().reset_index()
+            .rename(columns={'UMI':'AD_raw'})
+            .merge(
+                basecalls[['Cell','Variants','Depth']].drop_duplicates(), 
+                on=['Cell','Variants'], 
+                how='left'
+            )
+        )
+
+        # Trim edge basecalls
+        logging.info(f'Trim basecalls at <{edge_trim}bp distance from DNA fragments start/end')
+        splitted = basecalls['UMI'].str.split('_', expand=True)
+        start_raw = splitted[1].astype(int)
+        end_raw   = splitted[2].astype(int)
+        basecalls['Start'] = np.minimum(start_raw, end_raw)
+        basecalls['End']   = np.maximum(start_raw, end_raw)
+        basecalls['Edge_dist'] = np.minimum(
+            (basecalls['Pos'] - basecalls['Start']).abs(),
+            (basecalls['End'] - basecalls['Pos']).abs()
+        )
+        basecalls = basecalls.loc[basecalls['Edge_dist'] >= edge_trim].copy()
+
+        # Count AD after trimming
+        logging.info(f'Count AD after edge-trimming')
+        long_trim = (
+            basecalls.groupby(['Cell','Variants'])
+            ['UMI'].nunique().reset_index()
+            .rename(columns={'UMI':'AD_trimmed'})
+        )
+
+        # Correct Depth --> DP
+        logging.info(f'Correct DP for trimmed basecalls')
+        long = (
+            long
+            .merge(long_trim, on=['Cell','Variants'], how='outer')
+            .fillna({'AD_raw':0, 'AD_trimmed':0})
+            .assign(
+                n_trimmed=lambda x: x['AD_raw']-x['AD_trimmed'],
+                DP=lambda x: x['Depth']-x['n_trimmed']
+            )
+        )
+
+    elif pp_method == 'RedeemR':
+
+        # Read trimmed ADs from filtered redeemR summary
+        long = pd.read_csv(os.path.join(path_ch_matrix, 'FilteredCounts'), sep='\t') 
+
+    else:   
+        raise ValueError(f'pp_method should be either RedeemV, RedeemR or None. Provided: {pp_method}')
+
+    ##
+
+    # Filter for unique variant basecalls (i.e., no multi-allelic calls)
+    long['Pos'] = long['Variants'].map(lambda x: x.split('_')[0]).astype(int)
+    long['Ref'] = long['Variants'].map(lambda x: x.split('_')[1].split('>')[0])
+    long['Alt'] = long['Variants'].map(lambda x: x.split('_')[1].split('>')[1])
+    long['nunique'] = long.groupby(['Cell', 'Pos'])['Alt'].transform('nunique')
+    long = (
+        long.query('nunique==1')
+        .drop(columns=['nunique', 'Pos', 'Ref', 'Alt'])
+        .copy()
     )
 
-    # Handle cell meta, if present
-    if path_meta is not None and os.path.exists(path_meta):
+    # Add metrics
+    metrics['variant_basecalls'] = long.shape[0]
+    logging.info(f'Unique variant basecalls: {long.shape[0]}')
+
+    ##
+
+    # Filter basecalls of annotated cells only (i.e., we have cell metadata)
+    if path_meta not in [None,'null']:
+        logging.info(f'Filter for annotated cells (i.e., sample CBs in cell_meta)')
         cell_meta = pd.read_csv(path_meta, index_col=0)
-        cell_meta = cell_meta.query('sample==@sample').copy()
-        cells = list(set(cell_meta.index))
-        # Filter only good quality cells (Mean MT-total coverage >=10) as in redeemR (i.e., cells in filtered basecalls)
-        filtered_cells = list( set(basecalls['cell'].unique()) & set(cells) ) 
+        cells = list(set(cell_meta.index.map(lambda x: x.split('_')[0])) & set(long['Cell'].unique()))
+        long = long.query('Cell in @cells').copy()
+        metrics['variant_basecalls_for_annot_cells'] = long.shape[0]
+        logging.info(f'Unique variant basecalls for annotated cells: {long.shape[0]}')
     else:
-        cell_meta = pd.DataFrame({'mean_cov' : cov.groupby('cell')['DP'].mean()})
-        filtered_cells = list(set(basecalls['cell'].unique())) 
+        cell_meta = None
+        cells = list(long['Cell'].unique())
 
-    # Pivot filtered basecalls, and filter cell_meta and cov for cells
-    AD = basecalls.pivot(index='cell', columns='mut', values='AD').fillna(0).loc[filtered_cells].copy()
-    DP = basecalls.pivot(index='cell', columns='mut', values='DP').fillna(0).loc[filtered_cells].copy()
-    cell_meta = cell_meta.loc[filtered_cells].copy()
-
-    # Checks
+    # Matrices
+    logging.info(f'Format AD/DP matrices')
+    AD = long.pivot(index='Cell', columns='Variants', values='AD_trimmed').fillna(0)
+    DP = long.pivot(index='Cell', columns='Variants', values='DP').fillna(0)
     assert (AD.index.value_counts()==1).all()
+    AD = AD.loc[cells].copy()
+    DP = DP.loc[cells].copy()
+
+    # Cell meta
+    if path_meta is not None and os.path.exists(path_meta):
+        cell_meta = cell_meta.loc[cells].copy()
+    else:
+        cells = cells if sample is None else [ f"{cell}_{sample}" for cell in cells ]
+        cell_meta = pd.DataFrame(index=cells)
+
+    # Ensure at least one unique variant basecall for each cell
     assert (np.sum(DP>0, axis=1)>0).all()
     assert (np.sum(DP>0, axis=1)>0).all() 
     assert (AD.index == DP.index).all()
@@ -401,8 +488,8 @@ def read_redeem(
     char_meta['alt'] = char_meta['mut'].map(lambda x: x.split('_')[1].split('>')[1])
     char_meta = char_meta[['pos', 'ref', 'alt']]
 
-    # Create sparse matrices, and store into the AnnData object
-    logging.info('Build AnnData object...')
+    # To sparse and AnnData
+    logging.info('Build AnnData object')
     AF = csr_matrix(np.divide(AD.values,(DP.values+.00000001)).astype(np.float32))
     AD = csr_matrix(AD.values).astype(np.int16)
     DP = csr_matrix(DP.values).astype(np.int16)
@@ -411,20 +498,66 @@ def read_redeem(
         obs=cell_meta, 
         var=char_meta, 
         layers={'AD':AD, 'DP':DP}, 
-        uns={'pp_method':pp_method, 'scLT_system':scLT_system, 'raw_basecalls_metrics':None}
+        uns={'pp_method':pp_method, 'scLT_system':scLT_system, 'raw_basecalls_metrics':metrics}
     )
+
+    # Remove MT-SNVs with multi-allelic calls (different cells this time)
+    var_sites = afm.var_names.map(lambda x: x.split('_')[0])
+    test = var_sites.value_counts()[var_sites] == 1
+    afm = afm[:,afm.var_names[test]].copy()
+
+    # Sort vars
     sorted_vars = afm.var['pos'].sort_values().index
     assert sorted_vars.size == afm.shape[1]
     afm = afm[:,sorted_vars].copy()
 
-    # Add complete site coverage info
-    logging.info('Add site-coverage matrix and cell-coverage metrics')
-    cov = cov.query('cell in @filtered_cells').pivot(index='cell', columns='pos', values='DP').fillna(0)
-    mapping = afm.var['pos'].to_dict()
-    df_ = pd.DataFrame({ mut : cov[mapping[mut]].values for mut in mapping }, index=filtered_cells)
-    assert all(df_.columns == afm.var_names)
-    afm.layers['site_coverage'] = csr_matrix(df_.values)
-    afm.obs['mean_site_coverage'] = cov.mean(axis=1)   
+    ##
+
+    # Add coverage info
+    if os.path.exists(os.path.join(path_ch_matrix, 'QualifiedTotalCts')):
+
+        # Raw cell-MT_genome position consensus UMI counts
+        logging.info('Add full site-coverage matrix')
+        cov = pd.read_csv(os.path.join(path_ch_matrix, 'QualifiedTotalCts'), sep='\t', header=None)
+        cov.columns = ['Cell', 'Pos', 'Total', 'VerySensitive', 'Sensitive', 'Stringent']
+        cov = cov[['Cell', 'Pos', treshold]].rename(columns={treshold:'coverage'})   
+
+        # Pivot and align
+        cov = cov.pivot(index='Cell', columns='Pos', values='coverage').fillna(0)
+        cov = cov.loc[cells]
+        mapping = afm.var['pos'].to_dict()
+        df_ = pd.DataFrame({ mut : cov[mapping[mut]].values for mut in mapping }, index=cells)
+        assert all(df_.columns == afm.var_names)
+
+        # Correct trimmed DPs in site coverage layer
+        logging.info('Correct trimmed DPs in site_coverage layer')
+        x,y = afm.layers['DP'].nonzero()
+        df_.values[x,y] = afm.layers['DP'][x,y].A1
+        afm.layers['site_coverage'] = csr_matrix(df_.values)
+
+        # Add cell mean_site_coverage to cell meta
+        afm.obs['mean_site_coverage'] = cov.mean(axis=1)   
+
+    elif os.path.exists(os.path.join(path_ch_matrix, 'meanCellCov')) and \
+        os.path.exists(os.path.join(path_ch_matrix, 'meanSiteCov')):
+
+        # Read mean coverage (per cell and site)
+        logging.info('Add mean site and cell coverage across MT-genome')
+        cell_cov = pd.read_csv(os.path.join(path_ch_matrix, 'meanCellCov'), sep='\t', index_col=0)
+        site_cov = pd.read_csv(os.path.join(path_ch_matrix, 'meanSiteCov'), sep='\t', index_col=0)
+
+        # Add to cell and vars meta
+        afm.obs['mean_site_coverage'] = cell_cov.loc[afm.obs_names, 'coverage'].values
+
+        print(site_cov.loc[afm.var['pos'].values, 'coverage'].values)
+        
+        afm.var['mean_cov'] = site_cov.loc[afm.var['pos'].values, 'coverage'].values
+
+    else:
+        raise ValueError(f"""
+            Coverage files at {path_ch_matrix}. Provide either QualifiedTotalCts or meanCellCov/meanSiteCov files.
+            """
+        )
 
     return afm
 
@@ -674,15 +807,14 @@ def make_afm(
             logging.info('Public dataset. Character matrix already pre-processed. Just assembling the AFM...')
             logging.info('#TODO: include preprocessing entry-points for other scLT methods in nf-MiTo pipeline.')
 
-            pp_method = 'public dataset pre-processed'
             if scLT_system == 'RedeeM':
                 afm = read_redeem(path_ch_matrix, path_meta, sample, pp_method, scLT_system, **kwargs)
             elif scLT_system == 'Cas9':
-                afm = read_cas9(path_ch_matrix, path_meta, sample, pp_method, scLT_system, **kwargs)
+                afm = read_cas9(path_ch_matrix, path_meta, sample, 'Cassiopeia', scLT_system, **kwargs)
             elif scLT_system == 'scWGS':
-                afm = read_scwgs(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_scwgs(path_ch_matrix, path_meta, sample, 'Sequoia', scLT_system)
             elif scLT_system == 'EPI-clone':
-                afm = read_epiclone(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
+                afm = read_epiclone(path_ch_matrix, path_meta, sample, 'EPI-clone', scLT_system)
             else:
                 raise ValueError(f'Unknown {scLT_system}. Check your inputs...')
         
@@ -692,6 +824,55 @@ def make_afm(
 
     else:
         raise ValueError('Specify a valid path_ch_matrix!')
+
+
+##
+
+
+def filter_multiallelic_sites(afm: AnnData, verbose: bool = True) -> AnnData:
+    """
+    Remove variants associated to sites (.var['pos']) that have multiple variant alleles.
+    This ensures each genomic position has only one variant type across all cells.
+    
+    Parameters
+    ----------
+    afm : AnnData
+        The Allele Frequency Matrix.
+    verbose : bool, optional
+        Whether to print filtering statistics. Default is True.
+        
+    Returns
+    -------
+    afm : AnnData
+        Filtered AFM with only single-allelic sites.
+    """
+    
+    if 'pos' not in afm.var.columns:
+        raise ValueError("AFM must have 'pos' column in .var to identify genomic positions")
+    
+    # Count number of variants per site
+    site_variant_counts = afm.var['pos'].value_counts()
+    multiallelic_sites = site_variant_counts[site_variant_counts > 1].index
+    
+    if verbose:
+        logging.info(f'Found {len(multiallelic_sites)} sites with multiple variant alleles')
+        logging.info(f'Total variants before filtering: {afm.shape[1]}')
+    
+    # Create test for sites with only one variant allele
+    test = ~afm.var['pos'].isin(multiallelic_sites)
+    
+    # Filter AFM
+    afm_filtered = afm[:, test].copy()
+    
+    if verbose:
+        n_removed = afm.shape[1] - afm_filtered.shape[1]
+        logging.info(f'Removed {n_removed} variants from {len(multiallelic_sites)} multiallelic sites')
+        logging.info(f'Total variants after filtering: {afm_filtered.shape[1]}')
+        
+        if len(multiallelic_sites) > 0:
+            logging.info(f'Example multiallelic sites: {list(multiallelic_sites[:5])}')
+    
+    return afm_filtered
 
 
 ##

@@ -2,12 +2,14 @@
 All filters: variants/cells.
 """
 
+import os
 import logging
 import numpy as np
 import pandas as pd
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
 from mquad.mquad import *
+from joblib import Parallel, delayed, parallel_backend, cpu_count
 from .distances import *
 from ..ut.positions import mask_mt_sites
 from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
@@ -109,7 +111,7 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
             return
         else:
             logging.info('Re-annotate variants in afm')
-            afm.var = afm.var.iloc[:,:3].copy()
+            afm.var = afm.var.iloc[:,:4].copy()             # Retain mean coverage, if present
 
     # Initialize vars_df
 
@@ -544,7 +546,7 @@ def filter_MiTo(
         else:
             raise ValueError(f'MiTo filter not available for pp_method: {pp_method}')
         
-    elif scLT_system == 'redeem':
+    elif scLT_system == 'RedeeM':
         test = (
             (afm.var['mean_cov']>=min_cov) & \
             (afm.var['n0']>=min_frac_negative*afm.shape[0]) & \
@@ -737,30 +739,90 @@ def moran_I(W, x, num_permutations=100):
 ##
 
 
+def _compute_moran_batch(start_pos, end_pos, W, X, num_permutations):
+    """
+    Compute Moran's I for a batch of variants using joblib.
+    
+    Parameters:
+    - start_pos: start index for variant batch
+    - end_pos: end index for variant batch  
+    - W: spatial weights matrix
+    - X: data matrix
+    - num_permutations: number of permutations for p-value
+    
+    Returns:
+    - List of tuples: [(I, p_value), ...]
+    """
+    results = []
+    for i in range(start_pos, end_pos):
+        I, p_value = moran_I(W, X[:,i], num_permutations=num_permutations)
+        results.append((I, p_value))
+    
+    return results
+
+
+##
+
+
 def filter_variant_moransI(
     afm: AnnData, 
     num_permutations: int = 100, 
-    pval_treshold: float =.01
+    pval_treshold: float = .01,
+    n_cores: int = None
     ) -> AnnData:
 
     """
-    Filter MT-SNVs if not significantly auto-correlated.
+    Filter out MT-SNVs if not significantly auto-correlated (PARALLEL VERSION).
+    Uses joblib for parallel processing.
     """
     
     assert 'distances' in afm.obsp
     W = 1-afm.obsp['distances'].toarray()
     X = afm.X.toarray()
-
-    I = []
-    P = []
-    for i in range(afm.shape[1]):
-        i, p = moran_I(W, X[:,i], num_permutations=num_permutations)
-        I.append(i)
-        P.append(p)
     
-    afm.var['Moran I '] = I
-    afm.var['Moran I pvalue'] = P
+    # Set number of cores
+    if n_cores is None:
+        n_cores = max(1, os.cpu_count()-1)
+    
+    # Prepare batches
+    nvars = X.shape[1]
+    quotient = nvars // n_cores
+    residue = nvars % n_cores
+    intervals = []
+    start = end = 0
+    for i in range(n_cores):
+        end = start + quotient + (i < residue)
+        if end == start:
+            break
+        intervals.append((start, end))
+        start = end
 
+    # Parallel computation
+    with parallel_backend("loky", inner_max_num_threads=1):
+        result_list = Parallel(n_jobs=len(intervals))(
+            delayed(_compute_moran_batch)(
+                start_pos,
+                end_pos,
+                W,
+                X,
+                num_permutations
+            )
+            for start_pos, end_pos in intervals
+        )
+
+    # Flatten results from all batches
+    I_list = []
+    P_list = []
+    for batch_results in result_list:
+        for I, P in batch_results:
+            I_list.append(I)
+            P_list.append(P)
+    
+    # Store results in afm
+    afm.var['Moran I '] = I_list
+    afm.var['Moran I pvalue'] = P_list
+
+    # Filter variants by pvalue
     var_to_retain = afm[:,afm.var['Moran I pvalue']<=pval_treshold].var_names
     afm = afm[:,var_to_retain].copy()
 

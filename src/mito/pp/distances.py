@@ -293,8 +293,15 @@ def call_genotypes(
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)
     elif bin_method == 'MiTo':
-        X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
-                          min_AD=min_AD, min_cell_prevalence=min_cell_prevalence)
+        if cov_layer == 'site_coverage':
+            X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
+                              min_AD=min_AD, min_cell_prevalence=min_cell_prevalence)
+        else:
+            raise ValueError("""
+                    MiTo genotyping requires total site coverage info 
+                    in afm.layers["site_coverage"]
+                    """
+            )
     elif bin_method == 'MiTo_smooth':
         X = genotype_MiTo_smooth(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
                                  min_AD=min_AD, min_cell_prevalence=min_cell_prevalence, 

@@ -9,6 +9,7 @@ import cassiopeia as cs
 from tqdm import tqdm
 from itertools import product
 from typing import Iterable, Tuple
+from joblib import Parallel, delayed, parallel_backend, cpu_count
 from cassiopeia.data import CassiopeiaTree
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
@@ -43,7 +44,7 @@ def get_ranges_and_gaps(s: pd.Series, label):
 ##
 
 
-def fing_longest_stretch(ranges, series):
+def find_longest_stretch(ranges, series):
 
     n = len(ranges)
     if n == 0:
@@ -100,6 +101,60 @@ def _get_muts_order(tree):
 ##
 
 
+def _compute_mutation_enrichment_batch(start_pos, end_pos, T_columns, tree_values, T_values, muts_size, alpha):
+    """
+    Compute mutation enrichment for a batch of tree nodes using joblib.
+    
+    Parameters:
+    - start_pos: start index for node batch
+    - end_pos: end index for node batch  
+    - T_columns: column names (nodes) to process
+    - tree_values: tree mutation matrix values
+    - T_values: T matrix values (cell assignment matrix)
+    - muts_size: number of mutations
+    - alpha: significance level for FDR correction
+    
+    Returns:
+    - List of tuples: [(node_name, pvals), ...]
+    """
+    results = []
+    for i in range(start_pos, end_pos):
+        node_name = T_columns[i]
+        node_T_values = T_values[:,i]
+        target_ratio_array = np.zeros(muts_size)
+        oddsratio_array = np.zeros(muts_size)
+        pvals = np.zeros(muts_size)
+        test_lineage = node_T_values == 1
+        
+        for j in range(muts_size):
+            test_mut = tree_values[:,j] == 1
+            n_mut_lineage = np.sum(test_mut & test_lineage)
+            n_mut_no_lineage = np.sum(test_mut & ~test_lineage)
+            n_no_mut_lineage = np.sum(~test_mut & test_lineage)
+            n_no_mut_no_lineage = np.sum(~test_mut & ~test_lineage)
+            target_ratio_array[j] = n_mut_lineage / (np.sum(test_mut) + 1e-8)
+            
+            # Fisher's exact test
+            oddsratio, pvalue = fisher_exact(
+                [
+                    [n_mut_lineage, n_mut_no_lineage],
+                    [n_no_mut_lineage, n_no_mut_no_lineage],
+                ],
+                alternative='greater',
+            )
+            oddsratio_array[j] = oddsratio
+            pvals[j] = pvalue
+        
+        # Adjust p-values (FDR correction)
+        pvals = multipletests(pvals, alpha=alpha, method="fdr_bh")[1]
+        results.append((node_name, pvals))
+    
+    return results
+
+
+##
+
+
 class MiToTreeAnnotator():
     """
     MiTo tree annotation class. Performs clonal inference from an arbitrary
@@ -143,46 +198,59 @@ class MiToTreeAnnotator():
 
     ##
 
-    def get_M(self, alpha: float = 0.05):
+    def get_M(self, alpha: float = 0.05, n_cores: int = None):
         """
         Compute the "mutation enrichment" matrix, M.
         M is a mut x clade matrix storing for each mutation i and clade j the enrichment 
         value defined as -log10(pval) from a Fisher's Exact test.
+        Uses joblib for parallel processing.
         """
 
-        logging.info('Compute mutations enrichment')
-        P = {}
         muts = self.tree.layers['transformed'].columns
+        logging.info(f'Compute mutations enrichment: n muts={len(muts)}')
 
-        # For each internal node (clade)
-        for lineage_column in self.T.columns:
-            target_ratio_array = np.zeros(muts.size)
-            oddsratio_array = np.zeros(muts.size)
-            pvals = np.zeros(muts.size)
+        # Set number of cores
+        if n_cores is None:
+            n_cores = max(1, cpu_count()-1)
+        
+        # Cache matrices once to avoid multiple copies across workers
+        tree_values = self.tree.layers['transformed'].values
+        T_values = self.T.values
+        T_columns = self.T.columns.tolist()
+        
+        # Prepare batches
+        n_nodes = len(T_columns)
+        quotient = n_nodes // n_cores
+        residue = n_nodes % n_cores
+        intervals = []
+        start = end = 0
+        for i in range(n_cores):
+            end = start + quotient + (i < residue)
+            if end == start:
+                break
+            intervals.append((start, end))
+            start = end
 
-            # For each mutation
-            for i in range(muts.size):
-                test_mut = self.tree.layers['transformed'].values[:, i] == 1
-                test_lineage = self.T[lineage_column].values == 1
-                n_mut_lineage = np.sum(test_mut & test_lineage)
-                n_mut_no_lineage = np.sum(test_mut & ~test_lineage)
-                n_no_mut_lineage = np.sum(~test_mut & test_lineage)
-                n_no_mut_no_lineage = np.sum(~test_mut & ~test_lineage)
-                target_ratio_array[i] = n_mut_lineage / (np.sum(test_mut) + 1e-8)
-                # Fisher's exact test
-                oddsratio, pvalue = fisher_exact(
-                    [
-                        [n_mut_lineage, n_mut_no_lineage],
-                        [n_no_mut_lineage, n_no_mut_no_lineage],
-                    ],
-                    alternative='greater',
+        # Parallel computation using joblib like the filter pattern
+        with parallel_backend("loky", inner_max_num_threads=1):
+            result_list = Parallel(n_jobs=len(intervals))(
+                delayed(_compute_mutation_enrichment_batch)(
+                    start_pos,
+                    end_pos,
+                    T_columns,
+                    tree_values,
+                    T_values,
+                    muts.size,
+                    alpha
                 )
-                oddsratio_array[i] = oddsratio
-                pvals[i] = pvalue
+                for start_pos, end_pos in intervals
+            )
 
-            # Adjust p-values (FDR correction)
-            pvals = multipletests(pvals, alpha=alpha, method="fdr_bh")[1]
-            P[lineage_column] = pvals
+        # Flatten results from all batches
+        P = {}
+        for batch_results in result_list:
+            for node_name, pvals in batch_results:
+                P[node_name] = pvals
 
         M = pd.DataFrame(P, index=muts)
         M = -np.log10(M)
@@ -392,7 +460,7 @@ class MiToTreeAnnotator():
         if resolve_list:
             for i in range(len(resolve_list)):
                 clone, clone_ranges = resolve_list[i]
-                accepted, discarded = fing_longest_stretch(clone_ranges, ordered_clones)
+                accepted, discarded = find_longest_stretch(clone_ranges, ordered_clones)
                 accepted_range = (accepted[0][0], accepted[-1][1])
                 final_clone_cells = ordered_clones.index[accepted_range[0]:accepted_range[1]]
                 df_predict.loc[final_clone_cells, 'lca'] = (
@@ -678,7 +746,8 @@ class MiToTreeAnnotator():
         weight_silhouette: float =.3,
         weight_n_clones: float = .4,
         weight_similarity: float = .3,
-        max_fraction_unassigned: float = .05
+        max_fraction_unassigned: float = .05,
+        n_cores: int = None,
         ):
         """
         Optimize tresholds for `self.infer_clones` and pick clonal labels with
@@ -691,7 +760,7 @@ class MiToTreeAnnotator():
         # Get tree topology and mutation_enrichment tables
         if self.T is None or self.M is None: 
             self.get_T()
-            self.get_M()
+            self.get_M(n_cores=n_cores)
 
         # Define combos
         combos = list(product(similarity_tresholds, mut_enrichment_tresholds, merging_treshold))

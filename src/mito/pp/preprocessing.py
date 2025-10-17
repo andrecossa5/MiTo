@@ -248,7 +248,8 @@ def filter_afm(
     cells: Iterable[str] = None,
     filtering: str = 'MiTo', 
     filtering_kwargs: Dict[str,Any] = {}, 
-    filter_moran: bool = True, 
+    filter_moran: bool = True,
+    moran_I_pvalue: float = .01, 
     max_AD_counts: int = 2, 
     variants: Iterable[str] = None, 
     min_n_var: int = 1, 
@@ -290,6 +291,8 @@ def filter_afm(
         Additional keyword arguments for the selected filtering method. Default is {}.
     filter_moran : bool, optional
         Whether to remove MT-SNVs that are not spatially auto-correlated. Default is True.
+    moran_I_pvalue : float, optional
+        P-value threshold for Moran's I statistics. Default is 0.01.
     max_AD_counts : int, optional
         Retain an MT-SNV if at least one cell has this number of alternative allele counts.
         Default is 2.
@@ -326,6 +329,9 @@ def filter_afm(
     AnnData
         Filtered Allelic Frequency Matrix.
     """
+
+    T = Timer()
+    T.start()
 
     logging.info('Compute general dataset metrics...')
     compute_metrics_raw(afm)
@@ -415,7 +421,7 @@ def filter_afm(
     if filter_moran:
         logging.info(f'Filter only MT-SNVs with significant spatial auto-correlation (i.e., Moran I statistics)')
         n0 = afm.shape[1]
-        afm = filter_variant_moransI(afm)
+        afm = filter_variant_moransI(afm, pval_treshold=moran_I_pvalue, n_cores=ncores)
         n1 = afm.shape[1]
         n_not_autocorrelated = n0-n1
     else:
@@ -464,6 +470,8 @@ def filter_afm(
         'min_n_var' : min_n_var
     }
     afm.uns['char_filter'].update(filtering_kwargs)
+
+    logging.info(f'AFM filtering complete: {T.stop()}')
     
     if return_tree:
         return afm, tree

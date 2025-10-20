@@ -548,9 +548,6 @@ def read_redeem(
 
         # Add to cell and vars meta
         afm.obs['mean_site_coverage'] = cell_cov.loc[afm.obs_names, 'coverage'].values
-
-        print(site_cov.loc[afm.var['pos'].values, 'coverage'].values)
-        
         afm.var['mean_cov'] = site_cov.loc[afm.var['pos'].values, 'coverage'].values
 
     else:

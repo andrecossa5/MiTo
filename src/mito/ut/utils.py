@@ -347,7 +347,7 @@ def extract_kwargs(args, only_tree=False):
         
         else:
 
-            cell_filter = None; kwargs = None; 
+            cell_filter = None; kwargs = None;  
             filtering_kwargs = None; binarization_kwargs = None
             tree_kwargs = {'solver':args.solver, 'metric':args.metric}
 

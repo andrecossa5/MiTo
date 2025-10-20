@@ -419,6 +419,7 @@ def read_redeem(
                 n_trimmed=lambda x: x['AD_raw']-x['AD_trimmed'],
                 DP=lambda x: x['Depth']-x['n_trimmed']
             )
+            .query('AD_trimmed>0') # Remove basecalls with no trimmed AD left
         )
 
     elif pp_method == 'RedeemR':

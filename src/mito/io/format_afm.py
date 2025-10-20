@@ -424,10 +424,13 @@ def read_redeem(
 
     elif pp_method == 'RedeemR':
 
-        # Read trimmed ADs from filtered redeemR summary
-        long = pd.read_csv(os.path.join(path_ch_matrix, 'FilteredCounts'), sep='\t') 
-
-    else:   
+        if os.path.exists(os.path.join(path_ch_matrix, 'FilteredCounts')) and edge_trim==0:
+            long = pd.read_csv(os.path.join(path_ch_matrix, 'FilteredCounts'), sep='\t')
+        elif os.path.exists(os.path.join(path_ch_matrix, 'FilteredCounts.trimmed')) and edge_trim>0:
+            long = pd.read_csv(os.path.join(path_ch_matrix, 'FilteredCounts.trimmed'), sep='\t')
+        else:
+            raise ValueError(f'With pp_method={pp_method}, specified checkout your path_ch_matrix {path_ch_matrix} kwarg (edge_trim={edge_trim})')
+    else:
         raise ValueError(f'pp_method should be either RedeemV, RedeemR or None. Provided: {pp_method}')
 
     ##

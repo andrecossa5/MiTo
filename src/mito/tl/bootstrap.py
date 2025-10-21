@@ -73,12 +73,13 @@ def bootstrap_MiTo(
 
     if boot_replicate != 'observed':
 
+        cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP'
         if boot_strategy == 'jacknife':
             AD, _ = jackknife_allele_tables(afm, layer='AD')
-            cov, idx = jackknife_allele_tables(afm, layer='site_coverage')                                              # USE SITE, NBBB
+            cov, idx = jackknife_allele_tables(afm, layer=cov_layer)                                              # USE SITE, NBBB
         elif boot_strategy == 'feature_resampling':
             AD, _ = bootstrap_allele_tables(afm, layer='AD', frac_char_resampling=frac_char_resampling)
-            cov, idx = bootstrap_allele_tables(afm, layer='site_coverage', frac_char_resampling=frac_char_resampling)    # USE SITE, NBBB
+            cov, idx = bootstrap_allele_tables(afm, layer=cov_layer, frac_char_resampling=frac_char_resampling)    # USE SITE, NBBB
         elif boot_strategy == 'counts_resampling':
             raise ValueError(f'#TODO: {boot_strategy} boot_strategy. This strategy is not supported yet.')
         else:
@@ -87,7 +88,7 @@ def bootstrap_MiTo(
         AF = csr_matrix(np.divide(AD, (cov+.0000001)))
         AD = csr_matrix(AD)
         cov = csr_matrix(cov)
-        afm_new = AnnData(X=AF, obs=afm.obs, var=afm.var.iloc[idx,:], uns=afm.uns, layers={'AD':AD, 'site_coverage':cov})
+        afm_new = AnnData(X=AF, obs=afm.obs, var=afm.var.iloc[idx,:], uns=afm.uns, layers={'AD':AD, cov_layer:cov})
 
     else:
         afm_new = afm.copy()

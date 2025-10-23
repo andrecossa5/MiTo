@@ -2,7 +2,7 @@
 
 from .metrics import (
     normalized_mutual_info_score, custom_ARI, kbet, CI, RI,
-    distance_AUPRC, NN_entropy, NN_purity, calculate_corr_distances,
+    distance_AUPRC, NN_entropy, NN_purity, calculate_corr_distances, AOC
 )
 from .positions import transitions, transversions, MAESTER_genes_positions, mask_mt_sites
 from .stats_utils import (
@@ -30,5 +30,5 @@ from .phylo_utils import (
 __all__ = [
     "genotype_mix", "subsample_afm", "distance_AUPRC", 
     "NN_entropy", "calculate_corr_distances",
-    "custom_ARI", "kbet", "CI", "RI"
+    "custom_ARI", "kbet", "CI", "RI", "AOC"
 ]

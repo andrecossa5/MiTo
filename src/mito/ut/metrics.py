@@ -16,6 +16,7 @@ from scipy.stats import pearsonr
 from sklearn.metrics.pairwise import pairwise_distances
 from cassiopeia.data import CassiopeiaTree
 from .utils import rescale
+from ..pp.kNN import kNN_graph
 
 
 ##
@@ -358,6 +359,52 @@ def RI(tree: CassiopeiaTree) -> float:
     max_changes = len(tree.nodes)-1  # If every node had a unique state
 
     return (max_changes-observed_changes) / (max_changes-1)
+
+
+##
+
+
+def AOC_one_cell(idx_mito: np.array, CAS: np.array, i: int, k: int = 10, n_trials: int = 1000):
+    """
+    Agreement of Closeness (AOC) calculation, for one cell.
+    """
+
+    mt_neighbors = idx_mito[i,:]
+    dist_cas9_neighbors = CAS[i, mt_neighbors].mean()
+    obs_rank = np.sum(CAS[i,:] < dist_cas9_neighbors) + 1
+
+    random_ranks = np.zeros(n_trials)
+    for trial in range(n_trials):
+        cas9_random = np.random.choice(CAS.shape[0], size=k, replace=False)
+        dist_cas9_random = CAS[i, cas9_random].mean()
+        rank = np.sum(CAS[i,:] < dist_cas9_random) + 1
+        random_ranks[trial] = rank
+
+    aoc = np.mean((random_ranks - obs_rank) / idx_mito.shape[0])
+    p_value = 1 - (np.sum(random_ranks < obs_rank) / n_trials)
+
+    return aoc, p_value
+
+
+##
+
+
+def AOC(D1: np.array, D2: np.array, k: int = 10, n_trials: int = 1000):
+    """
+    Agreement of Closeness (AOC) metric calculation. See Weng et al., 2024.
+    """
+
+    n = D1.shape[0]
+    idx_D2, _, _ = kNN_graph(D=D2, k=k, from_distances=True)
+
+    AOC = np.zeros(n)
+    pvals = np.zeros(n)
+    for i in range(n):
+        aoc, p = AOC_one_cell(idx_D2, D1, i, k=k, n_trials=n_trials)
+        AOC[i] = aoc
+        pvals[i] = p
+
+    return AOC, pvals
 
 
 ##

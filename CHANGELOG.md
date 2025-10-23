@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2025-10-23
+### Enhanced
+- **Performance Optimizations**: Major parallelization improvements using joblib
+  - Parallelized Moran's I computation in `filter_variant_moransI` with batch processing
+  - Parallelized mutation enrichment computation in `MiToTreeAnnotator.get_M` method
+  - Memory-efficient matrix caching to avoid redundant serialization across workers
+  - Configurable core usage and temporary folder management for large datasets
+
+### Added
+- **Multi-allelic Site Filtering**: New quality control functionality
+  - Added `filter_multiallelic_sites` function to remove variants from sites with multiple alleles
+  - Integrated multi-allelic filtering in RedeeM data processing pipeline
+  - Ensures each genomic position has only one variant type for cleaner analyses
+- **Dual Implementation Support**: Both serial and parallel versions available for performance testing
+- **Enhanced RedeeM Support**: Improved data processing for RedeeM scLT system
+
+### Fixed
+- Memory usage optimization in parallel processing by caching matrix variables
+- Proper joblib backend configuration for stable parallel execution
+- Improved progress tracking for long-running computations
+
+### Technical
+- Migrated from multiprocessing to joblib for better memory management
+- Added batch processing patterns for scalable parallel computation
+- Enhanced error handling and progress reporting in parallel workflows
+
 ## [0.1.1] - 2025-10-08
 ### Enhanced
 - Improved clonal inference algorithm with edge case handling for small phylogenies

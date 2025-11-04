@@ -45,13 +45,14 @@ mamba env create -f envs/environment.yml -n MiTo
 
 ```bash
 mamba activate MiTo
-pip install mito_utils
+pip install mito-utils
 ```
 
 4. Verify successfull installation:
 
 ```python
 import mito as mt
+print(mt.__version__)
 ```
 
 ## Releases

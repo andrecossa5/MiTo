@@ -86,16 +86,10 @@ def get_idx_from_simmetric_matrix(X, k=15):
 
     idx_all = []
     for i in range(X.shape[0]):
-        x = np.delete(X[i,:], i)
-        idx_all.append(x.argsort())
+        idx_all.append(X[i,:].argsort())
 
-    idx_all = np.concatenate([
-        np.arange(X.shape[0]).reshape(X.shape[0],1),
-        np.vstack(idx_all)
-        ], axis=1
-    )
-
-    idx = idx_all[:,:k]
+    idx_all = np.vstack(idx_all)
+    idx = idx_all[:,1:k+1]
     dists = X[np.arange(X.shape[0])[:, None], idx]
 
     return idx, dists

@@ -381,7 +381,7 @@ def AOC_one_cell(idx_mito: np.array, CAS: np.array, i: int, k: int = 10, n_trial
         random_ranks[trial] = rank
 
     aoc = np.mean((random_ranks - obs_rank) / idx_mito.shape[0])
-    p_value = 1 - (np.sum(random_ranks < obs_rank) / n_trials)
+    p_value = np.sum(random_ranks < obs_rank) / n_trials
 
     return aoc, p_value
 

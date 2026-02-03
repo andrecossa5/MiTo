@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2026-01-29
+### Enhanced
+- **kNN Graph Computations**: Improved k-nearest neighbor graph algorithms
+  - Optimized distance calculations for better performance in large datasets
+  - Enhanced graph construction methods for more accurate neighborhood detection
+  - Improved memory efficiency in graph building operations
+  - Better handling of edge cases in sparse data scenarios
+
+### Technical
+- Refined algorithms for more robust graph-based analyses
+- Enhanced computational efficiency for scalable graph operations
+
 ## [0.1.2] - 2025-10-23
 ### Enhanced
 - **Performance Optimizations**: Major parallelization improvements using joblib

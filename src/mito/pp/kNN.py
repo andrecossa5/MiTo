@@ -131,6 +131,7 @@ def kNN_graph(
     -------
     tuple of (np.array, csr_matrix, csr_matrix)
         A tuple containing, in this order:
+
         - A numpy array of shape (n_samples, k) with the indices of the k-nearest
           neighbours of each observation, nearest first, excluding the observation itself.
         - A csr_matrix of the distances corresponding to the kNN graph.

@@ -1,0 +1,82 @@
+/* MiTo documentation -- small refinements on top of the Furo theme. */
+
+:root {
+  --mito-radius: 8px;
+}
+
+/* Keep the sidebar logo from dominating the page */
+.sidebar-logo {
+  max-width: 190px;
+  margin: 0.6rem auto 0.2rem;
+}
+
+/* Readable measure for body text */
+article {
+  max-width: 56rem;
+}
+
+/* API entries: give each function a clear card-like separation */
+dl.py.class > dt,
+dl.py.function > dt,
+dl.py.method > dt {
+  background: var(--color-background-secondary);
+  border-left: 3px solid var(--color-brand-primary);
+  border-radius: 0 var(--mito-radius) var(--mito-radius) 0;
+  padding: 0.45rem 0.7rem;
+  margin-bottom: 0.6rem;
+}
+
+dl.py.function > dd,
+dl.py.class > dd {
+  margin-bottom: 2.2rem;
+}
+
+/* Parameter names stand out from their descriptions */
+dl.field-list > dt {
+  font-weight: 600;
+}
+
+/* Tables: lighter, full width, no heavy grid */
+table.docutils {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+
+table.docutils th {
+  background: var(--color-background-secondary);
+  text-align: left;
+  font-weight: 600;
+}
+
+table.docutils td,
+table.docutils th {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--color-background-border);
+}
+
+/* Code blocks: softer corners, a touch more breathing room */
+div.highlight {
+  border-radius: var(--mito-radius);
+}
+
+div.highlight pre {
+  padding: 0.85rem 1rem;
+  line-height: 1.45;
+}
+
+/* Notebook cells rendered by nbsphinx */
+.nbinput .highlight,
+.nboutput .highlight {
+  border-radius: var(--mito-radius);
+}
+
+.nboutput .output_area img {
+  border-radius: var(--mito-radius);
+  max-width: 100%;
+}
+
+/* Admonitions sit a little closer to the surrounding text */
+.admonition {
+  border-radius: var(--mito-radius);
+}

@@ -73,7 +73,14 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=7.0", "pytest-cov>=4.0"]
-docs = ["sphinx>=6", "sphinx_rtd_theme", "nbsphinx"]
+docs = [
+    "sphinx>=7",
+    "furo",
+    "nbsphinx",
+    "sphinx-copybutton",
+    "sphinx-design",
+    "ipykernel",
+]
 
 [project.urls]
 Homepage = "https://github.com/andrecossa5/MiTo"

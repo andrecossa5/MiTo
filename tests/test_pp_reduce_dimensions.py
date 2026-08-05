@@ -64,3 +64,53 @@ def test_does_not_disturb_the_matrix(afm_filtered):
     mt.pp.reduce_dimensions(afm_filtered, method="PCA", ncores=1)
     assert afm_filtered.shape == shape
     assert len(afm_filtered.layers) == n_layers
+
+
+# -- disconnected graphs ----------------------------------------------------
+# UMAP falls back to a multi-component spectral layout when the kNN graph is
+# disconnected, and forwards `metric` to sklearn.pairwise_distances there.
+# MiTo's own metric names are unknown to sklearn, which used to raise.
+
+def _disconnected_afm(**overrides):
+    from conftest import build_afm
+    cfg = {"n_cells": 60, "n_vars": 24, "n_clones": 6, "clone_specific_frac": 1.0, "seed": 101}
+    cfg.update(overrides)
+    a = build_afm(**cfg)
+    mt.pp.annotate_vars(a)
+    return mt.pp.filter_afm(a, filtering="baseline", compute_enrichment=False, ncores=1)
+
+
+def test_fixture_really_is_disconnected():
+    """Guard: if this graph ever becomes connected, the tests below stop testing anything."""
+    from scipy.sparse.csgraph import connected_components
+    afm = _disconnected_afm()
+    _, _, conn = mt.pp.kNN_graph(D=afm.obsp["distances"].toarray(), k=5, from_distances=True)
+    n_components, _ = connected_components(conn, directed=False)
+    assert n_components > 1
+
+
+@pytest.mark.parametrize("metric", ["weighted_jaccard", "weighted_hamming"])
+def test_umap_with_custom_metric_on_disconnected_graph(metric):
+    """Regression: MiTo's custom metrics used to reach sklearn and raise."""
+    afm = _disconnected_afm()
+    if metric == "weighted_hamming":
+        pytest.skip("weighted_hamming needs per-character priors in .varm")
+    mt.pp.reduce_dimensions(afm, method="UMAP", metric=metric, k=5, ncores=1)
+    assert "X_umap" in afm.obsm
+    assert np.isfinite(afm.obsm["X_umap"]).all()
+
+
+@pytest.mark.parametrize("metric", ["euclidean", "cosine", "jaccard"])
+def test_umap_with_sklearn_metric_on_disconnected_graph(metric):
+    """Metrics sklearn knows are passed through unchanged."""
+    afm = _disconnected_afm()
+    mt.pp.reduce_dimensions(afm, method="UMAP", metric=metric, k=5, ncores=1)
+    assert "X_umap" in afm.obsm
+
+
+def test_umap_metric_fallback_is_only_for_unknown_metrics():
+    from mito.pp.dimred import _UMAP_SAFE_METRICS
+    assert "euclidean" in _UMAP_SAFE_METRICS
+    assert "jaccard" in _UMAP_SAFE_METRICS
+    assert "weighted_jaccard" not in _UMAP_SAFE_METRICS
+    assert "weighted_hamming" not in _UMAP_SAFE_METRICS

@@ -75,7 +75,7 @@ dependencies = [
 test = ["pytest>=7.0", "pytest-cov>=4.0"]
 docs = [
     "sphinx>=7",
-    "furo",
+    "renku-sphinx-theme",
     "nbsphinx",
     "sphinx-copybutton",
     "sphinx-design",

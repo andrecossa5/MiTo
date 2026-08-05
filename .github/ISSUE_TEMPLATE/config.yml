@@ -4,5 +4,5 @@ contact_links:
     url: https://discourse.scverse.org/
     about: For "how do I..." questions, please ask on the scverse Discourse forum.
   - name: MiTo documentation
-    url: https://andrecossa5.readthedocs.io/en/latest/index.html
+    url: https://scmito.readthedocs.io/en/latest/index.html
     about: Tutorials and API reference.

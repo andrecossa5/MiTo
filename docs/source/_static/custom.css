@@ -1,11 +1,10 @@
 /* MiTo documentation -- refinements on top of the Furo theme.
-   Colours are sampled from the logo: burgundy #9c323a, red #b22221,
-   orange #f5940d. */
+   Accent: a desaturated green (#46765e, hue 150deg at 26% saturation). */
 
 :root {
   --mito-radius: 6px;
-  --mito-accent: #9c323a;
-  --mito-accent-dark: #e08b8b;
+  --mito-accent: #46765e;
+  --mito-accent-dark: #92b9a5;
 }
 
 /* Sidebar logo: keep it from dominating the navigation */

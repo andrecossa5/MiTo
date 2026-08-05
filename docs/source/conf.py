@@ -99,11 +99,13 @@ html_theme_options = {
     "source_directory": "docs/source/",
     # accents sampled from the logo
     "light_css_variables": {
-        "color-brand-primary": "#9c323a",
-        "color-brand-content": "#9c323a",
+        "color-brand-primary": "#46765e",
+        "color-brand-content": "#46765e",
+        "color-api-name": "#46765e",
     },
     "dark_css_variables": {
-        "color-brand-primary": "#e08b8b",
-        "color-brand-content": "#e08b8b",
+        "color-brand-primary": "#92b9a5",
+        "color-brand-content": "#92b9a5",
+        "color-api-name": "#92b9a5",
     },
 }

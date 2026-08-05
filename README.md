@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="image/nf_mito.png" alt="MiTo" width="420">
+  <img src="image/MiTo_logo_transparent.png" alt="MiTo" width="260">
 </div>
 
 # MiTo (Mitochondrial single-cell lineage tracing Toolkit)

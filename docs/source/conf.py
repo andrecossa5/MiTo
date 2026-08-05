@@ -82,7 +82,7 @@ nbsphinx_assume_equations = True
 
 # -- HTML output -------------------------------------------------------------
 
-html_theme = "renku"
+html_theme = "furo"
 html_title = f"MiTo {release}"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
@@ -92,11 +92,18 @@ html_show_sourcelink = True
 html_copy_source = False
 
 html_theme_options = {
-    # renku is a skin over sphinx-rtd-theme, so it takes the RTD options
-    "collapse_navigation": False,
-    "navigation_depth": 3,
-    "sticky_navigation": True,
-    "titles_only": False,
-    "logo_only": True,
-    "style_external_links": True,
+    "sidebar_hide_name": True,          # the logo already carries the name
+    "navigation_with_keys": True,
+    "source_repository": "https://github.com/andrecossa5/MiTo/",
+    "source_branch": "master",
+    "source_directory": "docs/source/",
+    # accents sampled from the logo
+    "light_css_variables": {
+        "color-brand-primary": "#9c323a",
+        "color-brand-content": "#9c323a",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#e08b8b",
+        "color-brand-content": "#e08b8b",
+    },
 }

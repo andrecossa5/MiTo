@@ -1,34 +1,50 @@
-/* MiTo documentation -- small refinements on top of the Furo theme. */
+/* MiTo documentation -- refinements on top of the Furo theme.
+   Accent: a desaturated green (#46765e, hue 150deg at 26% saturation). */
 
 :root {
-  --mito-radius: 8px;
+  --mito-radius: 6px;
+  --mito-accent: #46765e;
+  --mito-accent-dark: #92b9a5;
 }
 
-/* Keep the sidebar logo from dominating the page */
+/* Sidebar logo: keep it from dominating the navigation */
 .sidebar-logo {
-  max-width: 190px;
-  margin: 0.6rem auto 0.2rem;
+  max-width: 170px;
+  margin: 0.4rem auto 0.2rem;
 }
 
-/* Readable measure for body text */
+/* Comfortable measure for prose */
 article {
   max-width: 56rem;
 }
 
-/* API entries: give each function a clear card-like separation */
-dl.py.class > dt,
-dl.py.function > dt,
-dl.py.method > dt {
-  background: var(--color-background-secondary);
-  border-left: 3px solid var(--color-brand-primary);
+/*
+ * API signatures.
+ *
+ * NB: Furo styles these as
+ *     .sig:not(.sig-inline) { padding: .25rem .5rem .25rem 3em; text-indent: -2.5em }
+ * i.e. a hanging indent for wrapped signatures. The 3em left padding and the
+ * -2.5em indent are a matched pair -- overriding the padding alone pushes the
+ * first line outside the tinted box. Keep the padding, add only the accent.
+ */
+dl.py > dt.sig {
+  border-left: 3px solid var(--mito-accent);
   border-radius: 0 var(--mito-radius) var(--mito-radius) 0;
-  padding: 0.45rem 0.7rem;
-  margin-bottom: 0.6rem;
 }
 
-dl.py.function > dd,
-dl.py.class > dd {
-  margin-bottom: 2.2rem;
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) dl.py > dt.sig {
+    border-left-color: var(--mito-accent-dark);
+  }
+}
+
+body[data-theme="dark"] dl.py > dt.sig {
+  border-left-color: var(--mito-accent-dark);
+}
+
+/* Space between consecutive API entries */
+dl.py > dd {
+  margin-bottom: 2rem;
 }
 
 /* Parameter names stand out from their descriptions */
@@ -55,17 +71,11 @@ table.docutils th {
   border-bottom: 1px solid var(--color-background-border);
 }
 
-/* Code blocks: softer corners, a touch more breathing room */
+/* Code blocks and notebook cells */
 div.highlight {
   border-radius: var(--mito-radius);
 }
 
-div.highlight pre {
-  padding: 0.85rem 1rem;
-  line-height: 1.45;
-}
-
-/* Notebook cells rendered by nbsphinx */
 .nbinput .highlight,
 .nboutput .highlight {
   border-radius: var(--mito-radius);
@@ -76,7 +86,6 @@ div.highlight pre {
   max-width: 100%;
 }
 
-/* Admonitions sit a little closer to the surrounding text */
 .admonition {
   border-radius: var(--mito-radius);
 }

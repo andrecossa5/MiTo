@@ -25,7 +25,7 @@ clonal trees.
 pip install scmito
 ```
 
-Requires Python 3.10–3.12. The import name is `mito`:
+Requires Python 3.11+. The import name is `mito`:
 
 ```python
 import mito as mt

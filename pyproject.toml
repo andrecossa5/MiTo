@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Mitochondrial lineage tracing and single-cell multi-omics in Python"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11"
 authors = [{ name = "Andrea Cossa", email = "andrea.cossa05@gmail.com" }]
 keywords = [
     "single-cell",
@@ -24,9 +24,9 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
@@ -57,7 +57,7 @@ dependencies = [
     "leidenalg>=0.10",
     "umap-learn>=0.5",
     # phylogenetics
-    "cassiopeia-mt>=2.1.2",
+    "cassiopeia-mt>=2.1.3",
     "biopython>=1.80",
 
     # variant calling / modelling

@@ -2,9 +2,8 @@ name: Tests
 
 on:
   push:
-    branches: [master, scverse]
+    branches: ["**"]
   pull_request:
-    branches: [master, scverse]
   schedule:
     # Weekly, so breakage from a dependency release surfaces on its own rather
     # than inside an unrelated commit.
@@ -23,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4

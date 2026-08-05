@@ -91,15 +91,15 @@ Troubleshooting
 
 **The build fails while compiling cassiopeia-mt.**
 A C++17-capable compiler is missing. Install the Xcode command line tools on
-macOS, or ``build-essential`` on Debian/Ubuntu.
+macOS (``xcode-select --install``), or ``build-essential`` on Debian/Ubuntu.
 
 **pip cannot find a compatible version.**
 Check your Python version: MiTo requires 3.11 or newer.
 
-**``import mito`` fails after a successful install.**
+**Importing mito fails after a successful install.**
 You are most likely inside a clone of the MiTo repository, where the local
 ``src/mito`` folder shadows the installed package. Change directory and retry.
 
-**Something else.**
+**Anything else.**
 Please open an issue at
 `github.com/andrecossa5/MiTo/issues <https://github.com/andrecossa5/MiTo/issues>`_.

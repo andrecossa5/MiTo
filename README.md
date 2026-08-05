@@ -2,9 +2,9 @@
   <img src="image/nf_mito.png" alt="MiTo" width="420">
 </div>
 
-# MiTo (**Mi**tochondrial single-cell lineage tracing **To**olkit)
+# MiTo (Mitochondrial single-cell lineage tracing Toolkit)
 
-**Mitochondrial single-cell multi-omics in Python**
+**Mitochondrial single-cell multi-omics in Python.**
 
 [![PyPI](https://img.shields.io/pypi/v/scmito.svg)](https://pypi.org/project/scmito/)
 [![Python](https://img.shields.io/pypi/pyversions/scmito.svg)](https://pypi.org/project/scmito/)
@@ -15,8 +15,8 @@
 **MiTo** infer clonal ancestries in single-cell data from natural mtDNA variation. 
 
 The framework provides the infrastructure to convert MAESTER, scmtATAC-seq and RedeeM pre-processing outputs
-into an Allele Frequency Matrix ([AnnData](https://anndata.readthedocs.io/)), filter informative mtDNA variants, genotype individual cells, and
-infer mitochondrial phylogenies and clones.
+into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and
+infer mitochondrial phylogenies and clones for dowstream multi-omic analysis.
 
 ## Installation
 
@@ -58,7 +58,7 @@ the full vignette.
 
 ## API
 
-MiTo follows the scverse layout, composing with `scanpy` and `anndata`:
+MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 
 | Module | Purpose |
 | --- | --- |

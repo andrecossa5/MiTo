@@ -10,10 +10,20 @@ import sklearn.preprocessing as pp
 from anndata import AnnData
 from scipy.linalg import eigh
 from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
 from umap.umap_ import find_ab_params, simplicial_set_embedding
 
 from .distances import compute_distances
 from .kNN import kNN_graph
+
+# UMAP only uses `metric` for the spectral initialisation of a disconnected
+# graph, where it forwards the name to sklearn.pairwise_distances. MiTo's own
+# metrics (weighted_jaccard, weighted_hamming) are not known there, so they are
+# mapped to a safe default -- the connectivity graph is precomputed either way.
+_UMAP_SAFE_METRICS = (
+    set(PAIRWISE_DISTANCE_FUNCTIONS) | set(PAIRWISE_BOOLEAN_FUNCTIONS)
+    | {'correlation', 'sqeuclidean'}
+)
 
 ##
 
@@ -170,7 +180,13 @@ def reduce_dimensions(
         X = _get_X(afm, layer)
         D = _get_D(afm, distance_key, **kwargs)
         _, _, conn = kNN_graph(D=D, k=k, from_distances=True)
-        afm.obsm['X_umap'] = _umap_from_X_conn(X, conn, ncomps=n_comps, metric=metric, seed=seed)
+        umap_metric = metric if metric in _UMAP_SAFE_METRICS else 'euclidean'
+        if umap_metric != metric:
+            logging.info(
+                f'UMAP spectral init does not support metric "{metric}": using "euclidean". '
+                f'Cell-cell distances are unaffected -- the kNN graph is precomputed.'
+            )
+        afm.obsm['X_umap'] = _umap_from_X_conn(X, conn, ncomps=n_comps, metric=umap_metric, seed=seed)
 
     elif method == 'diffmap':
         D = _get_D(afm, distance_key, **kwargs)

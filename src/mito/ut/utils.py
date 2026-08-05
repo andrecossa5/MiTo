@@ -2,11 +2,12 @@
 Miscellaneous utilities.
 """
 
-import os 
+import os
 import sys
-import time 
+import time
 import pickle
 from shutil import rmtree
+from importlib.resources import files
 import logging
 import numpy as np
 import pandas as pd
@@ -34,36 +35,9 @@ _var_filters = [
     # 'GT_stringent'
 ]
 
-# Try to find assets directory in multiple locations
-def _find_assets_path():
-    # First try relative path for development
-    dev_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets')
-    if os.path.exists(dev_path):
-        return dev_path
-    
-    # Try conda environment assets directory
-    import sys
-    if hasattr(sys, 'prefix'):
-        conda_assets = os.path.join(sys.prefix, 'assets')
-        if os.path.exists(conda_assets):
-            return conda_assets
-    
-    # Try installed package location in site-packages
-    import site
-    for site_dir in site.getsitepackages():
-        assets_path = os.path.join(site_dir, 'assets')
-        if os.path.exists(assets_path):
-            return assets_path
-    
-    # Fallback to user site directory
-    user_assets = os.path.join(site.getusersitepackages(), 'assets')
-    if os.path.exists(user_assets):
-        return user_assets
-    
-    # If nothing found, return the development path anyway
-    return dev_path
-
-path_assets = _find_assets_path()
+# Assets ship inside the package, so they resolve identically from a source
+# checkout, a wheel install and a zipped egg.
+path_assets = str(files('mito.assets'))
 
 
 ##
@@ -153,24 +127,6 @@ def update_params(d_original, d_passed):
         d_original[k] = d_passed[k]
         
     return d_original
-
-
-##
-
-
-def one_hot_from_labels(y):
-    """
-    My one_hot encoder from a categorical variable.
-    """
-    if len(y.categories) > 2:
-        Y = np.concatenate(
-            [ np.where(y == x, 1, 0)[:, np.newaxis] for x in y.categories ],
-            axis=1
-        )
-    else:
-        Y = np.where(y == y.categories[0], 1, 0)
-    
-    return Y
 
 
 ##
@@ -384,7 +340,7 @@ def rank_items(df, groupings, metrics, weights, metric_annot):
 
 
 def load_mut_spectrum_ref():
-    df = pd.read_csv(os.path.join(path_assets, 'weng2024_mut_spectrum_ref.csv'), index_col=0)
+    df = pd.read_csv(os.path.join(path_assets, 'weng2024_mut_spectrum_ref.csv.gz'), index_col=0)
     return df
 
 
@@ -392,7 +348,7 @@ def load_mut_spectrum_ref():
 
 
 def load_mt_gene_annot():
-    df = pd.read_csv(os.path.join(path_assets, 'formatted_table_wobble.csv'), index_col=0)
+    df = pd.read_csv(os.path.join(path_assets, 'formatted_table_wobble.csv.gz'), index_col=0)
     df['mut'] = df['Position'].astype(str) + '_' + df['Reference'] + '>' + df['Variant']
     return df
 
@@ -411,7 +367,7 @@ def load_common_dbSNP():
 
 
 def load_edits_REDIdb():
-    edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt'), index_col=0, sep='\t')
+    edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt.gz'), index_col=0, sep='\t')
     edits = edits.query('nSamples>100')
     edits = edits['Position'].astype('str') + '_' + edits['Ref'] + '>' + edits['Ed']
     edits = edits.to_list()

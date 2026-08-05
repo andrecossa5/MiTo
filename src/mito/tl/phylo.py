@@ -20,20 +20,16 @@ solver_d = {
     'UPMGA' : cs.solver.UPGMASolver,
     'NJ' : cs.solver.NeighborJoiningSolver,
     'spectral' : cs.solver.SpectralSolver,
-    'shared_muts' : cs.solver.SharedMutationJoiningSolver,
     'greedy' : cs.solver.SpectralGreedySolver,
-    'max_cut' : cs.solver.MaxCutGreedySolver,
 }
-    
+
 ##
 
 _solver_kwargs = {
     'UPMGA' : {},
     'NJ' : {'add_root':True},
     'spectral' : {},
-    'shared_muts' : {},
     'greedy' : {},
-    'max_cut' : {}
 }
 
 

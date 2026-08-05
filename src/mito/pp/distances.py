@@ -2,6 +2,7 @@
 Custom distance function among cell AF profiles.
 """
 
+import inspect
 import logging
 import numpy as np
 import pandas as pd
@@ -13,9 +14,7 @@ from sklearn.metrics.pairwise import (
     PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
 )
 from anndata import AnnData
-from bbmix.models import MixtureBinomial
 from cassiopeia.solver.solver_utilities import transform_priors
-from .kNN import kNN_graph
 from ..ut.utils import Timer
 from ..ut.stats_utils import genotype_mix, get_posteriors
 
@@ -25,6 +24,14 @@ from ..ut.stats_utils import genotype_mix, get_posteriors
 
 discrete_metrics = PAIRWISE_BOOLEAN_FUNCTIONS + ['weighted_jaccard', 'weighted_hamming']
 continuous_metrics = list(PAIRWISE_DISTANCE_FUNCTIONS.keys()) + ['correlation', 'sqeuclidean']
+
+# scikit-learn renamed `force_all_finite` to `ensure_all_finite` in 1.6 and dropped
+# the old spelling in 1.8; detect which one this installation accepts.
+_ALLOW_NON_FINITE_KWARG = (
+    'ensure_all_finite'
+    if 'ensure_all_finite' in inspect.signature(pairwise_distances).parameters
+    else 'force_all_finite'
+)
 
 
 ##
@@ -127,136 +134,24 @@ def genotype_MiTo(
 ##
 
 
-def genotype_MiTo_smooth(
-    AD: np.array, 
-    DP: np.array, 
-    t_prob: float = .7, 
-    t_vanilla: float = 0, 
-    min_AD: int = 2, 
-    min_cell_prevalence: float = .05, 
-    k: int = 5, 
-    gamma: float = .25, 
-    n_samples: int = 100, 
-    resample: bool = False
-    ):
-    """
-    Single-cell MT-SNVs genotyping with binomial mixtures posterior probabilities thresholding
-    (readapted from  MQuad, Kwock et al., 2022) and kNN smoothing (readapted from Phylinsic, 
-    Liu et al., 2022).
-    """
-
-    # kNN 
-    t = Timer()
-    t.start()
-
-    # 1. Resampling strategy, as in Phylinsic
-    if resample:
-
-        logging.info(f'Phylinsic-like procedure to obtain the cell kNN graph')
-
-        L = []
-        for _ in range(1,n_samples+1):
-
-            logging.info(f'Resampling AD counts for kNN: sample {_}/{n_samples}')
-            AD_sample = np.zeros(AD.shape)
-            for idx in range(AD.shape[1]):
-                model = MixtureBinomial(n_components=2, tor=1e-20)
-                _ = model.fit((AD[:,idx], DP[:,idx]), max_iters=500, early_stop=True)
-                AD_sample[:,idx] = model.sample(DP[:,idx])
-            afm_ = AnnData(
-                X=csr_matrix(np.divide(AD_sample, (DP+0.0000001))), 
-                layers={'AD':csr_matrix(AD_sample), 'site_coverage':csr_matrix(DP)},
-                uns={'scLT_system':'MAESTER'}
-            )
-            compute_distances(
-                afm_, 
-                bin_method='vanilla', 
-                binarization_kwargs={'min_AD':1, 't_vanilla':0}, # Loose genotyping.
-                verbose=False
-            )
-            L.append(afm_.obsp['distances'].toarray())
-
-        D = np.mean(np.stack(L, axis=0), axis=0)
-        logging.info(f'Compute kNN graph for smoothing')
-        index, _, _ = kNN_graph(D=D, k=k, from_distances=True)
-    
-    # 2. Direct kNN computation (weighted jaccard on MiTo binary genotypes), no resampling
-    else:
-
-        logging.info(f'Direct kNN graph calculation (weighted jaccard on MiTo binary genotypes)')
-
-        afm_ = AnnData(
-            X=csr_matrix(np.divide(AD, (DP+0.0000001))), 
-            layers={'AD':csr_matrix(AD), 'site_coverage':csr_matrix(DP)},
-            uns={'scLT_system':'MAESTER'}
-        )
-        compute_distances(
-            afm_, 
-            bin_method='MiTo', 
-            binarization_kwargs={'min_AD':min_AD, 't_vanilla':t_vanilla, 
-                                 't_prob':t_prob, 'min_cell_prevalence':min_cell_prevalence},
-            verbose=True,
-        )
-        logging.info(f'Compute kNN graph for smoothing')
-        index, _, _ = kNN_graph(D=afm_.obsp['distances'].toarray(), k=k, from_distances=True)
-
-    ##
-
-    # Compute posteriors
-    logging.info(f'Compute posteriors...')
-    P0 = np.zeros(AD.shape)
-    P1 = np.zeros(AD.shape)
-    for idx in range(P0.shape[1]):
-        ad = AD[:,idx]
-        dp = DP[:,idx]
-        positive_idx = np.where(dp>0)[0]
-        p = get_posteriors(ad[positive_idx], dp[positive_idx])
-        P0[positive_idx,idx] = p[:,0]
-        P1[positive_idx,idx] = p[:,1]
-
-    # Smooth posteriors
-    logging.info(f'Smooth each cell posteriors using neighbors values')
-    P0_smooth = np.zeros(P0.shape)
-    P1_smooth = np.zeros(P1.shape)
-    for i in range(index.shape[0]):
-        neighbors = index[i,1:]
-        P0_smooth[i,:] = (1-gamma) * P0[i,:] + gamma * (P0[neighbors,:].mean(axis=0))
-        P1_smooth[i,:] = (1-gamma) * P1[i,:] + gamma * (P1[neighbors,:].mean(axis=0))
-
-    # Assign final genotypes
-    logging.info(f'Final genotyping: {t.stop()}')
-    tests = [ 
-        (P1_smooth>t_prob) & (P0_smooth<(1-t_prob)), 
-        (P1_smooth<(1-t_prob)) & (P0_smooth>t_prob) 
-    ]
-    X = np.select(tests, [1,0], default=0)
-
-    return X
-
-
 
 ##
 
 
 def call_genotypes(
-    afm: AnnData, 
-    bin_method: str = 'MiTo', 
-    t_vanilla: float = .0, 
-    min_AD: int = 2, 
-    t_prob: float = .7, 
-    min_cell_prevalence: float = .1, 
-    k: int = 5, 
-    gamma: float = .25, 
-    n_samples: int = 100, 
-    resample: bool = False
+    afm: AnnData,
+    bin_method: str = 'MiTo',
+    t_vanilla: float = .0,
+    min_AD: int = 2,
+    t_prob: float = .7,
+    min_cell_prevalence: float = .1
     ):
     """
     Call genotypes. The 'bin' layer is added in-place.
 
-    Three strategies are implemented:
+    Two strategies are implemented:
     * "vanilla": simple, hard thresholding on raw AF values or number of alternative allele counts.
     * "MiTo": hybrid MiTo genotype calling strategy (see mito.pp.genotype_MiTo).
-    * "MiTo_smooth": MiTo with kNN smoothing of posterior probability before genotype calling.
 
     Parameters
     ----------
@@ -272,14 +167,6 @@ def call_genotypes(
         Minimum number of alternative UMI counts to assign the 'mut' (1) genotype. Default is 1.
     min_cell_prevalence : float, optional
         Minimum cell prevalence to use probabilistic genotyping. Default is 0.1.
-    k : int, optional
-        Number of neighbors for kNN search (if bin_method is "MiTo_smooth"). Default is 5.
-    gamma : float, optional
-        Correction factor weight from neighboring cells (if bin_method is "MiTo_smooth"). Default is 0.25.
-    n_samples : int, optional
-        Number of cell profile replicates (if bin_method is "MiTo_smooth"). Default is 100.
-    resample : bool, optional
-        Generate in-silico replicates of cell profiles before kNN (if bin_method is "MiTo_smooth"). Default is False.
     """
 
     assert 'AD' in afm.layers 
@@ -302,16 +189,11 @@ def call_genotypes(
                     in afm.layers["site_coverage"]
                     """
             )
-    elif bin_method == 'MiTo_smooth':
-        X = genotype_MiTo_smooth(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
-                                 min_AD=min_AD, min_cell_prevalence=min_cell_prevalence, 
-                                 k=k, gamma=gamma, n_samples=n_samples, resample=resample)
     else:
-        raise ValueError("""
-                Provide one of the following genotype calling methods: 
-                vanilla, MiTo, MiTo_smooth
-                """
-            )
+        raise ValueError(
+            f'"{bin_method}" is not a valid genotype calling method. '
+            f'Choose one of: vanilla, MiTo.'
+        )
 
     afm.layers['bin'] = csr_matrix(X)
     afm.uns['genotyping'] = {
@@ -347,7 +229,13 @@ def weighted_jaccard(M, w):
 
 
 def _get_priors(afm, key='priors'):
-    
+
+    if key not in afm.varm:
+        raise ValueError(
+            f'The "weighted_hamming" metric needs per-character priors in '
+            f'afm.varm["{key}"], which this AFM does not have. Provide them, or '
+            f'choose another metric (e.g. "weighted_jaccard").'
+        )
     W = afm.varm[key]
     priors = {}
     for i in range(W.shape[0]):
@@ -549,6 +437,18 @@ def compute_distances(
     if verbose:
         logging.info(f'Compute distances: ncores={ncores}, metric={metric}.')
 
+    if X.shape[0] == 0:
+        raise ValueError(
+            'Cannot compute distances: no cells left in the AFM. '
+            'Relax the cell and variant filters.'
+        )
+    if X.shape[1] == 0:
+        raise ValueError(
+            'Cannot compute distances: no characters left in the AFM. '
+            'The chosen filtering strategy retained no MT-SNVs; relax its thresholds '
+            'or pick a different one.'
+        )
+
     # Calculate distances (handle weights, if necessary)
     if metric=='weighted_jaccard':
         af = afm.X.toarray()
@@ -558,14 +458,22 @@ def compute_distances(
         w = _get_priors(afm)
         w = transform_priors(w)
         D = weighted_hamming(X, w)
+    elif metric in PAIRWISE_BOOLEAN_FUNCTIONS:
+        # scipy's boolean metrics reject float input, and skipping the finiteness
+        # check also skips the cast scikit-learn would otherwise apply.
+        D = pairwise_distances(X.astype(bool), metric=metric, n_jobs=ncores)
     else:
-        D = pairwise_distances(X, metric=metric, n_jobs=ncores, force_all_finite=False)
+        D = pairwise_distances(
+            X, metric=metric, n_jobs=ncores, **{_ALLOW_NON_FINITE_KWARG: False}
+        )
 
     # Optional: rescale distances (min-max)
-    if rescale:
-        min_dist = D[~np.eye(D.shape[0], dtype=bool)].min()
-        max_dist = D[~np.eye(D.shape[0], dtype=bool)].max()
-        D = (D-min_dist)/(max_dist-min_dist)
+    if rescale and D.shape[0] > 1:
+        off_diagonal = D[~np.eye(D.shape[0], dtype=bool)]
+        min_dist = off_diagonal.min()
+        max_dist = off_diagonal.max()
+        if max_dist > min_dist:
+            D = (D-min_dist)/(max_dist-min_dist)
         np.fill_diagonal(D, 0)
 
     afm.obsp[distance_key] = csr_matrix(D)

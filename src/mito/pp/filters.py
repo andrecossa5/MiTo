@@ -4,6 +4,7 @@ All filters: variants/cells.
 
 import os
 import logging
+import warnings
 import numpy as np
 import pandas as pd
 from scipy.stats import fisher_exact
@@ -106,12 +107,27 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
     Create vars_df and update .var.
     """
 
+    if afm.shape[0] == 0:
+        raise ValueError(
+            'Cannot annotate variants: the AFM has no cells left. '
+            'Relax the cell filters (e.g. lower min_cell_number, or the coverage thresholds).'
+        )
+
+    # Columns this function derives itself, and therefore recomputes on overwrite.
+    # Anything else in .var was put there by another step (e.g. deltaBIC from the
+    # MQuad mixtures, or per-lineage enrichment) and must survive re-annotation.
+    _DERIVED = [
+        'mean_af', 'mean_cov', 'quality',
+        'n0', 'n1', 'n2', 'n5', 'n10', 'n50', 'Variant_CellN',
+        'median_af_in_positives', 'mean_AD_in_positives', 'mean_DP_in_positives',
+    ]
+
     if 'mean_af' in afm.var.columns:
         if not overwrite:
             return
         else:
             logging.info('Re-annotate variants in afm')
-            afm.var = afm.var.iloc[:,:4].copy()             # Retain mean coverage, if present
+            afm.var = afm.var.drop(columns=_DERIVED, errors='ignore').copy()
 
     # Initialize vars_df
 
@@ -149,15 +165,22 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
     afm.var['Variant_CellN'] = (afm.X>0).sum(axis=0).A1
 
     # Add mean AF, AD and DP in +cells
-    X = afm.X.toarray()>0
-    afm.var['median_af_in_positives'] = np.nanmean(np.where(X>0, X, np.nan), axis=0)
-    afm.var['mean_AD_in_positives'] = np.nanmean(
-        np.where(X>0, afm.layers['AD'].toarray(), np.nan), axis=0
-    )
-    afm.var['mean_DP_in_positives'] = np.nanmean(
-        np.where(X>0, afm.layers['DP'].toarray(), np.nan), axis=0
-    )
-    del X
+    # NB: keep the AF values and the positivity mask separate. Using the mask in
+    # place of the values makes median_af_in_positives collapse to a constant 1.
+    AF = afm.X.toarray()
+    positive = AF > 0
+    with warnings.catch_warnings():        # all-negative variants yield empty slices
+        warnings.simplefilter('ignore', RuntimeWarning)
+        afm.var['median_af_in_positives'] = np.nanmean(
+            np.where(positive, AF, np.nan), axis=0
+        )
+        afm.var['mean_AD_in_positives'] = np.nanmean(
+            np.where(positive, afm.layers['AD'].toarray(), np.nan), axis=0
+        )
+        afm.var['mean_DP_in_positives'] = np.nanmean(
+            np.where(positive, afm.layers['DP'].toarray(), np.nan), axis=0
+        )
+    del AF, positive
 
 
 ##
@@ -349,10 +372,19 @@ def filter_MQuad(
     _, M = fit_MQuad_mixtures(
         afm, n_top=n_top, path_=path_, ncores=ncores, minDP=minDP, minAD=minAD, with_M=True
     )
-    _, _ = M.selectInformativeVariants(
-        min_cells=minCell, out_dir=path_, tenx_cutoff=None,
-        export_heatmap=False, export_mtx=False
-    )
+    try:
+        _, _ = M.selectInformativeVariants(
+            min_cells=minCell, out_dir=path_, tenx_cutoff=None,
+            export_heatmap=False, export_mtx=False
+        )
+    except TypeError as e:
+        # MQuad picks its deltaBIC cutoff with knee detection, which returns None
+        # when there are too few variants to describe a curve.
+        raise ValueError(
+            'MQuad could not determine a deltaBIC cutoff for this dataset, most '
+            'likely because too few MT-SNVs survived the baseline filter. Pass a '
+            'larger AFM, set n_top explicitly, or use another filtering strategy.'
+        ) from e
     idx = M.final_df.index.to_list()
     selected = [ afm.var_names[i] for i in idx ]
     afm = afm[:,selected].copy()

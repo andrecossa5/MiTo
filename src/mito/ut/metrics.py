@@ -99,9 +99,10 @@ def kbet(
         - accept_rate is the overall acceptance rate.
     """
  
-    # Compute null batch distribution
-    batch = batch.astype('category')
-    null_dist = batch.value_counts(normalize=True, sort=False).values 
+    # Neighbour indices are positional, so the annotation must be positionally
+    # indexed too: a pd.Series carrying cell names would be looked up by label.
+    batch = pd.Series(np.asarray(batch)).astype('category')
+    null_dist = batch.value_counts(normalize=True, sort=False).values
 
     # Parallel computation of kBET metric (pegasus code)
     starting_idx = chunker(len(batch))
@@ -149,11 +150,14 @@ def NN_entropy(index: np.array, labels: np.array) -> float:
     float : NN Shannon Entropy score.
     """
 
+    # Positional indexing: see the note in kbet.
+    labels = pd.Series(np.asarray(labels))
+
     SH = []
     for i in range(index.shape[0]):
         freqs = labels[index[i,:]].value_counts(normalize=True).values
         SH.append(-np.sum(freqs * np.log(freqs + 0.00001))) # Avoid 0 division
-    
+
     return np.median(SH)
 
 
@@ -177,16 +181,20 @@ def NN_purity(index: np.array, labels: np.array) -> float:
 
     """
 
+    # Positional indexing: see the note in kbet. mito.pp.kNN_graph returns
+    # neighbour indices that already exclude the cell itself, so every column
+    # counts towards purity.
+    labels = np.asarray(labels)
+
     kNN_purities = []
     n_cells = index.shape[0]
-    k = index.shape[1]-1
+    k = index.shape[1]
 
     for i in range(n_cells):
         l = labels[i]
-        idx = index[i, 1:]
-        l_neighbors = labels[idx]
+        l_neighbors = labels[index[i, :]]
         kNN_purities.append(np.sum(l_neighbors == l) / k)
-    
+
     return np.median(kNN_purities)
 
 
@@ -296,30 +304,6 @@ def calculate_corr_distances(tree: CassiopeiaTree) -> float:
     corr, p = pearsonr(x, y)
     
     return corr, p
-
-
-##
-
-
-def _compatibility_metric(x, y):
-    """
-    Custom metric to calculate the compatibility between two characters.
-    Returns the fraction of compatible leaf pairs.
-    """
-    return np.sum((x == x[:, None]) == (y == y[:, None])) / len(x) ** 2
-
-##
-
-
-def char_compatibility(tree):
-    """
-    Compute a matrix of pairwise-compatibility scores between characters.
-    """
-    return pairwise_distances(
-        tree.character_matrix.T, 
-        metric=lambda x, y: _compatibility_metric(x, y), 
-        force_all_finite=False
-    )
 
 
 ##

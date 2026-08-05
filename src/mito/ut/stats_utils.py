@@ -230,49 +230,4 @@ def genotype_mix(
 ##
 
 
-def get_posteriors_and_params(ad, dp):
-    
-    np.random.seed(1234)
-    model = MixtureBinomial(n_components=2, tor=1e-20)
-    model.fit((ad, dp), max_iters=500, early_stop=True)
-
-    ps = model.params[:2]
-    pis = model.params[2:]
-    idx1 = np.argmax(ps)
-    idx0 = 0 if idx1 == 1 else 1
-    p1 = ps[idx1]
-    p0 = ps[idx0]
-    pi1 = pis[idx1]
-    pi0 = pis[idx0]
-
-    return [p0,p1], [pi0,pi1]
-
-
-##
-
-
-def simulate_component_data(p, n_trials, n_samples):
-    return np.random.binomial(n=n_trials, p=p, size=n_samples)
-
-
-##
-
-
-def get_components(ad, dp):
-
-    ps, pis = get_posteriors_and_params(ad, dp)
-    p0, p1 = ps
-    pi0, pi1 = pis
-
-    n_samples = 10000
-    n_trials = int(np.mean(dp))
-    n_samples_0 = int(n_samples * pi0)
-    n_samples_1 = n_samples - n_samples_0
-
-    x_component_0 = simulate_component_data(p0, n_trials, n_samples_0)
-    x_component_1 = simulate_component_data(p1, n_trials, n_samples_1)
-
-    return x_component_0, x_component_1
-
-
 ##

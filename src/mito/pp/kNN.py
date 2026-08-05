@@ -84,10 +84,16 @@ def get_idx_from_simmetric_matrix(X, k=15):
         
     assert X.shape[0] == X.shape[1]
 
+    if k >= X.shape[0]:
+        raise ValueError(
+            f'k={k} is not smaller than the number of observations ({X.shape[0]}): '
+            f'each observation has at most {X.shape[0]-1} neighbours.'
+        )
+
     d_all = []
     idx_all = []
     for i in range(X.shape[0]):
-        idx = X[i,:].argsort()[1:]  # Ecluding self
+        idx = X[i,:].argsort()[1:k+1]  # Excluding self, keeping the k nearest
         idx_all.append(idx)
         d_all.append(X[i,idx])
 
@@ -123,10 +129,11 @@ def kNN_graph(
     Returns
     -------
     tuple of (np.array, csr_matrix, csr_matrix)
-        A tuple containing:
-        - A numpy array of shape (n_samples, k) with the indices of the k-nearest neighbors.
-        - A csr_matrix representing the connectivity matrix of the kNN graph.
-        - A csr_matrix representing the distances corresponding to the kNN graph.
+        A tuple containing, in this order:
+        - A numpy array of shape (n_samples, k) with the indices of the k-nearest
+          neighbours of each observation, nearest first, excluding the observation itself.
+        - A csr_matrix of the distances corresponding to the kNN graph.
+        - A csr_matrix of the connectivities of the kNN graph.
     """
 
     if from_distances:

@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scmito"
+dynamic = ["version"]
+description = "Mitochondrial lineage tracing and single-cell multi-omics in Python"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10,<3.13"
+authors = [{ name = "Andrea Cossa", email = "andrea.cossa05@gmail.com" }]
+keywords = [
+    "single-cell",
+    "lineage-tracing",
+    "mitochondrial-DNA",
+    "phylogenetics",
+    "scLT",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+dependencies = [
+
+    # core scientific stack
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.2",
+    "statsmodels>=0.14",
+    "scikit-learn>=1.4",
+    "joblib>=1.3",
+    "tqdm>=4.60",
+    # scverse
+    "anndata>=0.10",
+    "scanpy>=1.10",
+
+    # plotting
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "ac-plotting-ut>=0.2.1",
+    "circlify>=0.15",
+
+    # graphs and embeddings
+    "networkx>=3.1",
+    "igraph>=0.10",
+    "leidenalg>=0.10",
+    "umap-learn>=0.5",
+    # phylogenetics
+    "cassiopeia-mt>=2.1.2",
+    "biopython>=1.80",
+
+    # variant calling / modelling
+    "mquad>=0.1.8",
+    "bbmix>=0.1",
+    "lightgbm>=4.0",
+    "shap>=0.44",
+    
+    # enrichment
+    "gseapy>=1.1",
+
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-cov>=4.0"]
+docs = ["sphinx>=6", "sphinx_rtd_theme", "nbsphinx"]
+
+[project.urls]
+Homepage = "https://github.com/andrecossa5/MiTo"
+Documentation = "https://andrecossa5.readthedocs.io/en/latest/index.html"
+Repository = "https://github.com/andrecossa5/MiTo"
+Issues = "https://github.com/andrecossa5/MiTo/issues"
+
+[tool.hatch.version]
+path = "src/mito/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mito"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/mito", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"

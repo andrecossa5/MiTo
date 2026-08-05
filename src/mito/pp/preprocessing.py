@@ -322,7 +322,9 @@ def filter_afm(
     tree_kwargs : dict, optional
         Additional keyword arguments for tree inference (i.e., mito.tl.build_tree). Default is {}.
     return_tree : bool, optional
-        Whether to return a CassiopeiaTree if spatial_metrics is True. Default is False.
+        Whether to also return a CassiopeiaTree, as an (AnnData, CassiopeiaTree) tuple.
+        The tree is built as part of the spatial metrics, so passing True implies
+        spatial_metrics=True. Default is False.
 
     Returns
     -------
@@ -392,6 +394,13 @@ def filter_afm(
     
     logging.info(f'afm after {filtering} filter: n cells={afm.shape[0]}, n features={afm.shape[1]}')
 
+    if afm.shape[1] == 0:
+        raise ValueError(
+            f'The "{filtering}" filtering strategy retained no MT-SNVs. '
+            f'Relax its thresholds (filtering_kwargs), choose a different strategy, '
+            f'or check that the input AFM has enough signal.'
+        )
+
     # Filter common SNVs and possible RNA-edits
     if filter_dbs:
         afm, n_dbSNP = filter_dbSNP_common(afm)
@@ -405,6 +414,12 @@ def filter_afm(
     call_genotypes(afm, bin_method=bin_method, **binarization_kwargs)
     afm = afm[(afm.layers['bin']>0).sum(axis=1).A1>=min_n_var,:].copy()
     logging.info(f'Retain only cells with at least {min_n_var} MT-SNVs: {afm.shape[0]}')
+
+    if afm.shape[0] == 0:
+        raise ValueError(
+            f'No cell carries at least min_n_var={min_n_var} MT-SNVs after filtering. '
+            f'Lower min_n_var, or relax the variant filters.'
+        )
  
     # Bimodal mixture modelling: deltaBIC (MQuad-like) and max AD in at least one cell (Weng et al., 2024)
     if fit_mixtures:
@@ -445,11 +460,16 @@ def filter_afm(
             afm.var[f'FDR_{target_lineage}'] = res['FDR']
             afm.var[f'odds_ratio_{target_lineage}'] = res['odds_ratio']
 
-    # Compute final metrics
+    # Compute final metrics.
+    # NB: the tree is only a by-product of the spatial metrics, so asking for it
+    # back implies computing them.
     logging.info(f'Compute last (filtered) statistics.')
+    if return_tree and not spatial_metrics:
+        logging.info('return_tree=True requires spatial metrics: enabling them.')
+        spatial_metrics = True
     tree = compute_metrics_filtered(
-        afm, 
-        spatial_metrics=spatial_metrics, 
+        afm,
+        spatial_metrics=spatial_metrics,
         tree_kwargs=tree_kwargs
     )
 

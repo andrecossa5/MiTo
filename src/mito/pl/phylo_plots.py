@@ -5,6 +5,7 @@ Tree plotting utils.
 import logging
 import pandas as pd
 import scanpy as sc
+import matplotlib.pyplot as plt
 import plotting_utils as plu
 from typing import Iterable, Dict, Any
 from cassiopeia.data import CassiopeiaTree
@@ -407,6 +408,8 @@ def plot_tree(
     """
     
     # Set coord and axis
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 5))
     ax.axis('off')
 
     # Set graphic elements
@@ -515,9 +518,13 @@ def plot_tree(
         'markeredgecolor':'k', 'markeredgewidth':1, 'zorder':10
     }
     _internal_node_kwargs.update(internal_node_kwargs or {})
-    internal_nodes = { 
+    # NB: with add_root=True the layout adds a 'synthetic_root' node that is not
+    # part of the tree's network. Membership must be checked before calling
+    # is_internal_node, which raises for unknown nodes.
+    _tree_nodes = set(tree.nodes)
+    internal_nodes = {
         node : node_coords[node] for node in node_coords \
-        if tree.is_internal_node(node) and node != 'root'
+        if node in _tree_nodes and tree.is_internal_node(node)
     }
  
     # Subset nodes if necessary

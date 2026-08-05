@@ -166,6 +166,12 @@ class MiToTreeAnnotator():
         Initialize class slots from input CassiopeiaTree.
         """
 
+        if not isinstance(tree, CassiopeiaTree):
+            raise TypeError(
+                f'MiToTreeAnnotator needs a CassiopeiaTree, got {type(tree).__name__}. '
+                f'Build one first with mito.tl.build_tree.'
+            )
+
         # Slots
         self.tree = tree # .copy()
         self.T = None

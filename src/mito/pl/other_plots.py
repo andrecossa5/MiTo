@@ -48,14 +48,19 @@ def packed_circle_plot(
     ax.set_ylim(-lim, lim)
     
     # Colors
-    if isinstance(color, str) and not color in df.columns:
+    if color is None and cmap is None:
+        colors = { k : 'grey' for k in df.index }        # plain default
+    elif isinstance(color, str) and not color in df.columns:
         colors = { k : color for k in df.index }
     elif isinstance(cmap, str) and color_by in df.columns:
         colors = plu.create_palette(df, color_by, cmap, order=df.index[::-1]) # Assumes index contains IDs
     elif isinstance(cmap, dict):
         colors = cmap
     else:
-        raise TypeError('Check cmap and color arguments...')
+        raise TypeError(
+            'Provide either a single "color", a "cmap" name together with a '
+            '"color_by" column, or a {category: color} "cmap" dictionary.'
+        )
 
     # Plot circles
     for name, circle in zip(df.index[::-1], circles): # Don't know why, but it reverses...

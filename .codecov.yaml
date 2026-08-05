@@ -1,0 +1,11 @@
+# Based on the scverse cookiecutter template, itself based on pydata/xarray.
+codecov:
+  require_ci_to_pass: no
+
+coverage:
+  status:
+    project:
+      default:
+        # Require 1% coverage, i.e. always succeed: coverage is reported, not gated.
+        target: 1
+    patch: false

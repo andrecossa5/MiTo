@@ -4,27 +4,28 @@ or cells x cells distances/affinity matrices.
 """
 
 import logging
+from typing import Any
+
 import matplotlib
-import pandas as pd
-import scanpy as sc
 import matplotlib.pyplot as plt
+import pandas as pd
 import plotting_utils as plu
-from typing import Dict, Any
+import scanpy as sc
 from anndata import AnnData
 from cassiopeia.data import CassiopeiaTree
-from ..tl.phylo import build_tree, _get_leaves_order
-from ..tl.annotate import _get_muts_order
 
+from mito.tl.annotate import _get_muts_order
+from mito.tl.phylo import _get_leaves_order, build_tree
 
 ##
 
 
 def heatmap_distances(
-    afm: AnnData, 
+    afm: AnnData,
     distance_key: str = 'distances',
-    tree: CassiopeiaTree = None, 
-    vmin: float = .25, vmax: float = .95, 
-    cmap: str = 'Spectral', 
+    tree: CassiopeiaTree = None,
+    vmin: float = .25, vmax: float = .95,
+    cmap: str = 'Spectral',
     ax: matplotlib.axes.Axes = None
     ) -> matplotlib.axes.Axes:
     """
@@ -67,7 +68,7 @@ def heatmap_distances(
         ax=ax, xlabel='Cells', ylabel='Cells', xticks=[], yticks=[],
     )
     plu.add_cbar(
-        D.flatten(), ax=ax, palette=cmap, 
+        D.flatten(), ax=ax, palette=cmap,
         label='Distance', layout='outside',
         vmin=vmin, vmax=vmax
     )
@@ -79,17 +80,17 @@ def heatmap_distances(
 
 
 def heatmap_variants(
-    afm: AnnData, 
-    tree: CassiopeiaTree = None,  
-    label: str = 'Allelic Frequency', 
-    annot: str = None, 
-    annot_cmap: Dict[str,Any] = None, 
-    layer: str = None, 
-    ax: matplotlib.axes.Axes = None, 
-    cmap: str = 'mako', 
-    vmin: float = 0, 
+    afm: AnnData,
+    tree: CassiopeiaTree = None,
+    label: str = 'Allelic Frequency',
+    annot: str = None,
+    annot_cmap: dict[str,Any] = None,
+    layer: str = None,
+    ax: matplotlib.axes.Axes = None,
+    cmap: str = 'mako',
+    vmin: float = 0,
     vmax: float = .1,
-    kwargs: Dict[str, Any] = {} 
+    kwargs: dict[str, Any] = None
     ) -> matplotlib.axes.Axes:
     """
     Heatmap cell x variants.
@@ -126,6 +127,8 @@ def heatmap_variants(
     """
 
     # Order cells and columns
+    if kwargs is None:
+        kwargs = {}
     if 'distances' not in afm.obsp:
         raise ValueError('Compute distances first!')
 
@@ -142,7 +145,7 @@ def heatmap_variants(
         X = afm.layers[layer]
     else:
         raise KeyError(f'Layer {layer} not present in afm.layers')
-    
+
     # Prep ordered df
     df_ = (
         pd.DataFrame(X, index=afm.obs_names, columns=afm.var_names)
@@ -152,7 +155,7 @@ def heatmap_variants(
     # Plot annot, if necessary
     if annot is None:
         pass
-        
+
     elif annot in afm.obs.columns:
 
         annot_cmap_ = sc.pl.palettes.vega_10_scanpy if annot_cmap is None else annot_cmap
@@ -165,10 +168,10 @@ def heatmap_variants(
         )
         orientation = 'vertical'
         pos = (-.06, 0, 0.05, 1)
-        axins = ax.inset_axes(pos) 
+        axins = ax.inset_axes(pos)
         annot_cmap = matplotlib.colors.ListedColormap(colors)
         cb = plt.colorbar(
-            matplotlib.cm.ScalarMappable(cmap=annot_cmap), 
+            matplotlib.cm.ScalarMappable(cmap=annot_cmap),
             cax=axins, orientation=orientation
         )
         cb.ax.yaxis.set_label_position("left")
@@ -177,10 +180,10 @@ def heatmap_variants(
 
     else:
         raise KeyError(f'{annot} not in afm.obs. Check annotation...')
-    
+
     # Plot heatmap
     plu.plot_heatmap(
-        df_, ax=ax, vmin=vmin, vmax=vmax, 
+        df_, ax=ax, vmin=vmin, vmax=vmax,
         ylabel='Cells',
         linewidths=0, y_names=False, label=label, palette=cmap,
         **kwargs

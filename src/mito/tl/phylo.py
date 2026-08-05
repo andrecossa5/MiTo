@@ -3,15 +3,16 @@ Phylogenetic inference.
 """
 
 import logging
+from typing import Any
+
+import cassiopeia as cs
 import numpy as np
 import pandas as pd
 from anndata import AnnData
-import cassiopeia as cs
-from typing import Dict, Any
 from cassiopeia.data import CassiopeiaTree
 from scipy.sparse import csr_matrix
-from ..pp.distances import call_genotypes, compute_distances
 
+from mito.pp.distances import call_genotypes, compute_distances
 
 ##
 
@@ -53,7 +54,7 @@ def _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, m
     else:
         M_raw = M.copy()
 
-    # Remove variants from char matrix i) they are called in less than min_n_positive_cells or ii) > max_frac_positive 
+    # Remove variants from char matrix i) they are called in less than min_n_positive_cells or ii) > max_frac_positive
     # We avoid recomputing distances as their contribution to the average pairwise cell-cell distance is minimal
     if filter_muts and afm.uns['scLT_system'] != 'Cas9':
         test_germline = ((M==1).sum(axis=0) / M.shape[0]) <= max_frac_positive
@@ -69,15 +70,17 @@ def _initialize_CassiopeiaTree_kwargs(afm, distance_key, min_n_positive_cells, m
 
 
 def AFM_to_seqs(
-    afm: AnnData, 
-    bin_method: str = 'MiTo', 
-    binarization_kwargs: Dict[str,Any] = {}
-    ) -> Dict[str,str]:
+    afm: AnnData,
+    bin_method: str = 'MiTo',
+    binarization_kwargs: dict[str,Any] = None
+    ) -> dict[str,str]:
     """
     Convert an AFM to a dictionary of sequences.
     """
 
     # Extract ref and alt character sequences
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     L = [ x.split('_')[1].split('>') for x in afm.var_names ]
     ref = ''.join([x[0] for x in L])
     alt = ''.join([x[1] for x in L])
@@ -93,7 +96,7 @@ def AFM_to_seqs(
         seq = []
         for j, char in enumerate(m_):
             if char == 1:
-                seq.append(alt[j]) 
+                seq.append(alt[j])
             elif char == 0:
                 seq.append(ref[j])
             else:
@@ -107,18 +110,18 @@ def AFM_to_seqs(
 
 
 def build_tree(
-    afm: AnnData, 
-    precomputed: bool = False, 
-    distance_key: str = 'distances', 
-    metric: str = 'weighted_jaccard', 
-    bin_method: str ='MiTo', 
-    solver: str = 'UPMGA', 
-    ncores: int = 1, 
-    min_n_positive_cells: int = 2, 
+    afm: AnnData,
+    precomputed: bool = False,
+    distance_key: str = 'distances',
+    metric: str = 'weighted_jaccard',
+    bin_method: str ='MiTo',
+    solver: str = 'UPMGA',
+    ncores: int = 1,
+    min_n_positive_cells: int = 2,
     filter_muts: bool = False,
-    max_frac_positive: float = .95, 
-    binarization_kwargs: Dict[str,Any] = {}, 
-    solver_kwargs: Dict[str,Any] = {}, 
+    max_frac_positive: float = .95,
+    binarization_kwargs: dict[str,Any] = None,
+    solver_kwargs: dict[str,Any] = None,
     ) -> CassiopeiaTree:
     """
     Wrapper around cassiopeia lineage solvers. MW Jones et al., 2020.
@@ -157,13 +160,17 @@ def build_tree(
     """
 
     # Compute (if necessary, cell-cell distances, and retrieve necessary afm .slots)
+    if solver_kwargs is None:
+        solver_kwargs = {}
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     if precomputed:
         if distance_key in afm.obsp and precomputed:
             metric = afm.uns['distance_calculations'][distance_key]['metric']
             layer = afm.uns['distance_calculations'][distance_key]['layer']
             logging.info(f'Use precomputed distances: metric={metric}, layer={layer}')
             if layer == 'bin':
-                if 'genotyping' in afm.uns: 
+                if 'genotyping' in afm.uns:
                     bin_method = afm.uns['genotyping']['bin_method']
                     binarization_kwargs = afm.uns['genotyping']['binarization_kwargs']
                     logging.info(f'Precomputed bin layer: bin_method={bin_method} and binarization_kwargs={binarization_kwargs}')
@@ -172,15 +179,15 @@ def build_tree(
                     logging.info(f'Precomputed bin layer from scLT system: {afm.uns["scLT_system"]}')
     else:
         compute_distances(
-            afm, distance_key=distance_key, metric=metric, 
+            afm, distance_key=distance_key, metric=metric,
             bin_method=bin_method, ncores=ncores, binarization_kwargs=binarization_kwargs
         )
-    
+
     # Init
     M_raw, M, D = _initialize_CassiopeiaTree_kwargs(
         afm, distance_key, min_n_positive_cells, max_frac_positive, filter_muts=filter_muts
     )
- 
+
     # Solve cell phylogeny
     metric = afm.uns['distance_calculations'][distance_key]['metric']
     logging.info(f'Build tree: metric={metric}, solver={solver}')
@@ -217,10 +224,10 @@ def coarse_grained_tree(tree: CassiopeiaTree, groupby: str) -> CassiopeiaTree:
     X_bin_agg = X_bin_agg[muts].copy()
 
     afm_agg = AnnData(
-        X=csr_matrix(X_raw_agg.values), 
+        X=csr_matrix(X_raw_agg.values),
         obs=pd.DataFrame(index=X_raw_agg.index),
         layers={'bin':csr_matrix(X_bin_agg.values)},
-        uns={'genotyping':{'bin_method':'vanilla', 'binarization_kwargs':{}}, 
+        uns={'genotyping':{'bin_method':'vanilla', 'binarization_kwargs':{}},
              'scLT_system':'MAESTER'}
     )
     compute_distances(afm_agg, precomputed=True, bin_method='vanilla')

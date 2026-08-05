@@ -3,9 +3,8 @@ Bootstrap utils.
 """
 
 import numpy as np
-from scipy.sparse import issparse, csr_matrix
 from anndata import AnnData
-
+from scipy.sparse import csr_matrix, issparse
 
 ##
 
@@ -26,12 +25,12 @@ def bootstrap_allele_tables(afm, layer='AD', frac_char_resampling=.8):
     # Resample afm.var index
     n = X.shape[1]
     if frac_char_resampling == 1:
-        resampled_idx = np.random.choice(np.arange(n), n, replace=True) 
-    else:    
-        resampled_idx = np.random.choice(np.arange(n), round(n*frac_char_resampling), replace=False)   
+        resampled_idx = np.random.choice(np.arange(n), n, replace=True)
+    else:
+        resampled_idx = np.random.choice(np.arange(n), round(n*frac_char_resampling), replace=False)
 
     return X[:,resampled_idx], resampled_idx
-    
+
 
 
 ##
@@ -62,9 +61,9 @@ def jackknife_allele_tables(afm, layer='AD'):
 
 
 def bootstrap_MiTo(
-    afm: AnnData, 
-    boot_replicate: str = 'observed', 
-    boot_strategy: str ='feature_resampling', 
+    afm: AnnData,
+    boot_replicate: str = 'observed',
+    boot_strategy: str ='feature_resampling',
     frac_char_resampling: float = .8
     ) -> AnnData:
     """
@@ -84,7 +83,7 @@ def bootstrap_MiTo(
             raise ValueError(f'#TODO: {boot_strategy} boot_strategy. This strategy is not supported yet.')
         else:
             raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
-        
+
         AF = csr_matrix(np.divide(AD, (cov+.0000001)))
         AD = csr_matrix(AD)
         cov = csr_matrix(cov)
@@ -100,9 +99,9 @@ def bootstrap_MiTo(
 
 
 def bootstrap_bin(
-    afm: AnnData, 
-    boot_replicate: str = 'observed', 
-    boot_strategy: str ='feature_resampling', 
+    afm: AnnData,
+    boot_replicate: str = 'observed',
+    boot_strategy: str ='feature_resampling',
     frac_char_resampling: float = .8
     ) -> AnnData:
     """
@@ -112,17 +111,17 @@ def bootstrap_bin(
     if boot_replicate != 'observed':
 
         if boot_strategy == 'jacknife':
-            X_new, idx = jackknife_allele_tables(afm, layer='bin')                                             
+            X_new, idx = jackknife_allele_tables(afm, layer='bin')
         elif boot_strategy == 'feature_resampling':
-            X_new, idx = bootstrap_allele_tables(afm, layer='bin', frac_char_resampling=frac_char_resampling)  
+            X_new, idx = bootstrap_allele_tables(afm, layer='bin', frac_char_resampling=frac_char_resampling)
         else:
             raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
-        
+
         X_new = csr_matrix(X_new)
         afm_new = AnnData(
-            obs=afm.obs, 
-            var=afm.var.iloc[idx,:], 
-            uns=afm.uns, 
+            obs=afm.obs,
+            var=afm.var.iloc[idx,:],
+            uns=afm.uns,
             layers={'bin':X_new}
         )
 

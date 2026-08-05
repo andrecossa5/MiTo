@@ -1,60 +1,116 @@
 <div align="center">
-
-<img src="image/nf_mito.png" alt="nf-MiTo Logo" width="500" style="margin-bottom: 30px;">
-
-<div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #6a85b6 100%); padding: 60px 40px; border-radius: 25px; margin: 30px auto; max-width: 1000px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 4px solid rgba(255,255,255,0.15);">
-  
-  <h1 style="border: none; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Menlo', 'Consolas', monospace; font-size: 6em; font-weight: 900; margin: 20px 0; letter-spacing: 0.05em; text-transform: none; line-height: 1;">
-    <span style="color: #dc2626; filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.4));">MiTo</span>
-  </h1>
-  
-  <div style="width: 200px; height: 6px; background: linear-gradient(90deg, #ff6b6b, #ff8e53, #4ecdc4, #44a08d); margin: 35px auto; border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.4);"></div>
-  
-  <p style="font-size: 1.5em; font-weight: 400; color: #f8f9fa; margin: 30px 0 10px 0; line-height: 1.6; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); max-width: 800px; margin-left: auto; margin-right: auto;">
-    Mitochondrial lineage tracing and single-cell multi-omics in Python
-  </p>
-  
+  <img src="image/nf_mito.png" alt="MiTo" width="420">
 </div>
 
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Conda](https://img.shields.io/badge/conda-enabled-green.svg)](https://conda.io/)
+# MiTo
+
+**Mitochondrial lineage tracing and single-cell multi-omics in Python**
+
+[![PyPI](https://img.shields.io/pypi/v/scmito.svg)](https://pypi.org/project/scmito/)
+[![Python](https://img.shields.io/pypi/pyversions/scmito.svg)](https://pypi.org/project/scmito/)
+[![Tests](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml/badge.svg)](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml)
+[![Documentation](https://readthedocs.org/projects/andrecossa5/badge/?version=latest)](https://andrecossa5.readthedocs.io/en/latest/index.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://img.shields.io/badge/DOI-10.1101%2F2025.06.17.660165-blue)](https://doi.org/10.1101/2025.06.17.660165)
 
-</div>
-
-## Documentation
-scverse branch here.
-An extensive documentation of MiTo's key functionalitites is available at [MiTo Docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
+MiTo turns mitochondrial DNA variation into single-cell phylogenies. It reads
+MAESTER, RedeeM, Cas9 and scWGS output into an [AnnData](https://anndata.readthedocs.io/)
+Allele Frequency Matrix, selects informative MT-SNVs, calls single-cell genotypes,
+computes cell-cell distances in mutational space, and reconstructs and annotates
+clonal trees.
 
 ## Installation
-1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) (or conda)
-2. Clone this repo:
 
 ```bash
-git clone https://github.com/andrecossa5/MiTo.git
+pip install scmito
 ```
 
-3. Reproduce MiTo conda environment:
-
-```bash
-cd MiTo
-mamba env create -f envs/environment.yml -n MiTo
-```
-
-3. Activate the environment, and install MiTo via pypi:
-
-```bash
-mamba activate MiTo
-pip install mito-utils
-```
-
-4. Verify successfull installation:
+Requires Python 3.10–3.12. The import name is `mito`:
 
 ```python
 import mito as mt
 print(mt.__version__)
 ```
 
+> **Note on the package name.** The distribution is `scmito` on PyPI; earlier
+> releases were published as `mito-utils`, which is no longer maintained.
+
+## Quick start
+
+```python
+import scanpy as sc
+import mito as mt
+
+# Allele Frequency Matrix: an AnnData with AD / DP layers
+afm = sc.read('afm_unfiltered.h5ad')
+
+# Cell and variant filtering
+afm = mt.pp.filter_cells(afm, cell_filter='filter2')
+afm = mt.pp.filter_afm(afm, filtering='MiTo')
+
+# Embedding and neighbourhood structure
+mt.pp.reduce_dimensions(afm, method='UMAP')
+idx, _, _ = mt.pp.kNN_graph(D=afm.obsp['distances'].toarray(), k=15, from_distances=True)
+
+# Phylogeny and clonal inference
+tree = mt.tl.build_tree(afm, precomputed=True, solver='UPMGA')
+annotator = mt.tl.MiToTreeAnnotator(tree)
+annotator.clonal_inference()
+
+mt.pl.plot_tree(tree, features=['MiTo clone'])
+```
+
+A full walkthrough is in the
+[getting-started tutorial](https://andrecossa5.readthedocs.io/en/latest/getting_started_tutorial.html).
+
+## API
+
+MiTo follows the scverse layout, so it composes with `scanpy` and `anndata`:
+
+| Module | Purpose |
+| --- | --- |
+| `mt.io` | Build AFMs from pipeline output (`make_afm`), read/write Newick trees |
+| `mt.pp` | Cell and variant filtering, genotype calling, distances, kNN graphs, embeddings |
+| `mt.tl` | Tree building, clonal inference, clustering, fate bias, bootstrapping |
+| `mt.pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
+| `mt.ut` | Metrics (kBET, ARI, NMI, CI/RI), MT annotations, helpers |
+
+**Supported systems:** MAESTER, RedeeM, Cas9, scWGS.
+**Variant filters:** `baseline`, `CV`, `miller2022`, `weng2024`, `MQuad`, `MiTo`, `GT_enriched`.
+**Genotyping:** `vanilla` (hard thresholds), `MiTo` (binomial-mixture posteriors).
+**Tree solvers:** `UPMGA`, `NJ`, `spectral`, `greedy`.
+
+Full reference: [MiTo docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
+
+## Development
+
+```bash
+git clone https://github.com/andrecossa5/MiTo.git
+cd MiTo
+pip install -e ".[test]"
+pytest
+```
+
+Optional, matching the scverse template:
+
+```bash
+pre-commit install
+```
+
+## Citation
+
+If MiTo is useful in your work, please cite:
+
+> Cossa, A. et al. *MiTo: mitochondrial lineage tracing and single-cell multi-omics.*
+> bioRxiv (2025). [10.1101/2025.06.17.660165](https://doi.org/10.1101/2025.06.17.660165)
+
+MiTo builds on [Cassiopeia](https://github.com/YosefLab/Cassiopeia) for phylogenetic
+reconstruction; please cite it as well when using the tree solvers.
+
 ## Releases
-See [CHANGELOG.md](CHANGELOG.md) for a history of notable changes.
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

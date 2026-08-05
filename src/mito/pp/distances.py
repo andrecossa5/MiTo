@@ -4,20 +4,16 @@ Custom distance function among cell AF profiles.
 
 import inspect
 import logging
+from typing import Any
+
 import numpy as np
-import pandas as pd
 import sklearn.preprocessing as pp
-from typing import Dict, Any
-from scipy.sparse import csr_matrix
-from sklearn.metrics.pairwise import (
-    pairwise_distances, 
-    PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
-)
 from anndata import AnnData
 from cassiopeia.solver.solver_utilities import transform_priors
-from ..ut.utils import Timer
-from ..ut.stats_utils import genotype_mix, get_posteriors
+from scipy.sparse import csr_matrix
+from sklearn.metrics.pairwise import PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS, pairwise_distances
 
+from mito.ut.stats_utils import genotype_mix
 
 ##
 
@@ -38,16 +34,16 @@ _ALLOW_NON_FINITE_KWARG = (
 
 
 def genotype_mixtures(
-    AD: np.array, 
-    DP: np.array, 
-    t_prob: float = .75, 
-    t_vanilla: float = .001, 
-    min_AD: int = 2, 
+    AD: np.array,
+    DP: np.array,
+    t_prob: float = .75,
+    t_vanilla: float = .001,
+    min_AD: int = 2,
     debug: bool = False
     ) -> np.array:
     """
-    Single-cell MT-SNVs probabilistic genotyping. 
-    Thresholds the binomial mixtures posterior 
+    Single-cell MT-SNVs probabilistic genotyping.
+    Thresholds the binomial mixtures posterior
     probabilities obtained from the model defined in
     (Kwock et al., 2022).
     """
@@ -55,11 +51,11 @@ def genotype_mixtures(
     X = np.zeros(AD.shape)
     for idx in range(AD.shape[1]):
         X[:,idx] = genotype_mix(
-            AD[:,idx], 
-            DP[:,idx], 
-            t_prob=t_prob, 
-            t_vanilla=t_vanilla, 
-            min_AD=min_AD, 
+            AD[:,idx],
+            DP[:,idx],
+            t_prob=t_prob,
+            t_vanilla=t_vanilla,
+            min_AD=min_AD,
             debug=debug
         )
 
@@ -70,19 +66,19 @@ def genotype_mixtures(
 
 
 def genotype_MiTo(
-    AD: np.array, 
-    DP: np.array, 
+    AD: np.array,
+    DP: np.array,
     t_prob: float = .7,
-    t_vanilla: float = 0, 
-    min_AD: int = 1, 
-    min_cell_prevalence: float = .1, 
+    t_vanilla: float = 0,
+    min_AD: int = 1,
+    min_cell_prevalence: float = .1,
     debug: bool = False
     ) -> np.array:
     """
     MiTo genotype calling strategy.
-    
-    If a mutation has prevalence (i.e., fraction of positive cells with AD >= min_AD 
-    and AF >= t_vanilla) greater than or equal to min_cell_prevalence, MiTo uses 
+
+    If a mutation has prevalence (i.e., fraction of positive cells with AD >= min_AD
+    and AF >= t_vanilla) greater than or equal to min_cell_prevalence, MiTo uses
     bin_mixtures probabilistic modeling to assign each cell-variant genotype.
     Otherwise, each cell's mutational status is assigned using simple thresholding,
     as in the "vanilla" method.
@@ -113,13 +109,13 @@ def genotype_MiTo(
 
     X = np.zeros(AD.shape)
     n_binom = 0
-    
+
     for idx in range(AD.shape[1]):
         test = (AD[:,idx]/(DP[:,idx]+.0000001)>t_vanilla)
         prevalence = test.sum() / test.size
         if prevalence >= min_cell_prevalence:
             X[:,idx] = genotype_mix(
-                AD[:,idx], DP[:,idx], t_prob=t_prob, 
+                AD[:,idx], DP[:,idx], t_prob=t_prob,
                 t_vanilla=t_vanilla, min_AD=min_AD, debug=debug
             )
             n_binom += 1
@@ -169,23 +165,23 @@ def call_genotypes(
         Minimum cell prevalence to use probabilistic genotyping. Default is 0.1.
     """
 
-    assert 'AD' in afm.layers 
+    assert 'AD' in afm.layers
     assert 'site_coverage' in afm.layers or 'DP' in afm.layers
-    cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP' 
+    cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP'
 
     X = afm.X.toarray()
     AD = afm.layers['AD'].toarray()
     DP = afm.layers[cov_layer].toarray()
-    
+
     if bin_method == 'vanilla':
         X = np.where((X>=t_vanilla) & (AD>=min_AD), 1, 0)
     elif bin_method == 'MiTo':
         if cov_layer == 'site_coverage':
-            X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla, 
+            X = genotype_MiTo(AD, DP, t_prob=t_prob, t_vanilla=t_vanilla,
                               min_AD=min_AD, min_cell_prevalence=min_cell_prevalence)
         else:
             raise ValueError("""
-                    MiTo genotyping requires total site coverage info 
+                    MiTo genotyping requires total site coverage info
                     in afm.layers["site_coverage"]
                     """
             )
@@ -197,9 +193,9 @@ def call_genotypes(
 
     afm.layers['bin'] = csr_matrix(X)
     afm.uns['genotyping'] = {
-        'bin_method':bin_method, 
+        'bin_method':bin_method,
         'binarization_kwargs': {
-            't_prob':t_prob, 't_vanilla':t_vanilla, 
+            't_prob':t_prob, 't_vanilla':t_vanilla,
             'min_AD':min_AD, 'min_cell_prevalence':min_cell_prevalence
         }
     }
@@ -213,11 +209,11 @@ def weighted_jaccard(M, w):
     Vectorized weighted jaccard index from Weng et al., 2024.
     """
 
-    total = M @ w 
-    M_weighted = M * w 
-    a = M_weighted @ M.T 
-    b = np.expand_dims(total, axis=1) - a  
-    c = np.expand_dims(total, axis=0) - a 
+    total = M @ w
+    M_weighted = M * w
+    a = M_weighted @ M.T
+    b = np.expand_dims(total, axis=1) - a
+    c = np.expand_dims(total, axis=0) - a
     denom = a + b + c
     S = np.where(denom != 0, a / denom, 0.0)
     D = 1.0 - S
@@ -243,7 +239,7 @@ def _get_priors(afm, key='priors'):
         for j in range(W.shape[1]):
             if W[i,j] != -1:
                 priors[i][j] = W[i,j]
-    
+
     return priors
 
 
@@ -257,7 +253,7 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
 
     n, m = X.shape
     valid = (X != missing_state_indicator)
-    
+
     # Pairwise comparisons via broadcasting.
     X1 = X[:, None, :]  # shape: (n, 1, m)
     X2 = X[None, :, :]  # shape: (1, n, m)
@@ -265,7 +261,7 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
     count = valid_pair.sum(axis=2)
     same = (X1 == X2)
     diff_mask = valid_pair & (~same)
-    
+
     # Lookups
     lookup = []
     for i in range(m):
@@ -275,7 +271,7 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
         for state, w in col_weights.items():
             table[state] = w
         lookup.append(table)
-        
+
     # Build a weight matrix W of shape (n, m) using vectorized lookup.
     W = np.empty((n, m), dtype=float)
     for i in range(m):
@@ -289,14 +285,14 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
         # Expand weights to pairwise matrices.
         W1 = W[:, None, :]   # shape: (n, 1, m)
         W2 = W[None, :, :]   # shape: (1, n, m)
-        
+
         # Explicitly broadcast these arrays to full shape (n, n, m)
         X1_full = np.broadcast_to(X1, (n, n, m))
         W1_full = np.broadcast_to(W1, (n, n, m))
         W2_full = np.broadcast_to(W2, (n, n, m))
         zero_mask1 = np.broadcast_to((X1 == 0), (n, n, m))
         zero_mask2 = np.broadcast_to((X2 == 0), (n, n, m))
-        
+
         # Create masks for pairs where one sample is 0.
         mask_one_zero = diff_mask & (zero_mask1 | zero_mask2)
         mask_nonzero = diff_mask & ~(zero_mask1 | zero_mask2)
@@ -309,14 +305,14 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
         )
         # For pairs where both are nonzero, sum both weights.
         contrib[mask_nonzero] = W1_full[mask_nonzero] + W2_full[mask_nonzero]
-    
+
     # Sum contributions over features.
     D_total = contrib.sum(axis=2)
-    
+
     # Normalize by the number of valid comparisons.
     with np.errstate(divide='ignore', invalid='ignore'):
         D = np.where(count != 0, D_total / count, 0)
-    
+
     return D
 
 
@@ -324,15 +320,17 @@ def weighted_hamming(X, weights, missing_state_indicator=-1):
 
 
 def preprocess_feature_matrix(
-    afm, distance_key='distances', precomputed=False, metric='jaccard', 
-    bin_method='MiTo', binarization_kwargs={}, verbose=True
+    afm, distance_key='distances', precomputed=False, metric='jaccard',
+    bin_method='MiTo', binarization_kwargs=None, verbose=True
     ):
     """
     Preprocess a feature matrix for cell-cell distance computations.
     """
 
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     layer = None
-    scLT_system = afm.uns['scLT_system'] 
+    scLT_system = afm.uns['scLT_system']
     if 'distance_calculations' not in afm.uns:
         afm.uns['distance_calculations'] = { distance_key: {}}
     else:
@@ -354,7 +352,7 @@ def preprocess_feature_matrix(
             if layer in afm.layers and precomputed:
                 bin_method = afm.uns['genotyping']['bin_method']
                 binarization_kwargs = afm.uns['genotyping']['binarization_kwargs']
-                if verbose: 
+                if verbose:
                     logging.info(f'Use precomputed bin layer: bin_method={bin_method}, binarization_kwargs={binarization_kwargs}')
             else:
                 if verbose:
@@ -368,11 +366,11 @@ def preprocess_feature_matrix(
 
         if metric in continuous_metrics:
             raise ValueError(f'For {scLT_system} only discrete metrics are available!')
-        elif metric in discrete_metrics:     
+        elif metric in discrete_metrics:
             if 'bin' in afm.layers:
                 layer = 'bin'
                 if verbose:
-                    logging.info(f'Use precomputed bin layer.')
+                    logging.info('Use precomputed bin layer.')
             else:
                 raise ValueError(f'With the {scLT_system} system, provide an AFM with binary character matrix in afm.layers, under the "bin" key!')
         else:
@@ -389,13 +387,13 @@ def preprocess_feature_matrix(
 
 def compute_distances(
     afm: AnnData,
-    distance_key: str = 'distances', 
-    metric: str = 'weighted_jaccard', 
+    distance_key: str = 'distances',
+    metric: str = 'weighted_jaccard',
     precomputed: bool = False,
-    bin_method: str = 'MiTo', 
-    binarization_kwargs: Dict[str,Any] = {}, 
-    ncores: int = 1, 
-    rescale: bool = True, 
+    bin_method: str = 'MiTo',
+    binarization_kwargs: dict[str,Any] = None,
+    ncores: int = 1,
+    rescale: bool = True,
     verbose: bool = True
     ):
     """
@@ -424,8 +422,10 @@ def compute_distances(
     verbose : bool, optional
         Whether to print verbose logging. Default is True.
     """
-    
+
     # Preprocess afm
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     preprocess_feature_matrix(
         afm, distance_key=distance_key, metric=metric, precomputed=precomputed,
         bin_method=bin_method, binarization_kwargs=binarization_kwargs, verbose=verbose
@@ -477,7 +477,7 @@ def compute_distances(
         np.fill_diagonal(D, 0)
 
     afm.obsp[distance_key] = csr_matrix(D)
-    
+
 
 ##
 

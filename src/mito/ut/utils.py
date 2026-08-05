@@ -2,17 +2,17 @@
 Miscellaneous utilities.
 """
 
+import logging
 import os
+import pickle
 import sys
 import time
-import pickle
-from shutil import rmtree
 from importlib.resources import files
-import logging
+from shutil import rmtree
+
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
-
 
 ##
 
@@ -21,15 +21,15 @@ _cell_filters = ['filter1', 'filter2']
 _var_filters = [
     'baseline',
     'CV',
-    'miller2022', 
+    'miller2022',
     'weng2024',
-    'MQuad', 
+    'MQuad',
     'MiTo',
     'GT_enriched'
     # DEPRECATED
-    # 'ludwig2019', 
-    # 'velten2021', 
-    # 'seurat', 
+    # 'ludwig2019',
+    # 'velten2021',
+    # 'seurat',
     # 'MQuad_optimized',
     # 'density',
     # 'GT_stringent'
@@ -70,7 +70,7 @@ class Timer:
         Start a new timer.
         """
         if self._start_time is not None:
-            raise TimerError(f"Timer is running. Use .stop() to stop it")
+            raise TimerError("Timer is running. Use .stop() to stop it")
         self._start_time = time.perf_counter()
 
     def stop(self, pretty=True):
@@ -78,8 +78,8 @@ class Timer:
         Stop the timer, and report the elapsed time.
         """
         if self._start_time is None:
-            raise TimerError(f"Timer is not running. Use .start() to start it")
-        
+            raise TimerError("Timer is not running. Use .start() to start it")
+
         elapsed_time = time.perf_counter() - self._start_time
         self._start_time = None
 
@@ -96,7 +96,7 @@ class Timer:
 
         else:
             formatted_time = round(elapsed_time, 2)
-        
+
         return formatted_time
 
 
@@ -125,7 +125,7 @@ def update_params(d_original, d_passed):
         else:
             print(f'{k}:{d_passed[k]} kwargs added...')
         d_original[k] = d_passed[k]
-        
+
     return d_original
 
 
@@ -135,12 +135,12 @@ def update_params(d_original, d_passed):
 def rescale(x):
     """
     Max/min rescaling.
-    """    
+    """
     if np.min(x) != np.max(x):
         return (x - np.min(x)) / (np.max(x) - np.min(x))
     else:
         return x
-    
+
 
 ##
 
@@ -196,18 +196,18 @@ def format_tuning(path_tuning):
 
 def extract_kwargs(args, only_tree=False):
     """
-    Extract preprocessing parameters from CLI and tuning information. 
+    Extract preprocessing parameters from CLI and tuning information.
     """
-    
+
     path_tuning = args.path_tuning if hasattr(args, 'path_tuning') else None
 
     if path_tuning is not None and args.job_id is not None:
-        
+
         path_options = os.path.join(path_tuning, 'all_options_final.csv')
         if os.path.exists(path_options):
-            
+
             df_options = pd.read_csv(path_options).loc[lambda x: x['job_id'] == args.job_id]
-            d = { k:v for k,v in zip(df_options['option'],df_options['value']) }
+            d = dict(zip(df_options['option'],df_options['value'], strict=False))
 
             if not only_tree:
 
@@ -229,6 +229,7 @@ def extract_kwargs(args, only_tree=False):
                     'ncores' : args.ncores,
                     'metric' : metric,
                     'spatial_metrics' : args.spatial_metrics,
+                    'filter_dbs' : filter_dbs,
                     'filter_moran' : filter_moran
                 }
                 filtering_kwargs = {
@@ -239,24 +240,26 @@ def extract_kwargs(args, only_tree=False):
                     'af_confident_detection' : float(d['af_confident_detection']),
                     'min_n_confidently_detected' : int(d['min_n_confidently_detected']),
                     'min_mean_AD_in_positives' : float(d['min_mean_AD_in_positives']),
-                    'min_mean_DP_in_positives' : float(d['min_mean_DP_in_positives']) 
+                    'min_mean_DP_in_positives' : float(d['min_mean_DP_in_positives'])
                 }
-                filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {} 
+                filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
                 binarization_kwargs = {
-                    't_prob' : float(d['t_prob']), 
+                    't_prob' : float(d['t_prob']),
                     't_vanilla' : float(d['t_vanilla']),
                     'min_AD' : int(d['min_AD']),
                     'min_cell_prevalence' : float(d['min_cell_prevalence']),
-                    'k' : int(d['k']), 
-                    'gamma' :  float(d['gamma']), 
+                    'k' : int(d['k']),
+                    'gamma' :  float(d['gamma']),
                     'resample' : False
                 }
                 tree_kwargs = {'solver':d['solver'], 'metric':d['metric']}
-            
+
             else:
 
-                cell_filter = None; kwargs = None; 
-                filtering_kwargs = None; binarization_kwargs = None
+                cell_filter = None
+                kwargs = None
+                filtering_kwargs = None
+                binarization_kwargs = None
                 tree_kwargs = {'solver':d['solver'], 'metric':d['metric']}
 
         else:
@@ -287,24 +290,26 @@ def extract_kwargs(args, only_tree=False):
                 'af_confident_detection' : args.af_confident_detection,
                 'min_n_confidently_detected' : args.min_n_confidently_detected,
                 'min_mean_AD_in_positives' : args.min_mean_AD_in_positives,
-                'min_mean_DP_in_positives' : args.min_mean_DP_in_positives 
+                'min_mean_DP_in_positives' : args.min_mean_DP_in_positives
             }
-            filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}   
+            filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
             binarization_kwargs = {
-                't_prob' : args.t_prob, 
+                't_prob' : args.t_prob,
                 't_vanilla' : args.t_vanilla,
                 'min_AD' : args.min_AD,
                 'min_cell_prevalence' : args.min_cell_prevalence,
-                'k' : args.k, 
-                'gamma' : args.gamma, 
+                'k' : args.k,
+                'gamma' : args.gamma,
                 'resample' : False
             }
             tree_kwargs = {'solver':args.solver, 'metric':args.metric}
-        
+
         else:
 
-            cell_filter = None; kwargs = None;  
-            filtering_kwargs = None; binarization_kwargs = None
+            cell_filter = None
+            kwargs = None
+            filtering_kwargs = None
+            binarization_kwargs = None
             tree_kwargs = {'solver':args.solver, 'metric':args.metric}
 
     return cell_filter, kwargs, filtering_kwargs, binarization_kwargs, tree_kwargs
@@ -386,7 +391,7 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
     clones = clones_sorted[:n_clones].to_list()
 
     cells = []
-    for clone, f in zip(clones, freqs):
+    for _clone, f in zip(clones, freqs, strict=False):
         afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
         afm_clone = afm_clone[(afm_clone.layers['bin']>0).sum(axis=1).flatten()>2,
                               (afm_clone.layers['bin']>0).sum(axis=0).flatten()>=2]
@@ -396,7 +401,7 @@ def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
         )
 
     afm_subsample = afm[cells].copy()
-    
+
     return afm_subsample
 
 
@@ -412,7 +417,7 @@ def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
             (df['sample'] == sample) & \
             (df['n_cells'] >= n_cells) & \
             (df['n_GBC_groups'] >= n_GBC_groups) & \
-            (df['frac_unassigned'] <= frac_unassigned)  
+            (df['frac_unassigned'] <= frac_unassigned)
         ]
     )
     df_selected = (
@@ -432,8 +437,8 @@ def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
 def extract_bench_df(path):
 
     L = []
-    for folder,_,files in os.walk(path):
-        for file in files:
+    for folder,_,filenames in os.walk(path):
+        for file in filenames:
             if file.endswith('pickle'):
                 with open(os.path.join(folder, file), 'rb') as f:
                     d = pickle.load(f)

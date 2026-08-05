@@ -7,8 +7,8 @@ this checks the embedding methods, their output slots and the main knobs.
 
 import numpy as np
 import pytest
-import mito as mt
 
+import mito as mt
 
 METHODS = ["PCA", "UMAP", "diffmap"]
 SLOTS = {"PCA": "X_pca", "UMAP": "X_umap", "diffmap": "X_diffmap"}

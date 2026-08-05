@@ -2,33 +2,33 @@
 Custom plotting function for embeddings.
 """
 
-import scanpy as sc
-import matplotlib
-from typing import Iterable, Dict, Any, Tuple
-from anndata import AnnData
-import plotting_utils as plu
+from typing import Any
 
+import matplotlib
+import plotting_utils as plu
+import scanpy as sc
+from anndata import AnnData
 
 ##
 
 
 def draw_embedding(
-    afm: AnnData, 
-    basis: str = 'X_umap', 
+    afm: AnnData,
+    basis: str = 'X_umap',
     feature: str = None,
     ax: matplotlib.axes.Axes = None,
-    categorical_cmap: str|Dict[str,Any] = sc.pl.palettes.vega_20_scanpy,
+    categorical_cmap: str|dict[str,Any] = sc.pl.palettes.vega_20_scanpy,
     continuous_cmap: str = 'viridis',
     size: float = None,
     frameon: bool = False,
     outline: bool = False,
     legend: bool = False,
     loc: str = 'center left',
-    bbox_to_anchor: Tuple[float, float] = (1,.5),
+    bbox_to_anchor: tuple[float, float] = (1,.5),
     artists_size: float = 10,
     label_size: float = 10,
     ticks_size: float = 10,
-    kwargs: Dict[str,Any] = {}
+    kwargs: dict[str,Any] = None
     ) -> matplotlib.axes.Axes:
     """
     sc.pl.embedding, with some defaults and a custom legend.
@@ -74,8 +74,10 @@ def draw_embedding(
         Axes object.
     """
 
+    if kwargs is None:
+        kwargs = {}
     if isinstance(categorical_cmap, str) and feature in afm.obs.columns:
-        _cmap = plu.create_palette(afm.obs, feature, _cmap)
+        _cmap = plu.create_palette(afm.obs, feature, categorical_cmap)
     elif isinstance(categorical_cmap, dict) and feature in afm.obs.columns:
         assert all(x in categorical_cmap for x in afm.obs[feature].unique())
         _cmap = categorical_cmap
@@ -83,15 +85,15 @@ def draw_embedding(
         _cmap = None
 
     ax = sc.pl.embedding(
-        afm, 
-        basis=basis, 
-        ax=ax, 
-        color=feature, 
+        afm,
+        basis=basis,
+        ax=ax,
+        color=feature,
         palette=_cmap,
-        color_map=continuous_cmap, 
+        color_map=continuous_cmap,
         legend_loc=None,
-        size=size, 
-        frameon=frameon, 
+        size=size,
+        frameon=frameon,
         add_outline=outline,
         show=False,
         **kwargs
@@ -99,13 +101,13 @@ def draw_embedding(
 
     if legend:
         plu.add_legend(
-            ax=ax, 
-            label=feature, 
+            ax=ax,
+            label=feature,
             colors=categorical_cmap,
-            loc=loc, 
+            loc=loc,
             bbox_to_anchor=bbox_to_anchor,
-            artists_size=artists_size, 
-            label_size=label_size, 
+            artists_size=artists_size,
+            label_size=label_size,
             ticks_size=ticks_size
         )
 

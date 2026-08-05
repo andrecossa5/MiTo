@@ -7,11 +7,10 @@ be swept without the downstream cell filters masking their effect.
 
 import numpy as np
 import pytest
-import mito as mt
-from mito.pp.distances import genotype_MiTo, genotype_mixtures
-
 from conftest import build_afm
 
+import mito as mt
+from mito.pp.distances import genotype_MiTo, genotype_mixtures
 
 BIN_METHODS = ["vanilla", "MiTo"]
 

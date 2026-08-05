@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a new capability or an improvement to an existing one.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like MiTo to do?
+      description: Describe the capability and the analysis it would enable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing functions or other tools you have tried, and why they fall short.

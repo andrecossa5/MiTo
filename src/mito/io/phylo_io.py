@@ -1,21 +1,23 @@
 """
-I/O functions to read/write CassiopeiaTrees from annotated (supports) .newick strigs.
+I/O functions to read/write CassiopeiaTrees from annotated (supports) .newick strings.
 """
 
-import pandas as pd
-from cassiopeia.data import CassiopeiaTree
-from Bio.Phylo.NewickIO import Parser
 from io import StringIO
-import networkx as nx
 
+import networkx as nx
+import pandas as pd
+from Bio.Phylo.NewickIO import Parser
+from cassiopeia.data import CassiopeiaTree
 
 ##
 
 
-def _add_edges(G, clade, parent=None, counter=[1]):
+def _add_edges(G, clade, parent=None, counter=None):
     """
     Update the binary graph recursively.
     """
+    if counter is None:
+        counter = [1]
     if clade.is_terminal():
         node_name = clade.name
     else:
@@ -34,7 +36,7 @@ def _add_edges(G, clade, parent=None, counter=[1]):
 
 
 def read_newick(
-    path, X_raw: pd.DataFrame = None, X_bin: pd.DataFrame = None, 
+    path, X_raw: pd.DataFrame = None, X_bin: pd.DataFrame = None,
     D: pd.DataFrame = None, meta: pd.DataFrame = None
     ) -> CassiopeiaTree:
     """
@@ -59,7 +61,7 @@ def read_newick(
         The assembled Allele Frequency Matrix (AFM).
     """
 
-    with open(path, 'r') as f:
+    with open(path) as f:
         newick = f.read().strip()
 
     parser = Parser(StringIO(newick))
@@ -75,9 +77,9 @@ def read_newick(
 
     cells = [ x for x in G.nodes if not x.startswith('internal') ]
     cassiopeia_tree = CassiopeiaTree(
-        tree=G, 
-        character_matrix=X_bin.loc[cells,:] if X_bin is not None else None, 
-        dissimilarity_map=D.loc[cells,cells] if D is not None else None, 
+        tree=G,
+        character_matrix=X_bin.loc[cells,:] if X_bin is not None else None,
+        dissimilarity_map=D.loc[cells,cells] if D is not None else None,
         cell_meta=meta.loc[cells,:] if meta is not None else None
     )
     if X_raw is not None and X_bin is not None:
@@ -105,13 +107,13 @@ def to_DiGraph(tree: CassiopeiaTree) -> nx.DiGraph:
     for node in tree.nodes:
         try:
             G.add_node(node, support=tree.get_attribute(node, 'support'))
-        except:
+        except Exception:  # noqa: BLE001
             pass
     for u, v, in tree.edges:
         G.add_edge(u, v, branch_length=tree.get_branch_length(u, v))
 
     return G
-    
+
 
 ##
 
@@ -129,12 +131,12 @@ def _to_newick_str(g, node):
     if 'support' in g.nodes[node] and g.nodes[node]['support'] is not None:
         try:
             support_str = str(int(g.nodes[node]['support']))
-        except:
+        except (ValueError, TypeError):
             support_str = "0"
 
     _name = str(node)
     return (
-        "%s" % (_name,) + branch_length_str
+        f"{_name}" + branch_length_str
         if is_leaf
         else (
             "("
@@ -160,7 +162,7 @@ def write_newick(tree: CassiopeiaTree, path: str):
     path : str
         Path to newick string.
     """
-    
+
     G = to_DiGraph(tree)
     root = [ node for node in G if G.in_degree(node) == 0 ][0]
     newick = f'{_to_newick_str(G, root)};'

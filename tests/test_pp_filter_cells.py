@@ -6,12 +6,10 @@ across a wide parameter range, cell subsetting, and the AnnData invariants that
 must survive filtering.
 """
 
-import numpy as np
 import pytest
-import mito as mt
-
 from conftest import build_afm
 
+import mito as mt
 
 # -- basic contract ---------------------------------------------------------
 

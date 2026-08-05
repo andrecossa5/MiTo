@@ -17,15 +17,15 @@ The synthetic AFM mirrors the structure produced by ``mito.io.make_afm``:
 """
 
 import matplotlib
+
 matplotlib.use("Agg")
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
 from anndata import AnnData
 from scipy.sparse import csr_matrix
-import matplotlib.pyplot as plt
-
 
 N_CELLS = 90
 N_VARS = 40
@@ -46,7 +46,7 @@ def _make_positions(n_vars, rng):
     pos.sort()
     ref = rng.choice(bases, size=n_vars)
     alt = np.array([rng.choice(bases[bases != r]) for r in ref])
-    names = [f"{p}_{r}>{a}" for p, r, a in zip(pos, ref, alt)]
+    names = [f"{p}_{r}>{a}" for p, r, a in zip(pos, ref, alt, strict=False)]
     var = pd.DataFrame({"pos": pos, "ref": ref, "alt": alt}, index=names)
     return var
 
@@ -195,10 +195,10 @@ def afm_annotated():
 # strongly bimodal variants, while weng2024 requires >=90% negative cells per
 # variant -- so the input needs many small clones, each with its own high-VAF
 # variants.
-RICH_AFM = dict(
-    n_cells=320, n_vars=80, n_clones=16,
-    coverage=150, clone_specific_frac=1.0, seed=67,
-)
+RICH_AFM = {
+    "n_cells": 320, "n_vars": 80, "n_clones": 16,
+    "coverage": 150, "clone_specific_frac": 1.0, "seed": 67,
+}
 
 
 def build_rich_annotated(**overrides):
@@ -251,6 +251,7 @@ def tree(_tree_cache):
 def _annotated_tree_cache(_tree_cache):
     """Tree with clonal inference already run -- the grid search is slow."""
     import copy as _copy
+
     import mito as mt
     tree = _copy.deepcopy(_tree_cache)
     annotator = mt.tl.MiToTreeAnnotator(tree)

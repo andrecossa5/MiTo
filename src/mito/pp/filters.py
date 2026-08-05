@@ -2,19 +2,23 @@
 All filters: variants/cells.
 """
 
-import os
 import logging
+import os
 import warnings
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from anndata import AnnData
+from joblib import Parallel, delayed, parallel_backend
+from mquad.mquad import Mquad
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
-from mquad.mquad import *
-from joblib import Parallel, delayed, parallel_backend, cpu_count
-from .distances import *
-from ..ut.positions import mask_mt_sites
-from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
 
+from mito.ut.positions import mask_mt_sites
+from mito.ut.utils import load_common_dbSNP, load_edits_REDIdb
+
+from .distances import call_genotypes
 
 ##
 
@@ -22,16 +26,16 @@ from ..ut.utils import load_edits_REDIdb, load_common_dbSNP
 filtering_options = [
     'baseline',
     'CV',
-    'miller2022', 
+    'miller2022',
     'weng2024',
-    'MQuad', 
+    'MQuad',
     'MiTo',
     'GT_enriched'
 
     # DEPRECATED
-    # 'ludwig2019', 
-    # 'velten2021', 
-    # 'seurat', 
+    # 'ludwig2019',
+    # 'velten2021',
+    # 'seurat',
     # 'MQuad_optimized',
     # 'density',
     # 'GT_stringent'
@@ -56,13 +60,15 @@ def nans_as_zeros(afm):
 
 
 def filter_cells_with_at_least_one(
-    afm: AnnData, 
-    bin_method: str = 'vanilla', 
-    binarization_kwargs: Dict[str,Any] = {}
+    afm: AnnData,
+    bin_method: str = 'vanilla',
+    binarization_kwargs: dict[str, Any] = None
     ) -> AnnData:
     """
     Filter cells with at least one variant (genotypes from `bin_method`).
     """
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     X = call_genotypes(a=afm.copy(), bin_method=bin_method, **binarization_kwargs)
     afm = afm[afm.obs_names[X.sum(axis=1).A1>=1],:]
     afm.uns['per_position_coverage'] = afm.uns['per_position_coverage'].loc[afm.obs_names,:]
@@ -75,26 +81,26 @@ def filter_cells_with_at_least_one(
 
 
 def filter_cell_clones(
-    afm: AnnData, 
-    column: str = 'GBC', 
+    afm: AnnData,
+    column: str = 'GBC',
     min_cell_number: int = 10
     ) -> AnnData:
     """
-    Filter only cells from groups in afm.obs[`column`] with more 
+    Filter only cells from groups in afm.obs[`column`] with more
     than `min_cell_number` cells.
     """
-    
+
     logging.info(f'Filtering cells from {column} groups with >={min_cell_number} cells')
-    
+
     n0 = afm.shape[0]
     cell_counts = afm.obs.groupby(column).size()
-    clones_to_retain = cell_counts[cell_counts>=min_cell_number].index 
+    clones_to_retain = cell_counts[cell_counts>=min_cell_number].index
     test = afm.obs[column].isin(clones_to_retain)
     afm = afm[test,:].copy()
 
     logging.info(f'Removed other {n0-afm.shape[0]} cells')
     logging.info(f'Retaining {afm.obs[column].unique().size} discrete categories (i.e., {column}) for the analysis.')
-          
+
     return afm
 
 
@@ -157,11 +163,11 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
     # vars.tib<-cbind(vars.tib,Variant_CellN)
 
     afm.var['n0'] = (afm.X==0).sum(axis=0).A1       # NEGATIVE CELLS
-    afm.var['n1'] = (afm.X>.01).sum(axis=0).A1           
-    afm.var['n2'] = (afm.X>.02).sum(axis=0).A1           
-    afm.var['n5'] = (afm.X>.05).sum(axis=0).A1           
-    afm.var['n10'] = (afm.X>.1).sum(axis=0).A1           
-    afm.var['n50'] = (afm.X>.5).sum(axis=0).A1           
+    afm.var['n1'] = (afm.X>.01).sum(axis=0).A1
+    afm.var['n2'] = (afm.X>.02).sum(axis=0).A1
+    afm.var['n5'] = (afm.X>.05).sum(axis=0).A1
+    afm.var['n10'] = (afm.X>.1).sum(axis=0).A1
+    afm.var['n50'] = (afm.X>.5).sum(axis=0).A1
     afm.var['Variant_CellN'] = (afm.X>0).sum(axis=0).A1
 
     # Add mean AF, AD and DP in +cells
@@ -187,10 +193,10 @@ def annotate_vars(afm: AnnData, overwrite: bool = False):
 
 
 def filter_baseline(
-    afm: AnnData, 
-    min_site_cov: int = 5, 
-    min_var_quality: int = 30, 
-    min_n_positive: int = 2, 
+    afm: AnnData,
+    min_site_cov: int = 5,
+    min_var_quality: int = 30,
+    min_n_positive: int = 2,
     only_genes: bool = True
     ) -> AnnData:
     """
@@ -208,21 +214,21 @@ def filter_baseline(
             test_baseline = (
                 (afm.var['mean_cov']>=min_site_cov) & \
                 (afm.var['quality']>=min_var_quality) & \
-                (afm.var['Variant_CellN']>=min_n_positive) 
+                (afm.var['Variant_CellN']>=min_n_positive)
             )
             afm = afm[:,test_baseline].copy()
         else:
-            logging.info('Baseline filter only exlcudes MT-SNVs in un-targeted sites.')
-    
+            logging.info('Baseline filter only excludes MT-SNVs in un-targeted sites.')
+
     elif afm.uns['scLT_system'] == 'RedeeM':
         test_baseline = (
             (afm.var['mean_cov']>=min_site_cov) & \
-            (afm.var['Variant_CellN']>=min_n_positive) 
+            (afm.var['Variant_CellN']>=min_n_positive)
         )
         afm = afm[:,test_baseline].copy()
 
     else:
-        raise ValueError(f'Baseline filter not available for scLT_system current scLT_system and pp_method')
+        raise ValueError('Baseline filter not available for scLT_system current scLT_system and pp_method')
 
     # Exclude sites with more than one alt alleles observed
     var_sites = afm.var_names.map(lambda x: x.split('_')[0])
@@ -265,14 +271,14 @@ def filter_CV(afm: AnnData, n_top: int = 100) -> AnnData:
 
 
 def filter_miller2022(
-    afm: AnnData, 
-    min_site_cov: float = 100, 
-    min_var_quality: float = 30, 
-    p1: int = 1, 
-    p2: int = 99, 
-    perc1: float = 0.01, 
+    afm: AnnData,
+    min_site_cov: float = 100,
+    min_var_quality: float = 30,
+    p1: int = 1,
+    p2: int = 99,
+    perc1: float = 0.01,
     perc2: float = 0.1
-    ) -> AnnData: 
+    ) -> AnnData:
     """
     Filter MT-SNVs (MAESTER only) based on adaptive tresholds adopted in Miller et al., 2022.
     """
@@ -305,7 +311,7 @@ def fit_MQuad_mixtures(afm, n_top=None, path_=None, ncores=8, minDP=10, minAD=1,
     Filter MT-SNVs (MAESTER, redeem) with the MQuad method (Kwock et al., 2022)
     """
 
-    if n_top is not None:    
+    if n_top is not None:
         afm = filter_CV(afm, n_top=n_top) # Prefilter again, if still too much MT-SNVs
 
     # Fit models
@@ -319,18 +325,18 @@ def fit_MQuad_mixtures(afm, n_top=None, path_=None, ncores=8, minDP=10, minAD=1,
         return df.sort_values('deltaBIC', ascending=False), M
     else:
         return df.sort_values('deltaBIC', ascending=False)
-    
+
 
 ##
 
 
 def filter_MQuad(
-    afm: AnnData, 
-    ncores: int = 8, 
-    minDP: int = 5, 
+    afm: AnnData,
+    ncores: int = 8,
+    minDP: int = 5,
     minAD: int = 1,
-    minCell: int = 2, 
-    path_: str = None, 
+    minCell: int = 2,
+    path_: str = None,
     n_top: int = None
     ) -> AnnData:
     """
@@ -368,7 +374,7 @@ def filter_MQuad(
         pass
     else:
         raise ValueError(f'MQuad filter not available for scLT_system {scLT_system} and pp_method {pp_method}')
-    
+
     _, M = fit_MQuad_mixtures(
         afm, n_top=n_top, path_=path_, ncores=ncores, minDP=minDP, minAD=minAD, with_M=True
     )
@@ -399,14 +405,14 @@ def filter_MQuad(
 
 
 def filter_weng2024(
-    afm: AnnData, 
-    min_site_cov: float = 5, 
-    min_var_quality: float = 30, 
+    afm: AnnData,
+    min_site_cov: float = 5,
+    min_var_quality: float = 30,
     min_frac_negative: float = .9,
     min_n_positive: int = 2,
-    low_confidence_af: float = .1, 
-    high_confidence_af: float = .5, 
-    min_prevalence_low_confidence_af: float = .1, 
+    low_confidence_af: float = .1,
+    high_confidence_af: float = .5,
+    min_prevalence_low_confidence_af: float = .1,
     min_cells_high_confidence_af: int = 2
     ) -> AnnData:
     """
@@ -415,7 +421,7 @@ def filter_weng2024(
     Filters variants using the following criteria:
     - At least `min_site_cov` mean site coverage (across cells)
     - At least `min_var_quality` mean variant allele basecall quality (across cells)
-    - At least n cells * `min_frac_negative` negative cells 
+    - At least n cells * `min_frac_negative` negative cells
     - At least `min_n_positive` (AF > 0) cells
     - At least `min_prevalence_low_confidence_af` prevalence at AF less than `low_confidence_af`
     - At least `min_cells_high_confidence_af` cells with AF greater than `high_confidence_af`
@@ -469,14 +475,14 @@ def filter_weng2024(
     # }
     # }
     # Variability<-apply(af.dm,1,IsInfo) %>% data.frame(Info=.)
-    # vars_filter.tib<-Tomerge_v2(vars_filter.tib,Variability) 
-    
+    # vars_filter.tib<-Tomerge_v2(vars_filter.tib,Variability)
+
     annotate_vars(afm, overwrite=True)
     test = (
         (afm.var['mean_cov']>min_site_cov) & \
         (afm.var['quality']>=min_var_quality) & \
         (afm.var['n0']>min_frac_negative*afm.shape[0]) & \
-        (afm.var['Variant_CellN']>=min_n_positive) 
+        (afm.var['Variant_CellN']>=min_n_positive)
     )
     afm = afm[:,test].copy()
 
@@ -486,10 +492,10 @@ def filter_weng2024(
     # total<-length(x)
     # if(length(
         # which(x<10))/total>0.1        # Test1 : low prevalence of minimal detection.
-        # & 
+        # &
         # length(which(x>50))>10)       # Test2 : enough cells with confident detection.
         # {
-    #     return("Variable")            
+    #     return("Variable")
     # }else{
     #     return("Non")
     # }
@@ -499,7 +505,7 @@ def filter_weng2024(
     t1 = (afm.X<low_confidence_af).sum(axis=0).A1 / afm.shape[0] > min_prevalence_low_confidence_af
     t2 = (afm.X>high_confidence_af).sum(axis=0).A1 > min_cells_high_confidence_af
     test = t1 & t2
-    afm = afm[:,test].copy() 
+    afm = afm[:,test].copy()
 
     return afm
 
@@ -508,7 +514,7 @@ def filter_weng2024(
 
 
 def filter_MiTo(
-    afm: AnnData, 
+    afm: AnnData,
     min_cov: float = 5,
     min_var_quality: float = 30,
     min_frac_negative: float = 0.2,
@@ -522,7 +528,7 @@ def filter_MiTo(
     MiTo custom filter. Filter variants with:
     - At least `min_cov` mean site coverage (across cells)
     - At least `min_var_quality` mean variant allele basecall quality (across cells)
-    - At least n cells * `min_frac_negative` negative cells 
+    - At least n cells * `min_frac_negative` negative cells
     - At least `min_n_positive` (AF > 0) cells
     - At least `min_n_confidently_detected` cells in which the variant has been detected with AF greater than `af_confident_detection`
     - At least `min_mean_AD_in_positives` mean AD in positive cells
@@ -572,12 +578,12 @@ def filter_MiTo(
                 (afm.var['Variant_CellN']>=min_n_positive) & \
                 (afm.var['n_confidently_detected']>=min_n_confidently_detected) & \
                 (afm.var['mean_AD_in_positives']>=min_mean_AD_in_positives) & \
-                (afm.var['mean_DP_in_positives']>=min_mean_DP_in_positives) 
+                (afm.var['mean_DP_in_positives']>=min_mean_DP_in_positives)
             )
             afm = afm[:,test].copy()
         else:
             raise ValueError(f'MiTo filter not available for pp_method: {pp_method}')
-        
+
     elif scLT_system == 'RedeeM':
         test = (
             (afm.var['mean_cov']>=min_cov) & \
@@ -585,26 +591,26 @@ def filter_MiTo(
             (afm.var['Variant_CellN']>=min_n_positive) & \
             (afm.var['n_confidently_detected']>=min_n_confidently_detected) & \
             (afm.var['mean_AD_in_positives']>=min_mean_AD_in_positives) & \
-            (afm.var['mean_DP_in_positives']>=min_mean_DP_in_positives) 
+            (afm.var['mean_DP_in_positives']>=min_mean_DP_in_positives)
         )
         afm = afm[:,test].copy()
-    
+
     else:
         raise ValueError(f'MiTo filter not available for scLT_system: {scLT_system}')
 
     return afm
 
-    
+
 
 ##
 
 
 def compute_lineage_biases(
-    afm: AnnData, 
-    lineage_column: str, 
-    target_lineage: str, 
-    bin_method: str = 'MiTo', 
-    binarization_kwargs: Dict[str,Any] = {}, 
+    afm: AnnData,
+    lineage_column: str,
+    target_lineage: str,
+    bin_method: str = 'MiTo',
+    binarization_kwargs: dict[str, Any] = None,
     alpha: float = .05
     ) -> pd.DataFrame:
     """
@@ -631,9 +637,11 @@ def compute_lineage_biases(
         DataFrame containing computed statistics (e.g., -log10(FDR) from Fisher's exact test).
     """
 
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     if lineage_column not in afm.obs.columns:
         raise ValueError(f'{lineage_column} not present in cell metadata!')
-        
+
     muts = afm.var_names
     prevalences_array = np.zeros(muts.size)
     target_ratio_array = np.zeros(muts.size)
@@ -660,7 +668,7 @@ def compute_lineage_biases(
         oddsratio, pvalue = fisher_exact(
             [
                 [n_mut_lineage, n_mut_no_lineage],
-                [n_no_mut_lineage, n_no_mut_no_lineage], 
+                [n_no_mut_lineage, n_no_mut_no_lineage],
             ],
             alternative='greater',
         )
@@ -677,7 +685,7 @@ def compute_lineage_biases(
             'perc_in_target_lineage' : target_ratio_array,
             'odds_ratio' : oddsratio_array,
             'FDR' : pvals,
-            'lineage_bias' : -np.log10(pvals) 
+            'lineage_bias' : -np.log10(pvals)
         }, index=muts
         )
         .sort_values('lineage_bias', ascending=False)
@@ -690,15 +698,15 @@ def compute_lineage_biases(
 
 
 def filter_GT_enriched(
-    afm: AnnData, 
-    lineage_column: str = None, 
+    afm: AnnData,
+    lineage_column: str = None,
     fdr_treshold: float = .1,
-    n_enriched_groups: int = 2, 
-    bin_method: str = 'MiTo', 
-    binarization_kwargs: Dict[str,Any] = {}
+    n_enriched_groups: int = 2,
+    bin_method: str = 'MiTo',
+    binarization_kwargs: dict[str, Any] = None
     ) -> AnnData:
     """
-    Compute MT-SNVs enrichment scores for a given lineage category using 
+    Compute MT-SNVs enrichment scores for a given lineage category using
     -log10(FDR) from Fisher's exact test.
 
     Parameters
@@ -722,19 +730,21 @@ def filter_GT_enriched(
         Computed statistics.
     """
 
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
     if lineage_column is not None and lineage_column in afm.obs.columns:
         pass
     else:
         raise ValueError(f'{lineage_column} not available in afm.obs!')
-    
+
     L = []
     lineages = afm.obs[lineage_column].dropna().unique()
     for target_lineage in lineages:
         print(f'Computing variants enrichment for lineage {target_lineage}...')
-        res = compute_lineage_biases(afm, lineage_column, target_lineage, 
+        res = compute_lineage_biases(afm, lineage_column, target_lineage,
                                     bin_method=bin_method, binarization_kwargs=binarization_kwargs)
         L.append(res['FDR']<=fdr_treshold)
-    
+
     df_enrich = pd.concat(L, axis=1)
     df_enrich.columns = lineages
     test = df_enrich.apply(lambda x: np.sum(x>0)>0 and np.sum(x>0)<=n_enriched_groups, axis=1)
@@ -743,7 +753,7 @@ def filter_GT_enriched(
     cells = afm.obs[lineage_column].loc[lambda x: x.isin(id_lineages)].index
     afm = afm[cells, vois].copy()
 
-    return afm 
+    return afm
 
 
 ##
@@ -774,14 +784,14 @@ def moran_I(W, x, num_permutations=100):
 def _compute_moran_batch(start_pos, end_pos, W, X, num_permutations):
     """
     Compute Moran's I for a batch of variants using joblib.
-    
+
     Parameters:
     - start_pos: start index for variant batch
-    - end_pos: end index for variant batch  
+    - end_pos: end index for variant batch
     - W: spatial weights matrix
     - X: data matrix
     - num_permutations: number of permutations for p-value
-    
+
     Returns:
     - List of tuples: [(I, p_value), ...]
     """
@@ -789,7 +799,7 @@ def _compute_moran_batch(start_pos, end_pos, W, X, num_permutations):
     for i in range(start_pos, end_pos):
         I, p_value = moran_I(W, X[:,i], num_permutations=num_permutations)
         results.append((I, p_value))
-    
+
     return results
 
 
@@ -797,8 +807,8 @@ def _compute_moran_batch(start_pos, end_pos, W, X, num_permutations):
 
 
 def filter_variant_moransI(
-    afm: AnnData, 
-    num_permutations: int = 100, 
+    afm: AnnData,
+    num_permutations: int = 100,
     pval_treshold: float = .01,
     n_cores: int = None
     ) -> AnnData:
@@ -807,15 +817,15 @@ def filter_variant_moransI(
     Filter out MT-SNVs if not significantly auto-correlated (PARALLEL VERSION).
     Uses joblib for parallel processing.
     """
-    
+
     assert 'distances' in afm.obsp
     W = 1-afm.obsp['distances'].toarray()
     X = afm.X.toarray()
-    
+
     # Set number of cores
     if n_cores is None:
         n_cores = max(1, os.cpu_count()-1)
-    
+
     # Prepare batches
     nvars = X.shape[1]
     quotient = nvars // n_cores
@@ -849,7 +859,7 @@ def filter_variant_moransI(
         for I, P in batch_results:
             I_list.append(I)
             P_list.append(P)
-    
+
     # Store results in afm
     afm.var['Moran I '] = I_list
     afm.var['Moran I pvalue'] = P_list
@@ -869,11 +879,11 @@ def filter_dbSNP_common(afm: AnnData):
     Filter Allele Frequency Matrix from "COMMON" MT-SNVs (annotated dbSNP database).
     """
 
-    common = load_common_dbSNP()    
+    common = load_common_dbSNP()
     n_dbSNP = afm.var_names.isin(common).sum()
     logging.info(f'Exclude {n_dbSNP} common SNVs events (dbSNP)')
     variants = afm.var_names[~afm.var_names.isin(common)]
-    afm = afm[:,variants].copy() 
+    afm = afm[:,variants].copy()
 
     return afm, n_dbSNP
 
@@ -885,7 +895,7 @@ def filter_REDIdb_edits(afm: AnnData):
     """
     Filter Allele Frequency Matrix from previously annotated RNA-edits (REDIdb database).
     """
-    
+
     edits = load_edits_REDIdb()
     n_REDIdb = afm.var_names.isin(edits).sum()
     logging.info(f'Exclude {n_REDIdb} common RNA editing events (REDIdb)')

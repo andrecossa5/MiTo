@@ -2,22 +2,26 @@
 Metrics.
 """
 
-from joblib import cpu_count, parallel_backend, Parallel, delayed
+from collections.abc import Iterable
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Iterable, Tuple, Any
-from scipy.stats import chi2
-from scipy.special import binom
-from sklearn.metrics import (
-    normalized_mutual_info_score, recall_score, precision_score, auc
-)
-from networkx import shortest_path_length
-from scipy.stats import pearsonr
-from sklearn.metrics.pairwise import pairwise_distances
 from cassiopeia.data import CassiopeiaTree
-from .utils import rescale
-from ..pp.kNN import kNN_graph
+from joblib import Parallel, cpu_count, delayed, parallel_backend
+from networkx import shortest_path_length
+from scipy.special import binom
+from scipy.stats import chi2, pearsonr
+from sklearn.metrics import (  # noqa: F401  -- re-exported via mito.ut
+    auc,
+    normalized_mutual_info_score,
+    precision_score,
+    recall_score,
+)
 
+from mito.pp.kNN import kNN_graph
+
+from .utils import rescale
 
 ##
 
@@ -71,11 +75,11 @@ def kbet_one_chunk(index, batch, null_dist):
 
 
 def kbet(
-    index: np.array, 
-    batch: pd.Series, 
-    alpha: float = 0.05, 
+    index: np.array,
+    batch: pd.Series,
+    alpha: float = 0.05,
     only_score: bool = True
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
     """
     Computes the kBET metric (Buttner et al., 2018) to assess batch effects for an index matrix of a KNN graph.
 
@@ -98,7 +102,7 @@ def kbet(
         - pvalue_mean is the mean p-value,
         - accept_rate is the overall acceptance rate.
     """
- 
+
     # Neighbour indices are positional, so the annotation must be positionally
     # indexed too: a pd.Series carrying cell names would be looked up by label.
     batch = pd.Series(np.asarray(batch)).astype('category')
@@ -112,15 +116,15 @@ def kbet(
         kBET_arr = np.concatenate(
             Parallel(n_jobs=n_jobs)(
                 delayed(kbet_one_chunk)(
-                    index[starting_idx[i] : starting_idx[i + 1], :], 
-                    batch, 
+                    index[starting_idx[i] : starting_idx[i + 1], :],
+                    batch,
                     null_dist
                 )
                 for i in range(n_jobs)
             )
         )
-        
-    # Gather results 
+
+    # Gather results
     stat_mean, pvalue_mean = kBET_arr.mean(axis=0)
     accept_rate = (kBET_arr[:,1] >= alpha).sum() / len(batch)
 
@@ -232,9 +236,9 @@ def custom_ARI(g1: Iterable[Any], g2: Iterable[Any]) -> float:
 
 def distance_AUPRC(D: np.array, labels: Iterable[Any]) -> float:
     """
-    Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n). 
+    Uses a n x n distance matrix D as a binary classifier for a set of labels  (1,...,n).
     Reports Area Under Precision Recall Curve. Used in Ludwig et al., 2019.
-   
+
     Parameters
     ----------
     D : np.array
@@ -245,13 +249,13 @@ def distance_AUPRC(D: np.array, labels: Iterable[Any]) -> float:
     Returns
     -------
     float : AUPRC score.
-    """    
+    """
 
-    labels = pd.Categorical(labels) 
+    labels = pd.Categorical(labels)
 
     final = {}
     for alpha in np.linspace(0,1,10):
- 
+
         p_list = []
         gt_list = []
 
@@ -280,7 +284,7 @@ def distance_AUPRC(D: np.array, labels: Iterable[Any]) -> float:
 
 def calculate_corr_distances(tree: CassiopeiaTree) -> float:
     """
-    Calculate correlation between tree and character matrix cell-cell distances. 
+    Calculate correlation between tree and character matrix cell-cell distances.
     Used in Yang et al., 2023.
     """
 
@@ -289,7 +293,7 @@ def calculate_corr_distances(tree: CassiopeiaTree) -> float:
         D = D.loc[tree.leaves, tree.leaves] # In case root is there...
     else:
         raise ValueError('No precomputed character distance. Add one...')
-    
+
     L = []
     undirected = tree.get_tree_topology().to_undirected()
     for node in tree.leaves:
@@ -302,7 +306,7 @@ def calculate_corr_distances(tree: CassiopeiaTree) -> float:
     x = scale(D.values.flatten())
     y = scale(D_phylo.values.flatten())
     corr, p = pearsonr(x, y)
-    
+
     return corr, p
 
 

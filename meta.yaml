@@ -1,0 +1,34 @@
+# Submission entry for https://github.com/scverse/ecosystem-packages
+# Copy this to packages/MiTo/meta.yaml in a fork of that repository and open a PR,
+# completing the checklist from its README in the PR description.
+name: MiTo
+description: |
+  MiTo is a toolkit for mitochondrial single-cell lineage tracing (MT-scLT) data analysis.
+  It assembles Allele Frequency Matrices from MT-scLT assays (e.g., MAESTER, scmtATAC-seq, ReDeeM)
+  into AnnData objects, selects informative MT-SNVs, calls single-cell genotypes, 
+  reconstructs distance-based phylogenies in mtDNA mutational space, and 
+  annotates these with a bespoke algorithm to find discrete clonal populations.
+  Interoperability with other scverse frameworks allows mapping additional data modalities 
+  (e.g., gene expression, chromatin accessibility, protein abundance) to inferred phylogenies and clones
+  to investigate biological processes of interest.
+project_home: https://github.com/andrecossa5/MiTo
+documentation_home: https://andrecossa5.readthedocs.io/en/latest/index.html
+tutorials_home: https://andrecossa5.readthedocs.io/en/latest/getting_started_tutorial.html
+publications:
+  - 10.1101/2025.06.17.660165
+install:
+  pypi: scmito
+tags:
+  - single-cell
+  - multi-omics
+  - lineage-tracing
+  - mtDNA
+  - phylogenetics
+  - clonal-inference
+license: MIT
+version: v0.2.0
+contact:
+  - andrecossa5
+test_command: |
+  pip install ".[test]" && pytest
+category: ecosystem

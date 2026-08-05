@@ -1,24 +1,30 @@
 """
-Private: functions for supervised models training and evaluation. 
+Private: functions for supervised models training and evaluation.
 """
 
 import numpy as np
 import shap
-from scipy.sparse import issparse
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 from lightgbm import LGBMClassifier
-from sklearn.svm import SVC
+from scipy.sparse import issparse
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    auc,
+    balanced_accuracy_score,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+)
+from sklearn.model_selection import RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import StratifiedShuffleSplit, RandomizedSearchCV
-from sklearn.metrics import *
-
+from sklearn.preprocessing import StandardScaler
 
 ##
 
 
-def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_model=8, 
+def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_model=8,
                 cores_GS=1, GS_mode='bayes', full_output=False, feature_names=None):
     """
     Given some input data X y, run a classification analysis in several flavours.
@@ -27,25 +33,25 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
     ########### Standard sklearn models
     models = {
 
-        'logit' : 
+        'logit' :
         LogisticRegression(solver='saga', penalty='elasticnet', n_jobs=cores_model, max_iter=10000),
-        
-        'xgboost' : 
+
+        'xgboost' :
         LGBMClassifier(objective='binary', n_jobs=cores_model),
-        
+
         'kNN' :
         KNeighborsClassifier(n_jobs=cores_model)
 
     }
     params = {
 
-        'logit' : 
+        'logit' :
         {
             'logit__C' : [100, 10, 1.0, 0.1, 0.01],
             'logit__l1_ratio' : np.linspace(0, 1, 10)
         },
-        
-        'xgboost' : 
+
+        'xgboost' :
         {
             'xgboost__num_leaves': [31, 63, 127],
             'xgboost__learning_rate': [0.01, 0.05, 0.1],
@@ -75,7 +81,7 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
     }
     ###########
 
-    # Train-test split 
+    # Train-test split
     seed = 1234
     sss = StratifiedShuffleSplit(n_splits=2, test_size=0.2, random_state=seed)
 
@@ -89,9 +95,9 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
     # Pipe or hyperopt-model definition
     if GS_mode == 'random' and GS:
 
-        # Pipeline definiton
-        pipe = Pipeline( 
-            steps=[ 
+        # Pipeline definition
+        pipe = Pipeline(
+            steps=[
 
                 ('pp', StandardScaler()), # Always scale MT-SNVs features
                 (key, models[key])
@@ -99,8 +105,8 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
         )
         # GS definition
         model = RandomizedSearchCV(
-            pipe, 
-            param_distributions=params[key], 
+            pipe,
+            param_distributions=params[key],
             n_iter=n_combos,
             refit=True,
             n_jobs=cores_GS,
@@ -116,17 +122,17 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
 
     # Too much problems with ray
     # elif GS_mode == 'bayes' and GS:
-    # 
-    #     # Pipeline definiton
-    #     pipe = Pipeline( 
-    #         steps=[ 
-    # 
+    #
+    #     # Pipeline definition
+    #     pipe = Pipeline(
+    #         steps=[
+    #
     #             ('pp', StandardScaler()), # Always scale expression features
     #             (key, models[key]) # key = 'xgboost'
     #         ]
     #     )
-    # 
-    #     # Ray-tune choice and training 
+    #
+    #     # Ray-tune choice and training
     #     model = TuneGridSearchCV(
     #         pipe,
     #         params[key],
@@ -147,7 +153,7 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
 
     # Decision treshold tuning
     precisions, recalls, tresholds = precision_recall_curve(
-        y_train, f.predict_proba(X_train)[:,1], 
+        y_train, f.predict_proba(X_train)[:,1],
     )
     f1_scores = 2 * (precisions * recalls) / (precisions + recalls)
     alpha = tresholds[np.argmax(f1_scores)]
@@ -167,40 +173,40 @@ def classification(X, y, key='logit', GS=True, n_combos=50, score='f1', cores_mo
     }
 
     if full_output:
-        
+
         try:
             explainer = shap.Explainer(
-                f.predict, 
-                X_test, 
-                feature_names=feature_names 
+                f.predict,
+                X_test,
+                feature_names=feature_names
             )
             SHAP = explainer(X_test)
-            
-        except:
+
+        except Exception:  # noqa: BLE001
             explainer = shap.Explainer(
-                f.predict, 
-                X_test, 
+                f.predict,
+                X_test,
                 feature_names=feature_names,
                 max_evals = 2*feature_names.size+1
             )
             SHAP = explainer(X_test)
-            
+
     # Pack results up
     results = {
         'best_estimator' : f,
-        'performance_dict': d, 
-        'y_test' : y_test, 
-        'y_pred' : y_pred, 
-        'precisions' : precisions, 
+        'performance_dict': d,
+        'y_test' : y_test,
+        'y_pred' : y_pred,
+        'precisions' : precisions,
         'recalls' : recalls,
         'tresholds' : tresholds,
-        'alpha' : alpha  
+        'alpha' : alpha
     }
-    
+
     if full_output:
         results['SHAP'] = SHAP
-        
+
     return results
-        
+
 
 ##

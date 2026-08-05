@@ -6,11 +6,10 @@ inference produces. The method already sweeps its own hyper-parameter grid
 internally, so this does not re-sweep it from outside.
 """
 
-import numpy as np
 import pandas as pd
 import pytest
-import mito as mt
 
+import mito as mt
 
 # -- construction and inputs ------------------------------------------------
 

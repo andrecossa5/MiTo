@@ -40,6 +40,7 @@ dependencies = [
     "scikit-learn>=1.4",
     "joblib>=1.3",
     "tqdm>=4.60",
+
     # scverse
     "anndata>=0.10",
     "scanpy>=1.10",
@@ -65,8 +66,8 @@ dependencies = [
     "lightgbm>=4.0",
     "shap>=0.44",
     
-    # enrichment
-    "gseapy>=1.1",
+    # Others
+    "gseapy>=1.1"
 
 ]
 
@@ -92,3 +93,42 @@ include = ["src/mito", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.ruff]
+line-length = 120
+src = ["src"]
+extend-include = ["*.ipynb"]
+format.docstring-code-format = true
+lint.select = [
+    "B",      # flake8-bugbear
+    "BLE",    # flake8-blind-except
+    "C4",     # flake8-comprehensions
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "RUF100", # unused noqa directives
+    "TID",    # flake8-tidy-imports
+    "UP",     # pyupgrade
+    "W",      # pycodestyle warnings
+]
+lint.ignore = [
+    "B008", # function calls in argument defaults -- fine when the result is immutable
+    "E501", # long lines: long comments are accepted, the formatter handles code
+    "E731", # lambda assignment is convenient
+    "E741", # allow I, O, l as names -- I is the identity matrix
+]
+lint.per-file-ignores."*/__init__.py" = ["F401"]
+lint.per-file-ignores."docs/*" = ["I"]
+lint.per-file-ignores."tests/*" = ["D"]
+lint.pydocstyle.convention = "numpy"
+
+[tool.codespell]
+skip = ".git,*.ipynb,*.csv,*.txt,*.fa,*.gz,docs/_build"
+# NB: "treshold"/"tresh" and "indeces" appear in public parameter names
+# (e.g. MiToTreeAnnotator.clonal_inference(similarity_tresholds=...)), so they are
+# ignored rather than corrected: fixing them would be a breaking API change.
+ignore-words-list = "coo,nd,ist,hist,mut,muts,ND,SNS,treshold,tresholds,tresh,indeces,simmetric"
+
+[tool.coverage.run]
+source = ["mito"]
+omit = ["*/tests/*"]

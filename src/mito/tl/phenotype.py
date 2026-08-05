@@ -2,26 +2,28 @@
 Tools to map phenotype to lineage structures.
 """
 
+from collections.abc import Iterable
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from typing import Any, Iterable
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
 from statsmodels.sandbox.stats.multicomp import multipletests
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-from ..ut.phylo_utils import get_internal_node_stats
+from tqdm import tqdm
 
+from mito.ut.phylo_utils import get_internal_node_stats
 
 ##
 
 
 def compute_clonal_fate_bias(
-    tree: CassiopeiaTree, 
-    state_column: str, 
-    clone_column: str, 
+    tree: CassiopeiaTree,
+    state_column: str,
+    clone_column: str,
     target_state: str|Any
     ) -> pd.DataFrame:
     """
@@ -66,7 +68,7 @@ def compute_clonal_fate_bias(
         'perc_in_target_state' : target_ratio_array,
         'odds_ratio' : oddsratio_array,
         'FDR' : pvals,
-        'fate_bias' : -np.log10(pvals) 
+        'fate_bias' : -np.log10(pvals)
     }).sort_values('fate_bias', ascending=False)
 
     return results
@@ -113,7 +115,7 @@ def compute_scPlasticity(tree: CassiopeiaTree, meta_column: str):
 
 def nb_regression(df: pd.DataFrame, features: Iterable[str], predictor: str) -> pd.DataFrame:
     """
-    Negative binomial regression approach to associate 
+    Negative binomial regression approach to associate
     clonal-level features to gene expression.
 
     Parameters
@@ -149,7 +151,7 @@ def nb_regression(df: pd.DataFrame, features: Iterable[str], predictor: str) -> 
                 .assign(gene=gene)
             )
             L.append(df_)
-        except:
+        except Exception:  # noqa: BLE001
             pass
 
     results = pd.concat(L)
@@ -171,7 +173,7 @@ def _find_partitions(df, n_cells):
             df.iloc[i:min(i+n_cells,df.shape[0]),:].index
         )
         i += n_cells
-    
+
     return partitions
 
 
@@ -191,15 +193,15 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
     if n_cells is None and n_samples is None:
         agg = (
             pd.DataFrame(
-                adata[cells,:].layers['raw'].toarray(), 
+                adata[cells,:].layers['raw'].toarray(),
                 index=cells, columns=adata.var_names
             )
             .join(meta_top[['MiTo clone']])
             .groupby('MiTo clone')
             .agg(agg_method)
             .round()
-        )  
-    
+        )
+
     elif n_cells is not None and n_samples is not None:
 
         pseudobulk_samples = []
@@ -207,9 +209,9 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
             df_ = meta_top.loc[meta_top['MiTo clone']==clone]
             for i in range(n_samples):
                 cells = df_.sample(n_cells).index
-                profile = ( 
+                profile = (
                     pd.DataFrame(
-                        adata[cells,:].layers['raw'].toarray(), 
+                        adata[cells,:].layers['raw'].toarray(),
                         index=cells, columns=adata.var_names
                     )
                     .agg(agg_method, axis=0)
@@ -217,24 +219,24 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
                     .to_frame('counts')
                     .reset_index(names='gene')
                     .assign(sample=f'{clone}_{i}')
-                )   
+                )
                 pseudobulk_samples.append(profile)
 
         agg = (
             pd.concat(pseudobulk_samples)
             .pivot_table(index='sample', columns='gene', values='counts')
         )
-        
+
     elif n_cells is not None and n_samples is None:
-        
+
         pseudobulk_samples = []
         for clone in top_clones:
             df_ = meta_top.loc[meta_top['MiTo clone']==clone]
             partitions = _find_partitions(df_, n_cells)
             for i,cells in enumerate(partitions):
-                profile = ( 
+                profile = (
                     pd.DataFrame(
-                        adata[cells,:].layers['raw'].toarray(), 
+                        adata[cells,:].layers['raw'].toarray(),
                         index=cells, columns=adata.var_names
                     )
                     .agg(agg_method, axis=0)
@@ -242,7 +244,7 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
                     .to_frame('counts')
                     .reset_index(names='gene')
                     .assign(sample=f'{clone}_{i}')
-                )   
+                )
                 pseudobulk_samples.append(profile)
 
         agg = (
@@ -253,19 +255,19 @@ def agg_pseudobulk(tree, adata, agg_method='mean', min_n_cells=10, n_cells=None,
         raise ValueError('Wrong combo of n_cells, n_samples')
 
     # Filter genes and add counts columns
-    if agg_method == 'sum':   
-        total_clone_counts = agg.sum(axis=1) 
+    if agg_method == 'sum':
+        total_clone_counts = agg.sum(axis=1)
         agg_norm = agg.apply(lambda x: x/(total_clone_counts+1)*10**6, axis=0)
         norm_mean_expression = agg_norm.mean(axis=0)
         test = (norm_mean_expression >= np.percentile(norm_mean_expression, 10))
         agg = agg.loc[:,test].copy()
         agg['counts'] = total_clone_counts
-    
+
     elif agg_method == 'mean':
         mean_expression = agg.mean(axis=0)
         test = mean_expression > 0
         agg = agg.loc[:,test]
-        agg['counts'] = agg.mean(axis=1) 
+        agg['counts'] = agg.mean(axis=1)
 
 
     # Add clone level covariates, and re-scale them

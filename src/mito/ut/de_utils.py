@@ -2,33 +2,31 @@
 Utils for DE, GSEA analysis.
 """
 
-import numpy as np
-import pandas as pd
-import gseapy
-from typing import List
-from anndata import AnnData
-from sklearn.metrics import pairwise_distances
-from scipy.cluster.hierarchy import linkage, leaves_list
 
+import gseapy
+import pandas as pd
+from anndata import AnnData
+from scipy.cluster.hierarchy import leaves_list, linkage
+from sklearn.metrics import pairwise_distances
 
 ##
 
 
 def format_rank_genes_groups(
-    adata: AnnData, 
-    key: str = 'rank_genes_groups', 
+    adata: AnnData,
+    key: str = 'rank_genes_groups',
     filter_genes: bool = False,
     rank_by: str = 'log2FC',
-    max_pval_adj: float = .05, 
-    min_log2FC: float = 1, 
-    min_pct_group: float = .5, 
+    max_pval_adj: float = .05,
+    min_log2FC: float = 1,
+    min_pct_group: float = .5,
     max_pct_rest: float = .5
     ) -> pd.DataFrame :
 
     L = []
     cats = adata.uns[key]['names'].dtype.names
     group_col = adata.uns[key]['params']['groupby']
-    
+
     for cat in cats:
         genes = adata.uns[key]['names'][cat]
         df_ = pd.DataFrame({
@@ -44,7 +42,7 @@ def format_rank_genes_groups(
         cell_rest = adata.obs_names[adata.obs[group_col] != cat]
         df_['mean_exp_group'] = adata[cell_group, df_['gene']].X.toarray().mean(axis=0)
         df_['mean_exp_rest'] = adata[cell_rest, df_['gene']].X.toarray().mean(axis=0)
-        
+
         if filter_genes:
             df_ = df_.query('log2FC>=@min_log2FC and pct_group>@min_pct_group and pct_rest<=@max_pct_rest')
             df_ = df_.query('pval_adj<=@max_pval_adj')
@@ -104,8 +102,8 @@ def get_top_markers(df, groupby='group', sort_by='log2FC', ascending=False, orde
 
 
 def run_GSEA(
-    ranked_list: pd.Series, 
-    collections: str|List[str] = 'MSigDB_Hallmark_2020',
+    ranked_list: pd.Series,
+    collections: str|list[str] = 'MSigDB_Hallmark_2020',
     max_pval_adj: float = .01,
     min_size_set: int = 15,
     max_size_set: int =  1000
@@ -124,8 +122,8 @@ def run_GSEA(
         threads=-1,
         min_size=min_size_set,
         max_size=max_size_set,
-        permutation_num=200, 
-        outdir=None, 
+        permutation_num=200,
+        outdir=None,
         seed=1234,
         verbose=True,
     )
@@ -144,8 +142,8 @@ def run_GSEA(
 
 
 def run_ORA(
-    gene_list: List[str], 
-    collections: str|List[str] = 'MSigDB_Hallmark_2020',
+    gene_list: list[str],
+    collections: str|list[str] = 'MSigDB_Hallmark_2020',
     max_pval_adj: float = .01
     ) -> pd.DataFrame :
 
@@ -155,7 +153,7 @@ def run_ORA(
         gene_sets=L,
         cutoff=.1,
         no_plot=True,
-        outdir=None, 
+        outdir=None,
     ).results
     df = (
         results

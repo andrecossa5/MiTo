@@ -5,10 +5,9 @@ Discretization module.
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from bbmix.models import MixtureBinomial
 from scipy.optimize import minimize
 from scipy.special import logsumexp
-from bbmix.models import MixtureBinomial
-
 
 ##
 
@@ -18,12 +17,12 @@ def fit_binom(ad, dp, logratio=False, BIC=True):
     Fit a binomial distribution to ad, dp counts using MLE.
     """
     p_mle = np.sum(ad) / np.sum(dp)
-    ad_th = dp * p_mle 
+    ad_th = dp * p_mle
 
     d = {}
     if logratio:
         log_likelihood = np.sum(stats.binom.logpmf(ad, n=dp, p=p_mle))
-        log_likelihood_saturated = np.sum(np.log([ stats.binom.pmf(k, n, k/n) for n,k in zip(dp,ad) ]))
+        log_likelihood_saturated = np.sum(np.log([ stats.binom.pmf(k, n, k/n) for n,k in zip(dp,ad, strict=False) ]))
         G2_stat = 2 * (log_likelihood_saturated - log_likelihood)
         G2_p_value = stats.chi2.sf(G2_stat, df=dp.size-1)
         d['G2_stat'] = G2_stat
@@ -32,7 +31,7 @@ def fit_binom(ad, dp, logratio=False, BIC=True):
         log_likelihood = np.sum(stats.binom.logpmf(ad, n=dp, p=p_mle))
         d['BIC'] = 1 * np.log(dp.size) - 2 * log_likelihood
         d['L'] = log_likelihood
-    
+
     return ad_th, d
 
 
@@ -53,7 +52,7 @@ def fit_nbinom(ad, dp, logratio=False, BIC=True):
         """
         r, p = params
         if r <= 0 or not (0 < p < 1):
-            return np.inf 
+            return np.inf
         log_likelihood = np.sum(stats.nbinom.logpmf(ad, n=r, p=p))
         return -log_likelihood
 
@@ -71,7 +70,7 @@ def fit_nbinom(ad, dp, logratio=False, BIC=True):
     d = {}
     if logratio:
         log_likelihood = -_negbinom_log_likelihood([r_mle, p_mle], ad)
-        log_likelihood_saturated = np.sum(np.log([stats.nbinom.pmf(k, r_mle, (k+.0000001)/n) for n,k in zip(dp, ad)]))
+        log_likelihood_saturated = np.sum(np.log([stats.nbinom.pmf(k, r_mle, (k+.0000001)/n) for n,k in zip(dp, ad, strict=False)]))
         G2_stat = 2 * (log_likelihood_saturated - log_likelihood)
         G2_p_value = stats.chi2.sf(G2_stat, df=dp.size-1)
         d['G2_stat'] = G2_stat
@@ -80,9 +79,9 @@ def fit_nbinom(ad, dp, logratio=False, BIC=True):
         log_likelihood = -_negbinom_log_likelihood([r_mle, p_mle], ad)
         d['BIC'] = 2 * np.log(dp.size) - 2 * log_likelihood
         d['L'] = log_likelihood
-    
+
     return ad_th, d
-    
+
 
 ##
 
@@ -120,7 +119,7 @@ def fit_betabinom(ad, dp, logratio=False, BIC=True):
     d = {}
     if logratio:
         log_likelihood = -_betabinom_log_likelihood([alpha_mle, beta_mle], ad, dp)
-        log_likelihood_saturated = np.sum(np.log([stats.betabinom.pmf(k, n, alpha_mle, beta_mle) for n, k in zip(dp, ad)]))
+        log_likelihood_saturated = np.sum(np.log([stats.betabinom.pmf(k, n, alpha_mle, beta_mle) for n, k in zip(dp, ad, strict=False)]))
         G2_stat = 2 * (log_likelihood_saturated - log_likelihood)
         G2_p_value = stats.chi2.sf(G2_stat, df=dp.size - 1)
         d['G2_stat'] = G2_stat
@@ -129,7 +128,7 @@ def fit_betabinom(ad, dp, logratio=False, BIC=True):
         log_likelihood = -_betabinom_log_likelihood([alpha_mle, beta_mle], ad, dp)
         d['L'] = log_likelihood
         d['BIC'] = 2 * np.log(dp.size) - 2 * log_likelihood
-    
+
     return ad_th, d
 
 
@@ -149,7 +148,7 @@ def fit_mixbinom(ad, dp, logratio=False, BIC=True):
     if BIC:
         d['L'] = model.log_likelihood_mixture_bin(ad, dp, params)
         d['BIC'] = model.model_scores['BIC']
-    
+
     return ad_th, d
 
 
@@ -157,7 +156,7 @@ def fit_mixbinom(ad, dp, logratio=False, BIC=True):
 
 
 def get_posteriors(ad, dp):
-    
+
     np.random.seed(1234)
     model = MixtureBinomial(n_components=2, tor=1e-20)
     model.fit((ad, dp), max_iters=500, early_stop=True)
@@ -189,36 +188,36 @@ def get_posteriors(ad, dp):
 
 
 def genotype_mix(
-    ad: np.array, 
-    dp: np.array, 
-    t_prob: float = .7, 
-    t_vanilla: float = 0, 
-    debug: bool = False, 
+    ad: np.array,
+    dp: np.array,
+    t_prob: float = .7,
+    t_vanilla: float = 0,
+    debug: bool = False,
     min_AD: int = 1
     ) -> np.array:
     """
-    Derive a discrete genotype (1:'MUT', 0:'WT') for each cell, given the 
+    Derive a discrete genotype (1:'MUT', 0:'WT') for each cell, given the
     AD and DP counts of one of its candidate mitochondrial variants.
     """
 
     positive_idx = np.where(dp>0)[0]
     posterior_probs = get_posteriors(ad[positive_idx], dp[positive_idx])
-    tests = [ 
+    tests = [
         (posterior_probs[:,1]>t_prob) & (posterior_probs[:,0]<(1-t_prob)), # & (ad[positive_idx]>=min_AD),  # REMOVE!!
-        (posterior_probs[:,1]<(1-t_prob)) & (posterior_probs[:,0]>t_prob) 
+        (posterior_probs[:,1]<(1-t_prob)) & (posterior_probs[:,0]>t_prob)
     ]
     geno_prob = np.select(tests, [1,0], default=0)
     genotypes = np.zeros(ad.size, dtype=np.int16)
     genotypes[positive_idx] = geno_prob
-    
+
     # Compare to vanilla genotyping (AF>t --> 1, 0 otherwise)
     if debug:
         test = (ad/dp>t_vanilla) & (ad>=min_AD)
-        geno_vanilla = np.where(test,1,0)                        
+        geno_vanilla = np.where(test,1,0)
         df = pd.DataFrame({
-          'ad':ad[positive_idx], 'dp':dp[positive_idx], 
-          'geno_vanilla':geno_vanilla[positive_idx], 
-          'geno_prob':geno_prob, 
+          'ad':ad[positive_idx], 'dp':dp[positive_idx],
+          'geno_vanilla':geno_vanilla[positive_idx],
+          'geno_prob':geno_prob,
           'p0':posterior_probs[:,0], 'p1':posterior_probs[:,1]
         })
         print(pd.crosstab(df['geno_vanilla'], df['geno_prob'], dropna=False))

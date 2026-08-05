@@ -3,14 +3,17 @@ Dimensionality reduction utils to reduce a (pre-filtered) AFMs.
 """
 
 import logging
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any
+import sklearn.preprocessing as pp
+from anndata import AnnData
 from scipy.linalg import eigh
 from sklearn.decomposition import PCA
-from umap.umap_ import simplicial_set_embedding, find_ab_params
-from .kNN import *
-from .distances import *
+from umap.umap_ import find_ab_params, simplicial_set_embedding
 
+from .distances import compute_distances
+from .kNN import kNN_graph
 
 ##
 
@@ -37,13 +40,13 @@ def find_diffusion_matrix(D):
 def find_diffusion_map(P_prime, D_left, n_eign=10):
     """
     Function to find the diffusion coordinates in the diffusion space.
-    """   
+    """
     eigenValues, eigenVectors = eigh(P_prime)
     idx = eigenValues.argsort()[::-1]
     eigenValues = eigenValues[idx]
     eigenVectors = eigenVectors[:,idx]
     diffusion_coordinates = np.matmul(D_left, eigenVectors)
-    
+
     return diffusion_coordinates[:,:n_eign]
 
 
@@ -56,21 +59,23 @@ def find_pca(X, n_pcs=30, random_state=1234):
     """
     model = PCA(n_components=n_pcs, random_state=random_state)
     X_pca = model.fit_transform(X)
-    
+
     return X_pca
 
 
 ##
 
 
-def _umap_from_X_conn(X, conn, ncomps=2, metric='cosine', metric_kwargs={}, seed=1234):
+def _umap_from_X_conn(X, conn, ncomps=2, metric='cosine', metric_kwargs=None, seed=1234):
     """
-    Wrapper around umap.umap_.simplicial_set_embedding() to create a umap embedding of the 
+    Wrapper around umap.umap_.simplicial_set_embedding() to create a umap embedding of the
     feature matrix X using a precomputed fuzzy graph.
     """
+    if metric_kwargs is None:
+        metric_kwargs = {}
     a, b = find_ab_params(1.0, 0.5)
     X_umap, _ = simplicial_set_embedding(
-        X, conn, ncomps, 1.0, a, b, 1.0, 5, 200, 'spectral', 
+        X, conn, ncomps, 1.0, a, b, 1.0, 5, 200, 'spectral',
         random_state=np.random.RandomState(seed), metric=metric, metric_kwds=metric_kwargs,
         densmap=None, densmap_kwds=None, output_dens=None
     )
@@ -103,7 +108,7 @@ def _get_D(afm, distance_key, **kwargs):
                 logging.info(f'Use precomputed {distance_key}')
                 D = afm.obsp[distance_key].toarray()
                 return D
-            
+
     compute_distances(afm, distance_key=distance_key, **kwargs)
     D = afm.obsp[distance_key].toarray()
 
@@ -114,17 +119,17 @@ def _get_D(afm, distance_key, **kwargs):
 
 
 def reduce_dimensions(
-    afm: AnnData, 
+    afm: AnnData,
     layer: str = 'bin',
-    distance_key: str = 'distances', 
-    seed: int = 1234, 
-    method: str = 'UMAP', 
-    k: int = 10, 
-    n_comps: int = 2, 
+    distance_key: str = 'distances',
+    seed: int = 1234,
+    method: str = 'UMAP',
+    k: int = 10,
+    n_comps: int = 2,
     ncores: int = 8,
-    metric: str = 'weighted_jaccard', 
-    bin_method: str = 'MiTo', 
-    binarization_kwargs: Dict[str,Any] = {}
+    metric: str = 'weighted_jaccard',
+    bin_method: str = 'MiTo',
+    binarization_kwargs: dict[str,Any] = None
     ):
     """
     Dimensionality reduction for an Allele Frequency Matrix.
@@ -153,8 +158,10 @@ def reduce_dimensions(
         Keyword arguments for binarization. Default is {}.
     """
 
-    kwargs = dict(metric=metric, bin_method=bin_method, ncores=ncores, binarization_kwargs=binarization_kwargs)
-    
+    if binarization_kwargs is None:
+        binarization_kwargs = {}
+    kwargs = {'metric': metric, 'bin_method': bin_method, 'ncores': ncores, 'binarization_kwargs': binarization_kwargs}
+
     if method == 'PCA':
         X = _get_X(afm, layer)
         afm.obsm['X_pca'] = find_pca(X, n_pcs=n_comps, random_state=seed)
@@ -169,7 +176,7 @@ def reduce_dimensions(
         D = _get_D(afm, distance_key, **kwargs)
         P_prime, _,_,_, D_left = find_diffusion_matrix(D)
         afm.obsm['X_diffmap'] = find_diffusion_map(P_prime, D_left, n_eign=n_comps)
-    
+
     else:
         raise ValueError(f'Method {method} not recognized. Please use "PCA", "UMAP" or "diffmap".')
 

@@ -12,8 +12,8 @@ observable effect on the axes, that effect is asserted directly.
 
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
 import pytest
+
 import mito as mt
 
 
@@ -122,7 +122,7 @@ def test_multiple_features(tree):
 def test_feature_with_explicit_categorical_cmap(tree):
     ax = _ax()
     categories = tree.cell_meta["GBC"].unique()
-    cmap = {c: col for c, col in zip(categories, ["#e41a1c", "#377eb8", "#4daf4a"])}
+    cmap = dict(zip(categories, ["#e41a1c", "#377eb8", "#4daf4a"], strict=False))
     mt.pl.plot_tree(tree, ax=ax, features=["GBC"], categorical_cmaps={"GBC": cmap})
     assert _n_artists(ax) > 0
 
@@ -135,7 +135,7 @@ def test_feature_with_continuous_cmap(tree, cmap):
 
 
 def test_unknown_feature_raises(tree):
-    with pytest.raises(Exception):
+    with pytest.raises(KeyError):
         mt.pl.plot_tree(tree, ax=_ax(), features=["not_a_column"])
 
 

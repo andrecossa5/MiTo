@@ -2,11 +2,9 @@
 Clustering: leiden/vireoSNP.
 """
 
-import numpy as np
-import pandas as pd
-import scanpy as sc
 import leidenalg
-
+import numpy as np
+import scanpy as sc
 
 ##
 

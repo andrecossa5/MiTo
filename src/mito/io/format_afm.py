@@ -4,15 +4,18 @@ Create a clean allelic frequency matrix as AnnData object.
 
 import logging
 import os
+import warnings
+
+import cassiopeia as cs
 import numpy as np
 import pandas as pd
-import warnings
-import cassiopeia as cs
+from anndata import AnnData
 from scipy.io import mmread
 from scipy.sparse import csr_matrix
-from anndata import AnnData
-from ..ut.utils import Timer, path_assets
-from ..ut.positions import MAESTER_genes_positions, mask_mt_sites
+
+from mito.ut.positions import mask_mt_sites
+from mito.ut.utils import Timer, path_assets
+
 warnings.filterwarnings("ignore")
 
 
@@ -20,7 +23,7 @@ warnings.filterwarnings("ignore")
 
 
 def read_from_AD_DP(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
     pp_method: str = None, cell_col: str ='cell', scLT_system: str = 'MAESTER'
     ) -> AnnData :
     """
@@ -48,7 +51,7 @@ def read_from_AD_DP(
     table['MUT'] = table['POS'].astype(str) + '_' + table['REF'] + '>' + table['ALT']
     AD = table.pivot(index=cell_col, columns='MUT', values='AD').fillna(0)
     DP = table.pivot(index=cell_col, columns='MUT', values='DP').fillna(0)
-    
+
     if path_meta not in ['null',None] and os.path.exists(path_meta):
         cells = list(set(cell_meta.index) & set(DP.index))
         AD = AD.loc[cells].copy()
@@ -79,7 +82,7 @@ def read_from_AD_DP(
 
 
 def read_from_cellsnp(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
     pp_method: str = None,  scLT_system: str = 'MAESTER'
     ) -> AnnData :
 
@@ -106,7 +109,7 @@ def read_from_cellsnp(
     variants = vcf['POS'].astype(str) + '_' + vcf['REF'] + '>' + vcf['ALT']
     AD = pd.DataFrame(mmread(path_AD).toarray().T, index=cells, columns=variants)
     DP = pd.DataFrame(mmread(path_DP).toarray().T, index=cells, columns=variants)
-    
+
     if path_meta is not None and os.path.exists(path_meta):
         cell_meta = pd.read_csv(path_meta, index_col=0)
         cells = list(set(cell_meta.index) & set(DP.index))
@@ -148,7 +151,7 @@ def sparse_from_long(df, covariate, nrow, ncol, cell_order):
 
     df['code'] = pd.Categorical(df['cell'], categories=cell_order).codes
     sparse_matrix = csr_matrix(
-        (df[covariate].values, (df['code'].values, df['pos'].values-1)), 
+        (df[covariate].values, (df['code'].values, df['pos'].values-1)),
         shape=(nrow, ncol)
     )
 
@@ -159,12 +162,12 @@ def sparse_from_long(df, covariate, nrow, ncol, cell_order):
 
 
 def read_from_scmito(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
     pp_method: str = None, scLT_system: str = 'MAESTER', ref='rCRS'
     ) -> AnnData :
-    
+
     """
-    Create AFM as as AnnData object from cellsnp output tables. 
+    Create AFM as as AnnData object from cellsnp output tables.
     The path_ch_matrix folder must contain the default output from mito_preprocessing/maegatk:
     * 1: 'A|C|T|G.txt.gz'
     * 2: 'coverage.txt.gz'
@@ -183,7 +186,7 @@ def read_from_scmito(
     path_C = os.path.join(path_ch_matrix, 'C.txt.gz')
     path_T = os.path.join(path_ch_matrix, 'T.txt.gz')
     path_G = os.path.join(path_ch_matrix, 'G.txt.gz')
-    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')              
+    path_cov = os.path.join(path_ch_matrix, 'coverage.txt.gz')
 
     # Get ref
     if ref == 'rCRS':
@@ -193,14 +196,14 @@ def read_from_scmito(
     else:
         raise ValueError('Provide a path to your custom genome ref (FASTA file).')
 
-    with open(chrM_path, 'r') as f:
+    with open(chrM_path) as f:
         _ = f.readlines()
     seq = ''.join([ x.strip() for x in _[1:] ])
     ref = { pos+1:ref for pos,ref in enumerate(seq) }
 
     # Here we go
     L = []
-    for base, path_base in zip(['A', 'C', 'T', 'G'], [path_A, path_C, path_T, path_G]):
+    for base, path_base in zip(['A', 'C', 'T', 'G'], [path_A, path_C, path_T, path_G], strict=False):
 
         logging.info(f'Process table: {base}')
         base_df = pd.read_csv(path_base, header=None)
@@ -208,17 +211,17 @@ def read_from_scmito(
         if pp_method == 'maegatk':
             base_df.columns = ['pos', 'cell', 'count_fw', 'qual_fw', 'count_rev', 'qual_rev']
         elif pp_method == 'mito_preprocessing':
-            base_df.columns = ['pos', 'cell', 
-                               'count_fw', 'qual_fw', 'cons_fw', 'gs_fw', 
+            base_df.columns = ['pos', 'cell',
+                               'count_fw', 'qual_fw', 'cons_fw', 'gs_fw',
                                'count_rev', 'qual_rev', 'cons_rev', 'gs_rev']
-            
+
         base_df['counts'] = base_df['count_fw'] + base_df['count_rev']
         qual = base_df[['qual_fw', 'qual_rev']].values
         base_df['qual'] = np.nanmean(np.where(qual>0,qual,np.nan), axis=1)
         L.append(base_df[['pos', 'cell', 'counts', 'qual']].assign(base=base))
-    
+
     # Concat in long format
-    logging.info(f'Format all basecalls in a long table')
+    logging.info('Format all basecalls in a long table')
     long = pd.concat(L)
     if sample is not None:
         long['cell'] = long['cell'].map(lambda x: f'{x}_{sample}')
@@ -231,7 +234,7 @@ def read_from_scmito(
     logging.info(f'Total basecalls: {long.shape[0]}')
 
     # Filter only variant basecalls
-    logging.info(f'Filter variant allele basecalls')
+    logging.info('Filter variant allele basecalls')
     long = long.query('base!=ref').copy()
     long['nunique'] = long.groupby(['cell', 'pos'])['base'].transform('nunique')
     long = (
@@ -245,10 +248,10 @@ def read_from_scmito(
     # assert all(s == 1)
     metrics['variant_basecalls'] = long.shape[0]
     logging.info(f'Unique variant basecalls: {long.shape[0]}')
- 
+
     # Filter basecalls of annotated cells only (i.e., we have cell metadata)
     if path_meta not in [None,'null']:
-        logging.info(f'Filter for annotated cells (i.e., sample CBs in cell_meta)')
+        logging.info('Filter for annotated cells (i.e., sample CBs in cell_meta)')
         cell_meta = pd.read_csv(path_meta, index_col=0)
         cells = list(set(cell_meta.index) & set(long['cell'].unique()))
         long = long.query('cell in @cells').copy()
@@ -257,24 +260,24 @@ def read_from_scmito(
     else:
         cell_meta = None
         cells = list(long['cell'].unique())
- 
+
     # Add site coverage
-    logging.info(f'Retrieve cell-site total coverage')
+    logging.info('Retrieve cell-site total coverage')
     cov = pd.read_csv(path_cov, header=None)
     cov.columns = ['pos', 'cell', 'DP']
     if sample is not None:
         cov['cell'] = cov['cell'].map(lambda x: f'{x}_{sample}')
     long = long.merge(cov, on=['pos', 'cell'], how='left')
-  
+
     # Matrices
-    logging.info(f'Format AD/DP/qual matrices')
+    logging.info('Format AD/DP/qual matrices')
     long['mut'] = long['pos'].astype(str) + '_' + long['ref'] + '>' + long['alt']
     AD = long.pivot(index='cell', columns='mut', values='AD').fillna(0)
     DP = long.pivot(index='cell', columns='mut', values='DP').fillna(0)
     qual = long.pivot(index='cell', columns='mut', values='qual').fillna(0)
- 
+
     assert (AD.index.value_counts()==1).all()
- 
+
     # Ensure common cell index for each matrix
     AD = AD.loc[cells].copy()
     DP = DP.loc[cells].copy()
@@ -283,27 +286,27 @@ def read_from_scmito(
         cell_meta = cell_meta.loc[cells].copy()
     else:
         cell_meta = pd.DataFrame(index=cells)
- 
+
     # At least one unique variant basecall for each cell
     assert (np.sum(DP>0, axis=1)>0).all()
-    assert (np.sum(DP>0, axis=1)>0).all() 
+    assert (np.sum(DP>0, axis=1)>0).all()
     assert (AD.index == DP.index).all()
     assert (AD.columns == DP.columns).all()
- 
+
     # Char and cell metadata
     char_meta = DP.columns.to_series().to_frame('mut')
     char_meta['pos'] = char_meta['mut'].map(lambda x: int(x.split('_')[0]))
     char_meta['ref'] = char_meta['mut'].map(lambda x: x.split('_')[1].split('>')[0])
     char_meta['alt'] = char_meta['mut'].map(lambda x: x.split('_')[1].split('>')[1])
     char_meta = char_meta[['pos', 'ref', 'alt']]
- 
+
     """
-    We have selected relevant info (alt and ref counts, quality and allelic frequency) 
+    We have selected relevant info (alt and ref counts, quality and allelic frequency)
     about all interesting variant basecalls in the data. We have just excluded:
         1- basecalls of un-annotated cells
         2- basecalls for which more than one alternative allele has been observed (same cell, same site).
     """
- 
+
     # To sparse and AnnData
     logging.info('Build AnnData object')
     AF = csr_matrix(np.divide(AD.values,(DP.values+.00000001)).astype(np.float32))
@@ -311,16 +314,16 @@ def read_from_scmito(
     DP = csr_matrix(DP.values).astype(np.int16)
     qual = csr_matrix(qual.values).astype(np.int16)
     afm = AnnData(
-        X=AF, 
-        obs=cell_meta, 
-        var=char_meta, 
-        layers={'AD':AD, 'DP':DP, 'qual':qual}, 
+        X=AF,
+        obs=cell_meta,
+        var=char_meta,
+        layers={'AD':AD, 'DP':DP, 'qual':qual},
         uns={'pp_method':pp_method, 'scLT_system':scLT_system, 'raw_basecalls_metrics':metrics}
     )
     sorted_vars = afm.var['pos'].sort_values().index
     assert sorted_vars.size == afm.shape[1]
     afm = afm[:,sorted_vars].copy()
- 
+
     # Add complete site coverage info
     logging.info('Add site-coverage matrix and cell-coverage metrics')
     cov = cov.pivot(index='cell', columns='pos', values='DP').fillna(0)
@@ -329,7 +332,7 @@ def read_from_scmito(
     df_ = pd.DataFrame({ mut : cov[mapping[mut]].values for mut in mapping }, index=cells)
     assert all(df_.columns == afm.var_names)
     afm.layers['site_coverage'] = csr_matrix(df_.values)
-    afm.obs['mean_site_coverage'] = cov.mean(axis=1)   
+    afm.obs['mean_site_coverage'] = cov.mean(axis=1)
     test_sites = mask_mt_sites(range(cov.shape[1]))
     afm.obs['median_target_site_coverage'] = cov.loc[:,test_sites].median(axis=1)
     afm.obs['median_untarget_site_coverage'] = cov.loc[:,~test_sites].median(axis=1)
@@ -342,19 +345,19 @@ def read_from_scmito(
 
 
 def read_redeem(
-    path_ch_matrix: str, 
-    path_meta: str = None, 
-    sample: str = None, 
-    pp_method: str = None, 
+    path_ch_matrix: str,
+    path_meta: str = None,
+    sample: str = None,
+    pp_method: str = None,
     scLT_system: str = 'RedeeM',
-    edge_trim: int = 4, 
+    edge_trim: int = 4,
     treshold: str = 'Sensitive'
     ) -> AnnData :
     """
     Utility to assemble an AFM from RedeeM (see Weng et al., 2024) MT-SNVs data.
     """
 
-    # Intantiate metrics dictionary
+    # Instantiate metrics dictionary
     metrics = {}
 
     ##
@@ -376,23 +379,23 @@ def read_redeem(
                                 basecalls['Call']
 
         # AD counts, before trimming
-        logging.info(f'Count AD before edge-trimming')
+        logging.info('Count AD before edge-trimming')
         long = (
             basecalls.groupby(['Cell','Variants'])
             ['UMI'].nunique().reset_index()
             .rename(columns={'UMI':'AD_raw'})
             .merge(
-                basecalls[['Cell','Variants','Depth']].drop_duplicates(), 
-                on=['Cell','Variants'], 
+                basecalls[['Cell','Variants','Depth']].drop_duplicates(),
+                on=['Cell','Variants'],
                 how='left'
             )
         )
 
         # Trim edge basecalls
         logging.info(f'Trim basecalls at <{edge_trim}bp distance from DNA fragments start/end')
-        splitted = basecalls['UMI'].str.split('_', expand=True)
-        start_raw = splitted[1].astype(int)
-        end_raw   = splitted[2].astype(int)
+        split = basecalls['UMI'].str.split('_', expand=True)
+        start_raw = split[1].astype(int)
+        end_raw   = split[2].astype(int)
         basecalls['Start'] = np.minimum(start_raw, end_raw)
         basecalls['End']   = np.maximum(start_raw, end_raw)
         basecalls['Edge_dist'] = np.minimum(
@@ -402,7 +405,7 @@ def read_redeem(
         basecalls = basecalls.loc[basecalls['Edge_dist'] >= edge_trim].copy()
 
         # Count AD after trimming
-        logging.info(f'Count AD after edge-trimming')
+        logging.info('Count AD after edge-trimming')
         long_trim = (
             basecalls.groupby(['Cell','Variants'])
             ['UMI'].nunique().reset_index()
@@ -410,7 +413,7 @@ def read_redeem(
         )
 
         # Correct Depth --> DP
-        logging.info(f'Correct DP for trimmed basecalls')
+        logging.info('Correct DP for trimmed basecalls')
         long = (
             long
             .merge(long_trim, on=['Cell','Variants'], how='outer')
@@ -454,7 +457,7 @@ def read_redeem(
 
     # Filter basecalls of annotated cells only (i.e., we have cell metadata)
     if path_meta not in [None,'null']:
-        logging.info(f'Filter for annotated cells (i.e., sample CBs in cell_meta)')
+        logging.info('Filter for annotated cells (i.e., sample CBs in cell_meta)')
         cell_meta = pd.read_csv(path_meta, index_col=0)
         cells = list(set(cell_meta.index.map(lambda x: x.split('_')[0])) & set(long['Cell'].unique()))
         long = long.query('Cell in @cells').copy()
@@ -465,7 +468,7 @@ def read_redeem(
         cells = list(long['Cell'].unique())
 
     # Matrices
-    logging.info(f'Format AD/DP matrices')
+    logging.info('Format AD/DP matrices')
     AD = long.pivot(index='Cell', columns='Variants', values='AD_trimmed').fillna(0)
     DP = long.pivot(index='Cell', columns='Variants', values='DP').fillna(0)
     assert (AD.index.value_counts()==1).all()
@@ -481,7 +484,7 @@ def read_redeem(
 
     # Ensure at least one unique variant basecall for each cell
     assert (np.sum(DP>0, axis=1)>0).all()
-    assert (np.sum(DP>0, axis=1)>0).all() 
+    assert (np.sum(DP>0, axis=1)>0).all()
     assert (AD.index == DP.index).all()
     assert (AD.columns == DP.columns).all()
 
@@ -498,10 +501,10 @@ def read_redeem(
     AD = csr_matrix(AD.values).astype(np.int16)
     DP = csr_matrix(DP.values).astype(np.int16)
     afm = AnnData(
-        X=AF, 
-        obs=cell_meta, 
-        var=char_meta, 
-        layers={'AD':AD, 'DP':DP}, 
+        X=AF,
+        obs=cell_meta,
+        var=char_meta,
+        layers={'AD':AD, 'DP':DP},
         uns={'pp_method':pp_method, 'scLT_system':scLT_system, 'raw_basecalls_metrics':metrics}
     )
 
@@ -524,7 +527,7 @@ def read_redeem(
         logging.info('Add full site-coverage matrix')
         cov = pd.read_csv(os.path.join(path_ch_matrix, 'QualifiedTotalCts'), sep='\t', header=None)
         cov.columns = ['Cell', 'Pos', 'Total', 'VerySensitive', 'Sensitive', 'Stringent']
-        cov = cov[['Cell', 'Pos', treshold]].rename(columns={treshold:'coverage'})   
+        cov = cov[['Cell', 'Pos', treshold]].rename(columns={treshold:'coverage'})
 
         # Pivot and align
         cov = cov.pivot(index='Cell', columns='Pos', values='coverage').fillna(0)
@@ -540,7 +543,7 @@ def read_redeem(
         afm.layers['site_coverage'] = csr_matrix(df_.values)
 
         # Add cell mean_site_coverage to cell meta
-        afm.obs['mean_site_coverage'] = cov.mean(axis=1)   
+        afm.obs['mean_site_coverage'] = cov.mean(axis=1)
 
     elif os.path.exists(os.path.join(path_ch_matrix, 'meanCellCov')) and \
         os.path.exists(os.path.join(path_ch_matrix, 'meanSiteCov')):
@@ -582,7 +585,7 @@ def _add_priors(afm, priors, key='priors'):
         d = priors[i]
         for j in d:
             W[i,j] = d[j]
-    
+
     afm.varm[key] = W
 
 
@@ -590,8 +593,8 @@ def _add_priors(afm, priors, key='priors'):
 
 
 def read_cas9(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
-    pp_method: str = None, scLT_system: str = 'Cas9', 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
+    pp_method: str = None, scLT_system: str = 'Cas9',
     priors_groupby: str = 'MetFamily',
     sample_col: str = 'Tumor'
     ) -> AnnData :
@@ -630,12 +633,12 @@ def read_cas9(
 
     # Build AFM
     afm = AnnData(
-        X=csr_matrix(char_matrix.values), 
-        obs=cell_meta, 
+        X=csr_matrix(char_matrix.values),
+        obs=cell_meta,
         var=pd.DataFrame(index=char_matrix.columns),
         uns={
-           'pp_method':pp_method, 
-           'scLT_system':scLT_system, 
+           'pp_method':pp_method,
+           'scLT_system':scLT_system,
         }
     )
     _add_priors(afm, priors)
@@ -648,7 +651,7 @@ def read_cas9(
 
 
 def read_scwgs(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
     pp_method: str = None, scLT_system: str = 'scWGS'
     ) -> AnnData :
     """
@@ -670,8 +673,8 @@ def read_scwgs(
         cell_meta = pd.DataFrame(index=char_matrix.index)
 
     afm = AnnData(
-        X=csr_matrix(char_matrix.values), 
-        obs=cell_meta, 
+        X=csr_matrix(char_matrix.values),
+        obs=cell_meta,
         var=pd.DataFrame(index=char_matrix.columns),
         uns={'pp_method':pp_method, 'scLT_system':scLT_system}
     )
@@ -685,7 +688,7 @@ def read_scwgs(
 
 
 def read_epiclone(
-    path_ch_matrix: str, path_meta: str = None, sample: str = None, 
+    path_ch_matrix: str, path_meta: str = None, sample: str = None,
     pp_method: str = None, scLT_system: str = 'EPI-clone'
     ) -> AnnData :
     """
@@ -697,7 +700,7 @@ def read_epiclone(
     for f in required_files:
         if not os.path.exists(os.path.join(path_ch_matrix, f)):
             raise FileNotFoundError(f'{f} not found in {path_ch_matrix}. Check your inputs...')
-        
+
     # Read data
     char_matrix = pd.read_csv(os.path.join(path_ch_matrix, 'DNAm_binary.csv'), index_col=0)
     vars_meta = pd.read_csv(os.path.join(path_ch_matrix, 'panel_info_dropout_pwm.tsv'), sep='\t', index_col=0)
@@ -713,7 +716,7 @@ def read_epiclone(
     else:
         logging.info('No cell cell metadata present...')
         cell_meta = pd.DataFrame(index=char_matrix.index)
-    
+
     # Select DNAm features
     VOIs = variant_selection.query('Type=="Static"').index
     char_matrix = char_matrix[VOIs].copy()
@@ -721,7 +724,7 @@ def read_epiclone(
     vars_meta = vars_meta.loc[VOIs].copy()
 
     # Assemble AFM
-    afm = AnnData(X=char_matrix, 
+    afm = AnnData(X=char_matrix,
                   layers={'bin':char_matrix},
                   uns={'pp_method':pp_method,'scLT_system':scLT_system})
 
@@ -737,16 +740,16 @@ def read_epiclone(
 
 
 def make_afm(
-    path_ch_matrix: str, 
-    path_meta: str = None, 
-    sample: str = None, 
-    pp_method: str = 'maegatk', 
-    scLT_system: str = 'MAESTER', 
+    path_ch_matrix: str,
+    path_meta: str = None,
+    sample: str = None,
+    pp_method: str = 'maegatk',
+    scLT_system: str = 'MAESTER',
     ref: str ='rCRS',
-    kwargs: dict = {}
+    kwargs: dict = None
     ) -> AnnData :
     """
-    Creates an annotated Allele Frequency Matrix from different 
+    Creates an annotated Allele Frequency Matrix from different
     scLT_system and pre-processing pipelines outputs.
 
     Parameters
@@ -778,6 +781,8 @@ def make_afm(
         The assembled Allele Frequency Matrix (AFM).
     """
 
+    if kwargs is None:
+        kwargs = {}
     if os.path.exists(path_ch_matrix):
 
         logging.info(f'Allele Frequency Matrix generation: {scLT_system} system')
@@ -791,20 +796,20 @@ def make_afm(
 
             if pp_method in ['samtools', 'freebayes']:
                 afm = read_from_AD_DP(
-                    path_ch_matrix=path_ch_matrix, 
-                    path_meta=path_meta, 
-                    sample=sample, 
-                    pp_method=pp_method, 
-                    cell_col='cell', 
+                    path_ch_matrix=path_ch_matrix,
+                    path_meta=path_meta,
+                    sample=sample,
+                    pp_method=pp_method,
+                    cell_col='cell',
                     scLT_system=scLT_system
                 )
             elif pp_method == 'cellsnp-lite':
                 afm = read_from_cellsnp(path_ch_matrix, path_meta, sample, pp_method, scLT_system)
             elif pp_method in ['mito_preprocessing', 'maegatk']:
                 afm = read_from_scmito(path_ch_matrix, path_meta, sample, pp_method, scLT_system, ref)
-        
+
         else:
-            
+
             logging.info('Public dataset. Character matrix already pre-processed. Just assembling the AFM...')
             logging.info('#TODO: include preprocessing entry-points for other scLT methods in nf-MiTo pipeline.')
 
@@ -818,7 +823,7 @@ def make_afm(
                 afm = read_epiclone(path_ch_matrix, path_meta, sample, 'EPI-clone', scLT_system)
             else:
                 raise ValueError(f'Unknown {scLT_system}. Check your inputs...')
-        
+
         logging.info(f'Allele Frequency Matrix: cell x char {afm.shape}. {T.stop()}')
 
         return afm
@@ -834,45 +839,45 @@ def filter_multiallelic_sites(afm: AnnData, verbose: bool = True) -> AnnData:
     """
     Remove variants associated to sites (.var['pos']) that have multiple variant alleles.
     This ensures each genomic position has only one variant type across all cells.
-    
+
     Parameters
     ----------
     afm : AnnData
         The Allele Frequency Matrix.
     verbose : bool, optional
         Whether to print filtering statistics. Default is True.
-        
+
     Returns
     -------
     afm : AnnData
         Filtered AFM with only single-allelic sites.
     """
-    
+
     if 'pos' not in afm.var.columns:
         raise ValueError("AFM must have 'pos' column in .var to identify genomic positions")
-    
+
     # Count number of variants per site
     site_variant_counts = afm.var['pos'].value_counts()
     multiallelic_sites = site_variant_counts[site_variant_counts > 1].index
-    
+
     if verbose:
         logging.info(f'Found {len(multiallelic_sites)} sites with multiple variant alleles')
         logging.info(f'Total variants before filtering: {afm.shape[1]}')
-    
+
     # Create test for sites with only one variant allele
     test = ~afm.var['pos'].isin(multiallelic_sites)
-    
+
     # Filter AFM
     afm_filtered = afm[:, test].copy()
-    
+
     if verbose:
         n_removed = afm.shape[1] - afm_filtered.shape[1]
         logging.info(f'Removed {n_removed} variants from {len(multiallelic_sites)} multiallelic sites')
         logging.info(f'Total variants after filtering: {afm_filtered.shape[1]}')
-        
+
         if len(multiallelic_sites) > 0:
             logging.info(f'Example multiallelic sites: {list(multiallelic_sites[:5])}')
-    
+
     return afm_filtered
 
 
@@ -884,7 +889,7 @@ def read_coverage(afm_raw: AnnData, path_coverage: str, sample: str) -> pd.DataF
     Read coverage table from mito_preprocessing/maegatk output.
     """
     cov = pd.read_csv(path_coverage, header=None)
-    cov.columns = ['pos', 'cell', 'n'] 
+    cov.columns = ['pos', 'cell', 'n']
     cov['cell'] = cov['cell'].map(lambda x: f'{x}_{sample}')
     cov = cov.query('cell in @afm_raw.obs_names')
     cov['cell'] = pd.Categorical(cov['cell'], categories=afm_raw.obs_names)

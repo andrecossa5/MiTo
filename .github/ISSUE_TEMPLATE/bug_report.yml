@@ -1,0 +1,49 @@
+name: Bug report
+description: Report something that is broken or behaves unexpectedly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        Please check the [existing issues](https://github.com/andrecossa5/MiTo/issues)
+        first, in case it has already been reported.
+
+  - type: textarea
+    id: report
+    attributes:
+      label: What happened?
+      description: A clear description of the problem, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproducible example
+      description: The smallest snippet that shows the problem.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback
+      description: The full error output, if there is one.
+      render: python
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: |
+        Output of:
+        ```python
+        import mito, anndata, cassiopeia, sys
+        print(mito.__version__, anndata.__version__, cassiopeia.__version__, sys.version)
+        ```
+      render: text
+    validations:
+      required: true

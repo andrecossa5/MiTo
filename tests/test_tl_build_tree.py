@@ -6,8 +6,8 @@ tree's structural contract against the AFM it came from.
 """
 
 import pytest
-import mito as mt
 
+import mito as mt
 
 # The solvers MiTo exposes. shared_muts and max_cut were removed; NJ works from
 # cassiopeia-mt 2.1.2, which fixed the dissimilarity-map dtype under pandas 3.
@@ -83,6 +83,6 @@ def test_removed_solvers_are_rejected(afm_filtered, solver):
 
 def test_solver_registry_matches_expectation():
     """Guard: the exposed solver set is exactly the supported one."""
-    from mito.tl.phylo import solver_d, _solver_kwargs
+    from mito.tl.phylo import _solver_kwargs, solver_d
     assert set(solver_d) == set(SOLVERS)
     assert set(_solver_kwargs) == set(SOLVERS)

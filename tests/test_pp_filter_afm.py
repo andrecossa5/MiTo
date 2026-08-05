@@ -8,12 +8,10 @@ invariants the filtered AFM must satisfy.
 """
 
 import numpy as np
-import pandas as pd
 import pytest
-import mito as mt
-
 from conftest import build_afm, build_rich_annotated
 
+import mito as mt
 
 # Every variant-filtering strategy, as advertised in mito.ut.utils._var_filters.
 FILTERING_METHODS = ["CV", "MiTo", "MQuad", "weng2024", "miller2022"]
@@ -491,7 +489,7 @@ def test_structurally_invalid_metrics_raise(metric):
 
 def test_every_advertised_metric_is_covered():
     """Guard: if MiTo gains a metric, this test forces a decision about it."""
-    from mito.pp.distances import discrete_metrics, continuous_metrics
+    from mito.pp.distances import continuous_metrics, discrete_metrics
     covered = {
         "weighted_jaccard", "weighted_hamming", "jaccard", "dice", "russellrao",
         "sokalsneath", "yule", "rogerstanimoto", "euclidean", "cosine",

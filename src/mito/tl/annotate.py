@@ -3,23 +3,25 @@ Main MiTo class for MT-SNVs single-cell phylogenies annotation.
 """
 
 import logging
+from collections.abc import Iterable
+from itertools import product
+
+import cassiopeia as cs
 import numpy as np
 import pandas as pd
-import cassiopeia as cs
-from tqdm import tqdm
-from itertools import product
-from typing import Iterable, Tuple
-from joblib import Parallel, delayed, parallel_backend, cpu_count
 from cassiopeia.data import CassiopeiaTree
-from scipy.stats import fisher_exact
-from statsmodels.sandbox.stats.multicomp import multipletests
-from sklearn.metrics import silhouette_score
 from cassiopeia.tools.fitness_estimator._lbi_jungle import LBIJungle
-from ..pp.distances import weighted_jaccard
-from ..ut.phylo_utils import get_clades, get_internal_node_stats
-from ..ut.utils import Timer, rescale
-from .phylo import _get_leaves_order
+from joblib import Parallel, cpu_count, delayed, parallel_backend
+from scipy.stats import fisher_exact
+from sklearn.metrics import silhouette_score
+from statsmodels.sandbox.stats.multicomp import multipletests
+from tqdm import tqdm
 
+from mito.pp.distances import weighted_jaccard
+from mito.ut.phylo_utils import get_clades, get_internal_node_stats
+from mito.ut.utils import Timer, rescale
+
+from .phylo import _get_leaves_order
 
 ##
 
@@ -34,7 +36,7 @@ def get_ranges_and_gaps(s: pd.Series, label):
         d = np.diff(padded.astype(int))
         starts = np.where(d == 1)[0]
         ends   = np.where(d == -1)[0]
-        return list(zip(starts, ends))
+        return list(zip(starts, ends, strict=False))
 
     present = _get_runs(m)
     gaps    = _get_runs(~m)
@@ -49,10 +51,10 @@ def find_longest_stretch(ranges, series):
     n = len(ranges)
     if n == 0:
         return (), ()
-    
+
     non_nan = ~series.isna().values
     prefix = np.concatenate([[0], non_nan.cumsum()])
-    
+
     best_start = 0
     best_len = 1
     curr_start = 0
@@ -104,16 +106,16 @@ def _get_muts_order(tree):
 def _compute_mutation_enrichment_batch(start_pos, end_pos, T_columns, tree_values, T_values, muts_size, alpha):
     """
     Compute mutation enrichment for a batch of tree nodes using joblib.
-    
+
     Parameters:
     - start_pos: start index for node batch
-    - end_pos: end index for node batch  
+    - end_pos: end index for node batch
     - T_columns: column names (nodes) to process
     - tree_values: tree mutation matrix values
     - T_values: T matrix values (cell assignment matrix)
     - muts_size: number of mutations
     - alpha: significance level for FDR correction
-    
+
     Returns:
     - List of tuples: [(node_name, pvals), ...]
     """
@@ -125,7 +127,7 @@ def _compute_mutation_enrichment_batch(start_pos, end_pos, T_columns, tree_value
         oddsratio_array = np.zeros(muts_size)
         pvals = np.zeros(muts_size)
         test_lineage = node_T_values == 1
-        
+
         for j in range(muts_size):
             test_mut = tree_values[:,j] == 1
             n_mut_lineage = np.sum(test_mut & test_lineage)
@@ -133,7 +135,7 @@ def _compute_mutation_enrichment_batch(start_pos, end_pos, T_columns, tree_value
             n_no_mut_lineage = np.sum(~test_mut & test_lineage)
             n_no_mut_no_lineage = np.sum(~test_mut & ~test_lineage)
             target_ratio_array[j] = n_mut_lineage / (np.sum(test_mut) + 1e-8)
-            
+
             # Fisher's exact test
             oddsratio, pvalue = fisher_exact(
                 [
@@ -144,18 +146,18 @@ def _compute_mutation_enrichment_batch(start_pos, end_pos, T_columns, tree_value
             )
             oddsratio_array[j] = oddsratio
             pvals[j] = pvalue
-        
+
         # Adjust p-values (FDR correction)
         pvals = multipletests(pvals, alpha=alpha, method="fdr_bh")[1]
         results.append((node_name, pvals))
-    
+
     return results
 
 
 ##
 
 
-class MiToTreeAnnotator():
+class MiToTreeAnnotator:
     """
     MiTo tree annotation class. Performs clonal inference from an arbitrary
     MT-SNVs-based phylogeny.
@@ -207,7 +209,7 @@ class MiToTreeAnnotator():
     def get_M(self, alpha: float = 0.05, n_cores: int = None):
         """
         Compute the "mutation enrichment" matrix, M.
-        M is a mut x clade matrix storing for each mutation i and clade j the enrichment 
+        M is a mut x clade matrix storing for each mutation i and clade j the enrichment
         value defined as -log10(pval) from a Fisher's Exact test.
         Uses joblib for parallel processing.
         """
@@ -218,12 +220,12 @@ class MiToTreeAnnotator():
         # Set number of cores
         if n_cores is None:
             n_cores = max(1, cpu_count()-1)
-        
+
         # Cache matrices once to avoid multiple copies across workers
         tree_values = self.tree.layers['transformed'].values
         T_values = self.T.values
         T_columns = self.T.columns.tolist()
-        
+
         # Prepare batches
         n_nodes = len(T_columns)
         quotient = n_nodes // n_cores
@@ -297,10 +299,10 @@ class MiToTreeAnnotator():
 
         ordered_clones = self.tree.cell_meta.loc[_get_leaves_order(self.tree), 'MiTo clone']
         clones = ordered_clones.value_counts().index
-        
+
         assert len(self._get_disjoint_clones(ordered_clones))==0
-        
-        assert ( 
+
+        assert (
             (self.tree.cell_meta
             .groupby('lca')['MiTo clone']
             .nunique()==1)
@@ -315,7 +317,7 @@ class MiToTreeAnnotator():
             )
             assert len(nodes) <= 1
 
-            if len(nodes)==1:   
+            if len(nodes)==1:
                 lca = nodes[0]
                 cells = (
                     self.tree.cell_meta
@@ -328,21 +330,21 @@ class MiToTreeAnnotator():
     ##
 
     def resolve_ambiguous_clones(
-        self, 
-        df_predict: pd.DataFrame, 
-        merging_treshold: float = .7, 
+        self,
+        df_predict: pd.DataFrame,
+        merging_treshold: float = .7,
         af_treshold: float = .0,
-        add_to_meta: bool = False, 
-        ) -> Tuple[pd.Series,pd.Series]:
+        add_to_meta: bool = False,
+        ) -> tuple[pd.Series,pd.Series]:
         """
-        Final clonal resolution process. 
-        Tries to merge similar clones, iteratively. First, the (raw) AF matrix is aggregated 
+        Final clonal resolution process.
+        Tries to merge similar clones, iteratively. First, the (raw) AF matrix is aggregated
         at the clonal level using MiTo clones. Then, clone-clone similarities are computed using
-        (1-) weighted jaccard distances among these aggregated MT-SNVs clonal profiles. 
-        At each round, the tiniest "ambiguous" clone is selected for merging with its smallest 
-        "interacting clone". If the merge is successfull, the clonal assignment table is updated
+        (1-) weighted jaccard distances among these aggregated MT-SNVs clonal profiles.
+        At each round, the tiniest "ambiguous" clone is selected for merging with its smallest
+        "interacting clone". If the merge is successful, the clonal assignment table is updated
         and the process go through other merging rounds, until no ambiguous clones remain. Unresolved
-        clones (if any) are annotated as NaNs in the final MiTo clone column which is appended to 
+        clones (if any) are annotated as NaNs in the final MiTo clone column which is appended to
         `self.tree.cell_meta`.
         """
 
@@ -368,11 +370,11 @@ class MiToTreeAnnotator():
             S_agg = 1-weighted_jaccard((X_agg>af_treshold).astype(int), w=w)
             self.S_aggregate = pd.DataFrame(S_agg, index=X_agg.index, columns=X_agg.index)
 
-            # Spot interacting clones 
+            # Spot interacting clones
             S_agg_long = (
                 pd.DataFrame(
-                    np.triu(S_agg, k=1), 
-                    index=X_agg.index.to_list(), 
+                    np.triu(S_agg, k=1),
+                    index=X_agg.index.to_list(),
                     columns=X_agg.index.to_list()
                 )
                 .melt(ignore_index=False)
@@ -405,7 +407,7 @@ class MiToTreeAnnotator():
             if try_merge:
                 ambiguous_clones = set(S_agg_long['clone1']) | set(S_agg_long['clone2'])
                 for clone in clone_df.index:
-                    if clone in ambiguous_clones and not clone in remained_unresolved:
+                    if clone in ambiguous_clones and clone not in remained_unresolved:
                         try_merge = True
                         break
                     else:
@@ -429,7 +431,7 @@ class MiToTreeAnnotator():
                 else:
                     new_lca = self.tree.find_lca(*[lca_clone, lca_int_clone])
 
-                # Merge clones mutations 
+                # Merge clones mutations
                 clone_muts = set(clone_df.loc[clone, 'muts'].split(';'))
                 int_clone_muts = set(clone_df.loc[int_clone, 'muts'].split(';'))
                 new_clone_muts = ';'.join(list(clone_muts | int_clone_muts))
@@ -437,11 +439,11 @@ class MiToTreeAnnotator():
                 # Check merging possibility
                 cells_merged_clone = (
                     df_predict
-                    .loc[ lambda x: (x['MiTo clone'] == clone) | (x['MiTo clone'] == int_clone)]
+                    .loc[ lambda x, clone=clone, int_clone=int_clone: (x['MiTo clone'] == clone) | (x['MiTo clone'] == int_clone)]
                     .index
                 )
-                cells_clone = df_predict.loc[lambda x: x['MiTo clone'] == clone].index
-                cells_int_clone = df_predict.loc[lambda x: x['MiTo clone'] == int_clone].index
+                cells_clone = df_predict.loc[lambda x, clone=clone: x['MiTo clone'] == clone].index
+                cells_int_clone = df_predict.loc[lambda x, int_clone=int_clone: x['MiTo clone'] == int_clone].index
                 test =  len(set(cells_merged_clone) - (set(cells_clone) | set(cells_int_clone)) ) == 0
 
                 if test:
@@ -480,7 +482,7 @@ class MiToTreeAnnotator():
                 df_predict.loc[final_na_set, 'MiTo clone'] = np.nan
                 df_predict.loc[final_na_set, 'lca'] = np.nan
                 df_predict.loc[final_na_set, 'muts'] = np.nan
-        
+
         # Rename MiTo clones according to their lca size
         sizes = df_predict['lca'].value_counts()
         mapping = { x : f'MT-{i}' for i,x in enumerate(sizes.index) }
@@ -492,7 +494,7 @@ class MiToTreeAnnotator():
             df_predict['MiTo clone'] = pd.Categorical(df_predict['MiTo clone'])
             df_predict['lca'] = pd.Categorical(df_predict['lca'])
             df_predict['muts'] = pd.Categorical(df_predict['muts'])
-            cols = [ 
+            cols = [
                 x for x in self.tree.cell_meta.columns \
                 if x not in df_predict.columns
             ]
@@ -502,7 +504,7 @@ class MiToTreeAnnotator():
 
         return df_predict['MiTo clone'], df_predict['median cell similarity']
 
-    ##  
+    ##
 
     def compute_cell_fitness(self):
         """
@@ -536,7 +538,7 @@ class MiToTreeAnnotator():
         logging.info('Compute expansion pvalues')
         cs.tl.compute_expansion_pvalues(self.tree)
 
-    ## 
+    ##
 
     def extract_mut_order(self, pval_tresh: float = .01):
         """
@@ -569,7 +571,7 @@ class MiToTreeAnnotator():
 
     def infer_clones(self, similarity_percentile: float = 85, mut_enrichment_treshold: int = 5) -> pd.DataFrame:
         """
-        A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper 
+        A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper
         (... et al., 2025).
         """
 
@@ -578,7 +580,7 @@ class MiToTreeAnnotator():
         df_list = []
 
         # Get tree topology and mutation_enrichment tables
-        if self.T is None or self.M is None: 
+        if self.T is None or self.M is None:
             self.get_T()
             self.get_M()
 
@@ -623,7 +625,7 @@ class MiToTreeAnnotator():
             ):
                 triggered = {
                     mut for mut in usable_mutations \
-                    if mut_enrichment.loc[mut,node] >= mut_enrichment_treshold 
+                    if mut_enrichment.loc[mut,node] >= mut_enrichment_treshold
                 }
                 tree.set_attribute(node, 'muts', list(triggered))
                 new_usable = usable_mutations - triggered
@@ -644,22 +646,24 @@ class MiToTreeAnnotator():
             df_tmp['lca'] = tree.find_lca(*leaves) if len(leaves)>1 else np.nan
             try:
                 df_tmp['muts'] = ';'.join(tree.get_attribute(node_tmp, 'muts'))
-            except:
+            except Exception:  # noqa: BLE001
                 pass
             df_list.append(df_tmp)
 
         ##
 
-        def _collect_clade_info(tree, node_tmp, usable_mutations, level=0, data_list=[], name="0"):
+        def _collect_clade_info(tree, node_tmp, usable_mutations, level=0, data_list=None, name="0"):
+            if data_list is None:
+                data_list = []
             valid_tmp = (
                 ((mut_enrichment.loc[list(usable_mutations), node_tmp] >= mut_enrichment_treshold).any()) & \
                 (tree.get_attribute(node_tmp, 'similarity') >= similarity_treshold) & \
-                (not tree.is_leaf(node_tmp))                       
+                (not tree.is_leaf(node_tmp))
             )
             data_list.append([level, int(valid_tmp), len(tree.leaves_in_subtree(node_tmp)), name])
             for j0, child_tmp in enumerate(tree.children(node_tmp)):
                 _collect_clade_info(
-                    tree, child_tmp, usable_mutations, level=level+1, 
+                    tree, child_tmp, usable_mutations, level=level+1,
                     data_list=data_list, name=f"{name},{j0}"
                 )
 
@@ -740,11 +744,11 @@ class MiToTreeAnnotator():
         df_predict.loc[df_predict['muts'].isna(), 'MiTo clone'] = np.nan
 
         return df_predict
-    
+
     ##
 
     def clonal_inference(
-        self, 
+        self,
         similarity_tresholds: Iterable[int] = [ 85, 90, 95, 99 ],
         mut_enrichment_tresholds: Iterable[int] = [ 3, 5, 10 ],
         merging_treshold: Iterable[float] = [ .25, .5, .75 ],
@@ -764,7 +768,7 @@ class MiToTreeAnnotator():
         T.start()
 
         # Get tree topology and mutation_enrichment tables
-        if self.T is None or self.M is None: 
+        if self.T is None or self.M is None:
             self.get_T()
             self.get_M(n_cores=n_cores)
 
@@ -772,13 +776,13 @@ class MiToTreeAnnotator():
         combos = list(product(similarity_tresholds, mut_enrichment_tresholds, merging_treshold))
         logging.info(f'Start Grid Search. n hyper-parameter combinations to explore: {len(combos)}')
 
-        silhouettes = [] 
+        silhouettes = []
         unassigned = []
         n_clones = []
         similarities = []
 
         # Grid search
-        for i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
+        for _i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
             try:
                 df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)
                 labels, sim = self.resolve_ambiguous_clones(
@@ -793,19 +797,19 @@ class MiToTreeAnnotator():
                 unassigned.append(test.sum()/labels.size)
                 n_clones.append(labels.unique().size)
                 similarities.append(sim.mean())
-            except:
+            except Exception:  # noqa: BLE001
                 # Some error occurred with this hyper-parameter combo
                 pass
 
         # Pick optimal combination, and perform final splitting
         self.solutions = (
-            pd.DataFrame({'silhouette':silhouettes, 'unassigned':unassigned, 
+            pd.DataFrame({'silhouette':silhouettes, 'unassigned':unassigned,
                           'n_clones':n_clones, 'similarity':similarities})
             .assign(
                 sil_rescaled = lambda x: rescale(x['silhouette']),
                 sim_rescaled = lambda x: rescale(x['similarity']),
                 n_clones_rescaled = lambda x: rescale(-x['n_clones']),
-                score = lambda x: 
+                score = lambda x:
                     weight_silhouette * x['sil_rescaled'] + \
                     weight_n_clones * x['n_clones_rescaled'] + \
                     weight_similarity * x['similarity']
@@ -822,11 +826,11 @@ class MiToTreeAnnotator():
         else:
             raise ValueError(
                 f'''
-                None of the solution tested falls below the 
+                None of the solution tested falls below the
                 max_fraction_unassigned treshold: {max_fraction_unassigned}
                 '''
             )
-        
+
         # Final round
         logging.info(f'Hyper-params chosen: similarity_percentile={s}, mut_enrichment_treshold={m}, merging_treshold={j}')
         df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)

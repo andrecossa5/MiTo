@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
-import mito as mt
 
+import mito as mt
 
 SUBMODULES = ["io", "pp", "tl", "pl", "ut"]
 
@@ -64,7 +64,7 @@ def test_newick_roundtrip(tree, tmp_path):
 
 
 def test_make_afm_rejects_a_missing_path():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         mt.io.make_afm("/definitely/not/a/real/path")
 
 

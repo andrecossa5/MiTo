@@ -7,6 +7,7 @@ the k parameter, and the shape contract of the returned triple.
 
 import numpy as np
 import pytest
+
 import mito as mt
 
 

@@ -2,12 +2,11 @@
 Nearest neighbors utils.
 """
 
-import numpy as np
-from typing import Tuple, Dict, Any
-from umap.umap_ import nearest_neighbors  
-from umap.umap_ import fuzzy_simplicial_set 
-from scipy.sparse import coo_matrix, csr_matrix, issparse
+from typing import Any
 
+import numpy as np
+from scipy.sparse import coo_matrix, csr_matrix, issparse
+from umap.umap_ import fuzzy_simplicial_set, nearest_neighbors
 
 ##
 
@@ -46,22 +45,24 @@ def _get_sparse_matrix_from_indices_distances_umap(
 
 
 def _NN(
-    X: np.array, 
-    k: int = 15, 
-    metric: str = 'cosine', 
-    implementation: str = 'pyNNDescent', 
-    random_state: int = 1234, 
-    metric_kwds: Dict[str,Any] = {}
-    ) -> Tuple[csr_matrix,csr_matrix]:
+    X: np.array,
+    k: int = 15,
+    metric: str = 'cosine',
+    implementation: str = 'pyNNDescent',
+    random_state: int = 1234,
+    metric_kwds: dict[str,Any] = None
+    ) -> tuple[csr_matrix,csr_matrix]:
     """
     kNN search over an X obs x features matrix. pyNNDescent and hsnwlib implementation available.
     """
 
+    if metric_kwds is None:
+        metric_kwds = {}
     if k <= 500 and implementation == 'pyNNDescent':
         knn_indices, knn_dists, _ = nearest_neighbors(
             X,
             k,
-            metric=metric, 
+            metric=metric,
             metric_kwds=metric_kwds,
             angular=False,
             random_state=random_state
@@ -81,7 +82,7 @@ def get_idx_from_simmetric_matrix(X, k=15):
     """
     if issparse(X):
         X = X.toarray()
-        
+
     assert X.shape[0] == X.shape[1]
 
     if k >= X.shape[0]:
@@ -104,12 +105,12 @@ def get_idx_from_simmetric_matrix(X, k=15):
 
 
 def kNN_graph(
-    X: np.array = None, 
+    X: np.array = None,
     D: np.array = None,
-    k: int = 10, 
-    from_distances: bool = False, 
-    nn_kwargs: Dict[str,Any] = {}
-    ) -> Tuple[np.array,csr_matrix,csr_matrix]:
+    k: int = 10,
+    from_distances: bool = False,
+    nn_kwargs: dict[str,Any] = None
+    ) -> tuple[np.array,csr_matrix,csr_matrix]:
     """
     kNN graph computation.
 
@@ -136,16 +137,18 @@ def kNN_graph(
         - A csr_matrix of the connectivities of the kNN graph.
     """
 
+    if nn_kwargs is None:
+        nn_kwargs = {}
     if from_distances:
         knn_indices, knn_dists = get_idx_from_simmetric_matrix(D, k=k)
         n = D.shape[0]
     else:
         knn_indices, knn_dists = _NN(X, k, **nn_kwargs)
         n = X.shape[0]
-    
+
     # Compute connectivities
     connectivities = fuzzy_simplicial_set(
-        coo_matrix(([], ([], [])), 
+        coo_matrix(([], ([], [])),
         shape=(n, 1)),
         k,
         None,
@@ -156,7 +159,7 @@ def kNN_graph(
         local_connectivity=1.0,
     )
     connectivities = connectivities[0]
-    
+
     # Sparsiy
     distances = _get_sparse_matrix_from_indices_distances_umap(
         knn_indices, knn_dists, n, k

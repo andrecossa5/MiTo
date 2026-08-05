@@ -29,6 +29,7 @@ __pycache__/
 # IDEs
 /.idea/
 /.vscode/
+.claude/
 
 # Data files from tutorials
 /docs/notebooks/*.fcs

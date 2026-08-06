@@ -49,8 +49,8 @@ Citation
 If MiTo is useful in your work, please cite:
 
   Cossa, A. *et al.* **MiTo: mitochondrial lineage tracing and single-cell
-  multi-omics.** bioRxiv (2025).
-  `doi:10.1101/2025.06.17.660165 <https://doi.org/10.1101/2025.06.17.660165>`_
+  multi-omics.** Nature Communications (2026).
+  `doi:10.1038/s41467-026-71607-5 <https://doi.org/10.1038/s41467-026-71607-5>`_
 
 Please also cite the underlying methods you rely on — in particular
 `Cassiopeia <https://doi.org/10.1186/s13059-020-02000-8>`_ for tree

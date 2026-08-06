@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-08-06
+### Fixed
+- Documentation URL in the package metadata pointed at a Read the Docs slug
+  that does not exist yet, so the "Documentation" link on PyPI was dead.
+
+## [0.2.0] - 2026-08-05
+### Added
+- Distributed on PyPI as `scmito` (previously `mito-utils`); import name is
+  unchanged (`import mito as mt`).
+- Test-suite of 462 tests, and CI across Linux and macOS on Python 3.11-3.13.
+- Automated PyPI releases and GitHub Releases via Trusted Publishing.
+
+### Changed
+- Modern `pyproject.toml` packaging (hatchling); `setup.py` removed.
+- Requires Python 3.11+; phylogenetics now depends on `cassiopeia-mt`.
+- Assets ship inside the package and are resolved with `importlib.resources`;
+  installed footprint down from 14 MB to ~1.5 MB.
+- Tree solvers reduced to `UPMGA`, `NJ`, `spectral`, `greedy`.
+- Genotyping method `MiTo_smooth` removed.
+
+### Fixed
+- `median_af_in_positives` averaged a boolean mask, so it was always 1.0.
+- Every distance metric except `weighted_jaccard` raised on current
+  scikit-learn and SciPy.
+- `k` was ignored when building a kNN graph from precomputed distances.
+- `kbet`, `NN_entropy` and `NN_purity` raised on a pandas Series of labels.
+- `reduce_dimensions(method='UMAP')` crashed on disconnected graphs.
+- `plot_tree` crashed with `add_root=True` and with `ax=None`.
+- `draw_embedding` crashed when given a named palette.
+- `fit_mixtures` computed `deltaBIC` and then discarded it.
+- Filters that select nothing now raise a clear error instead of failing deep
+  inside NumPy or SciPy.
+
 ## [0.1.5] - 2026-02-03
 - Nat Comm release
 

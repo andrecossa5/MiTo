@@ -9,7 +9,7 @@
 [![PyPI](https://img.shields.io/pypi/v/scmito.svg)](https://pypi.org/project/scmito/)
 [![Python](https://img.shields.io/pypi/pyversions/scmito.svg)](https://pypi.org/project/scmito/)
 [![Tests](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml/badge.svg)](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml)
-[![Documentation](https://readthedocs.org/projects/andrecossa5/badge/?version=latest)](https://andrecossa5.readthedocs.io/en/latest/index.html)
+[![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/latest/index.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **MiTo** infer clonal ancestries in single-cell data from natural mtDNA variation. 
@@ -53,7 +53,7 @@ annotator.clonal_inference()
 mt.pl.plot_tree(tree, features=['MiTo clone'])
 ```
 
-See [getting-started tutorial](https://andrecossa5.readthedocs.io/en/latest/getting_started_tutorial.html) for 
+See [getting-started tutorial](https://mito.readthedocs.io/en/latest/getting_started_tutorial.html) for 
 the full vignette.
 
 ## API
@@ -70,7 +70,7 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 
 **Supported platforms:** scRNA-seq (MAESTER), scmtATAC-seq and 10x MultiOme (RedeeM).
 
-Full reference: [MiTo docs](https://andrecossa5.readthedocs.io/en/latest/index.html).
+Full reference: [MiTo docs](https://mito.readthedocs.io/en/latest/index.html).
 
 ## Development
 

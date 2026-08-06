@@ -22,11 +22,11 @@ clonal trees.
 
       Set up MiTo and its dependencies.
 
-   .. grid-item-card:: Tutorial
-      :link: getting_started
+   .. grid-item-card:: Tutorials
+      :link: tutorials
       :link-type: doc
 
-      A full walkthrough, from raw AFM to an annotated phylogeny.
+      A walkthrough of the main workflow, and a ground truth benchmark.
 
    .. grid-item-card:: API reference
       :link: api
@@ -88,7 +88,7 @@ At a glance
    :caption: Getting started
 
    installation
-   getting_started
+   tutorials
 
 .. toctree::
    :hidden:

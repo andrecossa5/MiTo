@@ -12,8 +12,8 @@ description: |
   (e.g., gene expression, chromatin accessibility, protein abundance) to inferred phylogenies and clones
   to investigate biological processes of interest.
 project_home: https://github.com/andrecossa5/MiTo
-documentation_home: https://scmito.readthedocs.io/en/latest/index.html
-tutorials_home: https://scmito.readthedocs.io/en/latest/getting_started_tutorial.html
+documentation_home: https://andrecossa5.readthedocs.io/en/latest/index.html
+tutorials_home: https://andrecossa5.readthedocs.io/en/latest/getting_started_tutorial.html
 publications:
   - 10.1101/2025.06.17.660165
 install:

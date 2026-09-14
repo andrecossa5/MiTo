@@ -895,14 +895,15 @@ class MiToTreeAnnotator:
                 sil_rescaled = lambda x: rescale(x['silhouette']),
                 sim_rescaled = lambda x: rescale(x['similarity']),
                 n_clones_rescaled = lambda x: rescale(-x['n_clones']),
-                # NB: use the rescaled similarity, as for the other two terms. Raw
-                # similarity sits close to 1 with very little spread across combos,
-                # so as an un-rescaled term it acts as a near-constant offset and
-                # contributes almost nothing to the ranking.
+                # NB: similarity enters the score RAW, unlike the other two terms.
+                # Rescaling it looks more consistent, but was measured to pick a
+                # different hyper-parameter combination on MDA_clones, dropping ARI
+                # 0.945 -> 0.646 (12 labels for 8 clones), with no change on
+                # simulated data. Keep raw until a replacement is benchmarked.
                 score = lambda x:
                     weight_silhouette * x['sil_rescaled'] + \
                     weight_n_clones * x['n_clones_rescaled'] + \
-                    weight_similarity * x['sim_rescaled']
+                    weight_similarity * x['similarity']
             )
             .sort_values('score', ascending=False)
         )

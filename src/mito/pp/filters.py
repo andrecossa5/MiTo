@@ -810,17 +810,55 @@ def filter_variant_moransI(
     afm: AnnData,
     num_permutations: int = 100,
     pval_treshold: float = .01,
+    min_n_positive: int = 10,
     n_cores: int = None
     ) -> AnnData:
 
     """
     Filter out MT-SNVs if not significantly auto-correlated (PARALLEL VERSION).
     Uses joblib for parallel processing.
+
+    NB: the permutation test has no power for a variant carried by only a handful of
+    cells, so a rare but perfectly clean clonal marker is indistinguishable from
+    noise and would be discarded. Variants positive in fewer than `min_n_positive`
+    cells are therefore left untested and retained, with their Moran statistics set
+    to NaN, and must be filtered on prevalence beforehand if that is not wanted.
+
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix, with cell-cell distances in ``.obsp['distances']``.
+    num_permutations : int, optional
+        Number of permutations for the p-value. Default is 100.
+    pval_treshold : float, optional
+        Maximum p-value for a tested variant to be retained. Default is 0.01.
+    min_n_positive : int, optional
+        Minimum number of positive (AF > 0) cells for a variant to be tested at all.
+        Variants below it are retained untested. Default is 10.
+    n_cores : int, optional
+        Number of cores. Defaults to one less than what is available.
+
+    Returns
+    -------
+    afm : AnnData
+        Filtered Allele Frequency Matrix.
     """
 
     assert 'distances' in afm.obsp
     W = 1-afm.obsp['distances'].toarray()
     X = afm.X.toarray()
+
+    # Variants seen in too few cells carry no power in the permutation test: test
+    # only the rest, and keep these untested rather than discarding them.
+    n_positive = (X>0).sum(axis=0)
+    tested = np.flatnonzero(n_positive>=min_n_positive)
+    n_skipped = X.shape[1] - tested.size
+    if n_skipped > 0:
+        logging.info(
+            f'Skip Moran I test for {n_skipped} MT-SNVs positive in <{min_n_positive} '
+            f'cells: retained untested'
+        )
+    X = X[:,tested]
 
     # Set number of cores
     if n_cores is None:
@@ -840,32 +878,38 @@ def filter_variant_moransI(
         start = end
 
     # Parallel computation
-    with parallel_backend("loky", inner_max_num_threads=1):
-        result_list = Parallel(n_jobs=len(intervals))(
-            delayed(_compute_moran_batch)(
-                start_pos,
-                end_pos,
-                W,
-                X,
-                num_permutations
-            )
-            for start_pos, end_pos in intervals
-        )
-
-    # Flatten results from all batches
     I_list = []
     P_list = []
-    for batch_results in result_list:
-        for I, P in batch_results:
-            I_list.append(I)
-            P_list.append(P)
+    if intervals:
+        with parallel_backend("loky", inner_max_num_threads=1):
+            result_list = Parallel(n_jobs=len(intervals))(
+                delayed(_compute_moran_batch)(
+                    start_pos,
+                    end_pos,
+                    W,
+                    X,
+                    num_permutations
+                )
+                for start_pos, end_pos in intervals
+            )
 
-    # Store results in afm
-    afm.var['Moran I '] = I_list
-    afm.var['Moran I pvalue'] = P_list
+        # Flatten results from all batches
+        for batch_results in result_list:
+            for I, P in batch_results:
+                I_list.append(I)
+                P_list.append(P)
 
-    # Filter variants by pvalue
-    var_to_retain = afm[:,afm.var['Moran I pvalue']<=pval_treshold].var_names
+    # Store results in afm, leaving the untested variants as NaN
+    I_all = np.full(afm.shape[1], np.nan)
+    P_all = np.full(afm.shape[1], np.nan)
+    I_all[tested] = I_list
+    P_all[tested] = P_list
+    afm.var['Moran I '] = I_all
+    afm.var['Moran I pvalue'] = P_all
+    afm.var['Moran I tested'] = np.isin(np.arange(afm.shape[1]), tested)
+
+    # Filter variants by pvalue, retaining the ones that were never tested
+    var_to_retain = afm.var_names[(P_all<=pval_treshold) | np.isnan(P_all)]
     afm = afm[:,var_to_retain].copy()
 
     return afm

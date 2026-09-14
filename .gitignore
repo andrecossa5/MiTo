@@ -2,6 +2,8 @@
 */.DS_Store
 *~
 buck-out/
+data/
+data_test/
 
 # Compiled files
 .venv/

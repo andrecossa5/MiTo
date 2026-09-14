@@ -13,6 +13,7 @@ from .metrics import (
 )
 from .phylo_utils import get_clades, get_internal_node_feature, get_internal_node_stats
 from .positions import MAESTER_genes_positions, mask_mt_sites, transitions, transversions
+from .simulate import simulate_afm
 from .stats_utils import (
     fit_betabinom,
     fit_binom,
@@ -60,6 +61,8 @@ __all__ = [
     # differential expression / enrichment
     "format_rank_genes_groups", "run_GSEA", "run_ORA",
     "get_top_markers", "order_groups",
+    # simulation
+    "simulate_afm",
     # phylogenetics
     "get_clades", "get_internal_node_feature", "get_internal_node_stats",
 ]

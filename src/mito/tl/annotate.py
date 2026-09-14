@@ -365,29 +365,44 @@ class MiToTreeAnnotator:
             )
             X_agg = X_agg.loc[:,np.any(X_agg>af_treshold, axis=0)]
 
-            # Compute similarity of putative clones (i.e., aggregated profiles)
-            w = np.nanmedian(np.where(X_agg>af_treshold, X_agg, np.nan), axis=0)
-            S_agg = 1-weighted_jaccard((X_agg>af_treshold).astype(int), w=w)
-            self.S_aggregate = pd.DataFrame(S_agg, index=X_agg.index, columns=X_agg.index)
-
-            # Spot interacting clones
-            S_agg_long = (
-                pd.DataFrame(
-                    np.triu(S_agg, k=1),
-                    index=X_agg.index.to_list(),
-                    columns=X_agg.index.to_list()
+            # NB: no aggregated clonal profile clears af_treshold, so there are no
+            # profiles to compare and no merge is possible. Without this guard the
+            # weighted jaccard below is handed an empty frame and raises.
+            if X_agg.shape[1] == 0:
+                logging.info(
+                    'No MT-SNV above af_treshold in the aggregated clonal profiles. '
+                    'Skip clone merging.'
                 )
-                .melt(ignore_index=False)
-                .reset_index()
-            )
-            S_agg_long.columns = ['clone1', 'clone2', 'similarity']
-            S_agg_long = (
-                S_agg_long
-                .query('clone1!=clone2 and similarity>=@merging_treshold')
-                .reset_index(drop=True).drop_duplicates()
-            )
-            if S_agg_long.shape[0] == 0:
+                self.S_aggregate = pd.DataFrame(
+                    index=X_agg.index, columns=X_agg.index, dtype=float
+                )
+                S_agg_long = pd.DataFrame(columns=['clone1', 'clone2', 'similarity'])
                 try_merge = False
+
+            else:
+                # Compute similarity of putative clones (i.e., aggregated profiles)
+                w = np.nanmedian(np.where(X_agg>af_treshold, X_agg, np.nan), axis=0)
+                S_agg = 1-weighted_jaccard((X_agg>af_treshold).astype(int), w=w)
+                self.S_aggregate = pd.DataFrame(S_agg, index=X_agg.index, columns=X_agg.index)
+
+                # Spot interacting clones
+                S_agg_long = (
+                    pd.DataFrame(
+                        np.triu(S_agg, k=1),
+                        index=X_agg.index.to_list(),
+                        columns=X_agg.index.to_list()
+                    )
+                    .melt(ignore_index=False)
+                    .reset_index()
+                )
+                S_agg_long.columns = ['clone1', 'clone2', 'similarity']
+                S_agg_long = (
+                    S_agg_long
+                    .query('clone1!=clone2 and similarity>=@merging_treshold')
+                    .reset_index(drop=True).drop_duplicates()
+                )
+                if S_agg_long.shape[0] == 0:
+                    try_merge = False
 
             # Attempt merging, starting from the tiniest ambiguous clone
 
@@ -569,10 +584,42 @@ class MiToTreeAnnotator:
 
     ##
 
-    def infer_clones(self, similarity_percentile: float = 85, mut_enrichment_treshold: int = 5) -> pd.DataFrame:
+    def infer_clones(
+        self,
+        similarity_percentile: float = 85,
+        mut_enrichment_treshold: int = 5,
+        stopping_rule: str = 'absolute',
+        min_similarity_gain: float = 0.05,
+        ) -> pd.DataFrame:
         """
         A MT-SNVs-specific re-adaptation of the recursive approach described in the MethylTree paper
         (... et al., 2025).
+
+        Parameters
+        ----------
+        similarity_percentile : float, optional
+            Percentile of the cell-cell similarity distribution used as the descent
+            threshold, when `stopping_rule` is "absolute". Default is 85.
+        mut_enrichment_treshold : int, optional
+            Minimum mutation enrichment for a clade to be considered. Default is 5.
+        stopping_rule : str, optional
+            How the recursion decides to stop descending and call a clade a clone:
+
+            - "absolute": the clade's median similarity must clear a global threshold.
+            - "relative": stop when descending no longer makes clades meaningfully
+              tighter, i.e. when the best child improves median similarity by less
+              than `min_similarity_gain`.
+
+            The absolute rule needs one global value to be simultaneously high enough
+            to descend past ancestral nodes and low enough that genuine clones still
+            pass. When clones differ widely in size no such value need exist, since a
+            small clade's median similarity is both lower and noisier. The relative
+            rule compares a clade only with its own children, so it does not depend on
+            clone size or on the composition of the similarity distribution.
+            Default is "absolute", which preserves historical behaviour.
+        min_similarity_gain : float, optional
+            Under the "relative" rule, the smallest improvement in median similarity
+            that justifies descending further. Default is 0.05.
         """
 
         # Prep lists for recursion
@@ -598,6 +645,11 @@ class MiToTreeAnnotator:
         # Calculate similarity treshold
         similarity_treshold = np.percentile(S.values, similarity_percentile)
         self.params['similarity_treshold'] = similarity_treshold
+        self.params['stopping_rule'] = stopping_rule
+        if stopping_rule not in ('absolute', 'relative'):
+            raise ValueError(
+                f'"{stopping_rule}" is not a valid stopping_rule. Choose "absolute" or "relative".'
+            )
 
         # Set median similarity among clade cells as tree node attributes
         clades = get_clades(self.tree, with_singletons=True)
@@ -610,6 +662,30 @@ class MiToTreeAnnotator:
 
         # Internal, recursive functions =========================================================== #
 
+        def _clade_is_tight_enough(tree, node):
+            """
+            Whether the recursion should stop here and call `node` a clone.
+
+            Under the absolute rule the clade must clear a global similarity
+            threshold. Under the relative rule it must be nearly as tight as the best
+            it could become by descending: if a child would improve median similarity
+            by at least `min_similarity_gain`, keep going.
+            """
+            s = tree.get_attribute(node, 'similarity')
+
+            if stopping_rule == 'absolute':
+                return bool(s >= similarity_treshold)
+
+            children = [c for c in tree.children(node) if not tree.is_leaf(c)]
+            if not children:
+                return True
+
+            best = max(tree.get_attribute(c, 'similarity') for c in children)
+
+            return bool(best - s < min_similarity_gain)
+
+        ##
+
         def _find_clones(tree, node, usable_mutations):
 
             if not usable_mutations:
@@ -620,7 +696,7 @@ class MiToTreeAnnotator:
                 _collect_clones(tree, node)
             elif (
                 ((mut_enrichment.loc[list(usable_mutations), node] >= mut_enrichment_treshold).any()) & \
-                (tree.get_attribute(node, 'similarity') >= similarity_treshold) & \
+                _clade_is_tight_enough(tree, node) & \
                 (not tree.is_leaf(node))
             ):
                 triggered = {
@@ -644,6 +720,11 @@ class MiToTreeAnnotator:
             df_tmp["median cell similarity"] = tree.get_attribute(node_tmp, 'similarity')
             df_tmp["n cells"] = len(leaves)
             df_tmp['lca'] = tree.find_lca(*leaves) if len(leaves)>1 else np.nan
+            # NB: always define the column. Clones collected at a leaf, or once the
+            # usable mutations run out, carry no 'muts' attribute, and if that holds
+            # for every clone the column would be missing from the concatenated frame
+            # entirely, breaking every downstream access to it.
+            df_tmp['muts'] = np.nan
             try:
                 df_tmp['muts'] = ';'.join(tree.get_attribute(node_tmp, 'muts'))
             except Exception:  # noqa: BLE001
@@ -758,6 +839,8 @@ class MiToTreeAnnotator:
         weight_similarity: float = .3,
         max_fraction_unassigned: float = .05,
         n_cores: int = None,
+        stopping_rule: str = 'absolute',
+        min_similarity_gain: float = 0.05,
         ):
         """
         Optimize tresholds for `self.infer_clones` and pick clonal labels with
@@ -784,7 +867,10 @@ class MiToTreeAnnotator:
         # Grid search
         for _i, (s, m, j) in enumerate(tqdm(combos, total=len(combos), desc="Grid Search")):
             try:
-                df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)
+                df_predict = self.infer_clones(
+                    similarity_percentile=s, mut_enrichment_treshold=m,
+                    stopping_rule=stopping_rule, min_similarity_gain=min_similarity_gain,
+                )
                 labels, sim = self.resolve_ambiguous_clones(
                     df_predict, merging_treshold=j, af_treshold=af_treshold, add_to_meta=False
                 )
@@ -809,10 +895,14 @@ class MiToTreeAnnotator:
                 sil_rescaled = lambda x: rescale(x['silhouette']),
                 sim_rescaled = lambda x: rescale(x['similarity']),
                 n_clones_rescaled = lambda x: rescale(-x['n_clones']),
+                # NB: use the rescaled similarity, as for the other two terms. Raw
+                # similarity sits close to 1 with very little spread across combos,
+                # so as an un-rescaled term it acts as a near-constant offset and
+                # contributes almost nothing to the ranking.
                 score = lambda x:
                     weight_silhouette * x['sil_rescaled'] + \
                     weight_n_clones * x['n_clones_rescaled'] + \
-                    weight_similarity * x['similarity']
+                    weight_similarity * x['sim_rescaled']
             )
             .sort_values('score', ascending=False)
         )
@@ -833,7 +923,10 @@ class MiToTreeAnnotator:
 
         # Final round
         logging.info(f'Hyper-params chosen: similarity_percentile={s}, mut_enrichment_treshold={m}, merging_treshold={j}')
-        df_predict = self.infer_clones(similarity_percentile=s, mut_enrichment_treshold=m)
+        df_predict = self.infer_clones(
+            similarity_percentile=s, mut_enrichment_treshold=m,
+            stopping_rule=stopping_rule, min_similarity_gain=min_similarity_gain,
+        )
         _, _ = self.resolve_ambiguous_clones(
             df_predict, merging_treshold=j, af_treshold=af_treshold, add_to_meta=True
         )

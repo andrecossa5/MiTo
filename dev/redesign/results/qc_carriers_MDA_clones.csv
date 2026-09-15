@@ -1,0 +1,6 @@
+dataset,carriers_def,calls,median_carriers_GT,median_carriers_nonGT,kept,GT_kept,GT_total,nonGT_kept,shipped_vars_kept,shipped_total,secs
+MDA_clones,guard flat g>0.7 (current),850,21.0,0.0,20,17,26,3,16,29,1
+MDA_clones,guard flat g>0.5,1111,24.0,0.0,20,18,26,2,17,29,2
+MDA_clones,AD>=1,2765,31.0,12.0,31,21,26,10,21,29,3
+MDA_clones,AD>=2,1478,23.0,3.0,31,23,26,8,21,29,2
+MDA_clones,old flat g>0.7 (unguarded),4675,25.0,10.0,32,22,26,10,23,29,2

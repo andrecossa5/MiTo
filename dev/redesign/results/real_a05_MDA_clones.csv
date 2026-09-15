@@ -1,0 +1,8 @@
+cells,cells_pct,labels,ARI,NMI,pipeline,seed,abstain,n_vars,GT_kept,qc_kept,common_cells,ARI_common,SHIPPED_ARI_common
+278,74.1,9,0.956,0.928,SHIPPED (max_fraction_unassigned=0.05),-,-,28,19,,,,
+318,84.8,8,0.887,0.83,QC2 a=0.05 abstain=none,0,none,29,19,32.0,273.0,0.942,0.957
+301,80.3,8,0.895,0.843,QC2 a=0.05 abstain=tau0.25,0,tau0.25,29,19,32.0,261.0,0.95,0.959
+312,83.2,9,0.906,0.853,QC2 a=0.05 abstain=none,1,none,29,18,32.0,270.0,0.949,0.957
+297,79.2,9,0.908,0.862,QC2 a=0.05 abstain=tau0.25,1,tau0.25,29,18,32.0,260.0,0.952,0.958
+318,84.8,8,0.887,0.83,QC2 a=0.05 abstain=none,2,none,29,19,32.0,273.0,0.942,0.957
+301,80.3,8,0.895,0.843,QC2 a=0.05 abstain=tau0.25,2,tau0.25,29,19,32.0,261.0,0.95,0.959

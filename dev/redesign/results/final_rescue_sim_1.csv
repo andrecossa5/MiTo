@@ -1,0 +1,43 @@
+pipeline,cells_pct,labels,ARI,NMI,rescued,clones,topo,seed,clones_rec_all,of_all
+guarded (current default),92.1,5,0.99,0.979,,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3,88.5,5,0.983,0.969,,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3 + tau,88.2,5,0.986,0.974,,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3 + read rescue,89.2,5,0.972,0.952,7.0,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3 + pooled rescue,88.5,5,0.983,0.969,0.0,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3 + tau + read rescue,89.2,5,0.972,0.952,10.0,5,polytomy,1,5,5
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,88.4,5,0.986,0.974,2.0,5,polytomy,1,5,5
+guarded (current default),80.0,2,0.612,0.672,,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3,76.4,2,0.608,0.688,,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3 + tau,75.2,2,0.619,0.709,,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3 + read rescue,78.2,2,0.62,0.689,18.0,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3 + pooled rescue,78.2,2,0.62,0.689,18.0,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3 + tau + read rescue,77.2,2,0.631,0.709,20.0,5,depth3,2,1,5
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,77.2,2,0.631,0.709,20.0,5,depth3,2,1,5
+guarded (current default),96.6,13,0.707,0.818,,10,depth3,0,2,10
+QC 1e-4 + binom 1e-3,55.1,6,0.976,0.97,,10,depth3,0,6,10
+QC 1e-4 + binom 1e-3 + tau,54.2,6,0.99,0.988,,10,depth3,0,6,10
+QC 1e-4 + binom 1e-3 + read rescue,60.7,6,0.894,0.862,56.0,10,depth3,0,6,10
+QC 1e-4 + binom 1e-3 + pooled rescue,55.2,6,0.972,0.964,1.0,10,depth3,0,6,10
+QC 1e-4 + binom 1e-3 + tau + read rescue,60.7,6,0.894,0.862,65.0,10,depth3,0,6,10
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,55.2,6,0.972,0.964,10.0,10,depth3,0,6,10
+guarded (current default),90.5,31,0.919,0.943,,30,polytomy,1,28,30
+QC 1e-4 + binom 1e-3,83.8,34,0.906,0.944,,30,polytomy,1,26,30
+QC 1e-4 + binom 1e-3 + tau,83.5,34,0.911,0.948,,30,polytomy,1,27,30
+QC 1e-4 + binom 1e-3 + read rescue,87.3,34,0.872,0.918,35.0,30,polytomy,1,26,30
+QC 1e-4 + binom 1e-3 + pooled rescue,83.8,34,0.906,0.944,0.0,30,polytomy,1,26,30
+QC 1e-4 + binom 1e-3 + tau + read rescue,87.0,34,0.878,0.922,35.0,30,polytomy,1,26,30
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,83.7,34,0.907,0.945,2.0,30,polytomy,1,27,30
+guarded (current default),88.1,32,0.56,0.827,,30,depth3,2,6,30
+QC 1e-4 + binom 1e-3,67.8,27,0.615,0.846,,30,depth3,2,8,30
+QC 1e-4 + binom 1e-3 + tau,64.4,27,0.618,0.856,,30,depth3,2,8,30
+QC 1e-4 + binom 1e-3 + read rescue,75.1,27,0.563,0.788,73.0,30,depth3,2,5,30
+QC 1e-4 + binom 1e-3 + pooled rescue,67.8,27,0.615,0.846,0.0,30,depth3,2,8,30
+QC 1e-4 + binom 1e-3 + tau + read rescue,73.4,27,0.566,0.792,90.0,30,depth3,2,5,30
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,66.5,27,0.622,0.857,21.0,30,depth3,2,8,30
+guarded (current default),94.7,36,0.518,0.837,,50,depth3,0,11,50
+QC 1e-4 + binom 1e-3,89.4,25,0.422,0.796,,50,depth3,0,7,50
+QC 1e-4 + binom 1e-3 + tau,86.8,25,0.43,0.808,,50,depth3,0,7,50
+QC 1e-4 + binom 1e-3 + read rescue,91.6,25,0.417,0.785,22.0,50,depth3,0,6,50
+QC 1e-4 + binom 1e-3 + pooled rescue,89.5,25,0.422,0.796,1.0,50,depth3,0,7,50
+QC 1e-4 + binom 1e-3 + tau + read rescue,89.6,25,0.426,0.797,28.0,50,depth3,0,6,50
+QC 1e-4 + binom 1e-3 + tau + pooled rescue,88.4,25,0.429,0.806,16.0,50,depth3,0,7,50

@@ -1,0 +1,13 @@
+step,description,cells,cells_pct,clones_recovered,clones_with_marker_or_weak,labels,ARI
+L0,cells in clones >= 5 with a marker (>=30%),1739,63.1,36,46,,
+L0b,cells in clones >= 5 with marker or weak marker,2014,73.1,46,46,,
+L0c,cells in clones >= 5 with a strict variant (all cells),126,4.6,3,46,,
+L1a,cells with a significant call on a marker of their clone (oracle assignment),1310,47.5,28,46,46.0,1.0
+L1b,cells with >=1 read on a marker of their clone (oracle assignment),1511,54.8,39,46,46.0,1.0
+L2,oracle markers + binomial calls; cell -> clone of the marker(s) it carries (unambiguous only),1350,49.0,20,46,45.0,0.868
+L3a,"oracle markers, binomial genotypes, tree + cut + tau (82 chars)",1222,44.3,17,46,38.0,0.918
+L3b,"oracle markers, binomial genotypes, tree + cut, no abstention (82 chars)",1336,48.5,19,46,43.0,0.911
+L3c,"oracle markers, guarded graph EM + imputation, tree + cut + tau (74 chars)",1741,63.1,6,46,81.0,0.661
+L4a,"QC-selected (74 vars, 52/84 oracle markers), binomial genotypes, tree + cut + tau",1299,47.1,11,46,48.0,0.87
+L4b,"QC-selected, binomial genotypes, tree + cut, no abstention",1405,51.0,12,46,49.0,0.85
+L4c,"QC-selected AND oracle markers only (52), binomial genotypes, tree + cut + tau",1200,43.5,13,46,33.0,0.918

@@ -1,0 +1,30 @@
+dataset,pipeline,cells,cells_pct,labels,ARI,clones_rec_min10,of_min10,clones_rec_min5,of_min5,qc_alpha_cell,genotypes,abstain,qc_kept,final_chars,calls
+MDA_PT,CEILING L1a call (clones>=10 markers),1246,45.2,32,1.0,18,32,18,46,,,,,,
+MDA_PT,CEILING L1b read (clones>=10 markers),1436,52.1,32,1.0,26,32,26,46,,,,,,
+MDA_PT,CEILING L1a call (clones>=5 markers),1310,47.5,46,1.0,18,32,28,46,,,,,,
+MDA_PT,CEILING L1b read (clones>=5 markers),1511,54.8,46,1.0,26,32,39,46,,,,,,
+MDA_PT,SHIPPED,1569,56.9,33,0.755,12,32,12,46,,,,,,
+MDA_PT,QC 0.01 | geno binom 1e-3 | abstain none,1356,49.2,34,0.871,11,32,11,46,0.01,binom 1e-3,none,71.0,69.0,1906.0
+MDA_PT,QC 0.01 | geno binom 1e-3 | abstain tau,1249,45.3,33,0.898,11,32,11,46,0.01,binom 1e-3,tau,71.0,69.0,1906.0
+MDA_PT,QC 0.01 | geno binom 1e-2 | abstain none,1505,54.6,78,0.626,4,32,4,46,0.01,binom 1e-2,none,71.0,58.0,2299.0
+MDA_PT,QC 0.01 | geno binom 1e-2 | abstain tau,1378,50.0,78,0.657,4,32,4,46,0.01,binom 1e-2,tau,71.0,58.0,2299.0
+MDA_PT,QC 0.01 | geno binom 5e-2 | abstain none,1476,53.5,68,0.594,2,32,2,46,0.01,binom 5e-2,none,71.0,52.0,2274.0
+MDA_PT,QC 0.01 | geno binom 5e-2 | abstain tau,1293,46.9,68,0.662,2,32,2,46,0.01,binom 5e-2,tau,71.0,52.0,2274.0
+MDA_PT,QC 0.01 | geno AD>=1 | abstain none,1476,53.5,68,0.594,2,32,2,46,0.01,AD>=1,none,71.0,52.0,2274.0
+MDA_PT,QC 0.01 | geno AD>=1 | abstain tau,1293,46.9,68,0.662,2,32,2,46,0.01,AD>=1,tau,71.0,52.0,2274.0
+MDA_PT,QC 0.001 | geno binom 1e-3 | abstain none,1405,51.0,49,0.85,12,32,12,46,0.001,binom 1e-3,none,74.0,72.0,1936.0
+MDA_PT,QC 0.001 | geno binom 1e-3 | abstain tau,1299,47.1,48,0.87,11,32,11,46,0.001,binom 1e-3,tau,74.0,72.0,1936.0
+MDA_PT,QC 0.001 | geno binom 1e-2 | abstain none,1583,57.4,86,0.615,4,32,4,46,0.001,binom 1e-2,none,74.0,62.0,2456.0
+MDA_PT,QC 0.001 | geno binom 1e-2 | abstain tau,1446,52.4,86,0.651,4,32,4,46,0.001,binom 1e-2,tau,74.0,62.0,2456.0
+MDA_PT,QC 0.001 | geno binom 5e-2 | abstain none,1513,54.9,85,0.551,2,32,2,46,0.001,binom 5e-2,none,74.0,55.0,2380.0
+MDA_PT,QC 0.001 | geno binom 5e-2 | abstain tau,1298,47.1,85,0.628,2,32,2,46,0.001,binom 5e-2,tau,74.0,55.0,2380.0
+MDA_PT,QC 0.001 | geno AD>=1 | abstain none,1513,54.9,85,0.551,2,32,2,46,0.001,AD>=1,none,74.0,55.0,2380.0
+MDA_PT,QC 0.001 | geno AD>=1 | abstain tau,1298,47.1,85,0.628,2,32,2,46,0.001,AD>=1,tau,74.0,55.0,2380.0
+MDA_PT,QC 0.0001 | geno binom 1e-3 | abstain none,1403,50.9,40,0.871,14,32,14,46,0.0001,binom 1e-3,none,73.0,71.0,1925.0
+MDA_PT,QC 0.0001 | geno binom 1e-3 | abstain tau,1295,47.0,37,0.896,13,32,13,46,0.0001,binom 1e-3,tau,73.0,71.0,1925.0
+MDA_PT,QC 0.0001 | geno binom 1e-2 | abstain none,1612,58.5,78,0.646,4,32,4,46,0.0001,binom 1e-2,none,73.0,61.0,2489.0
+MDA_PT,QC 0.0001 | geno binom 1e-2 | abstain tau,1422,51.6,74,0.694,4,32,4,46,0.0001,binom 1e-2,tau,73.0,61.0,2489.0
+MDA_PT,QC 0.0001 | geno binom 5e-2 | abstain none,1504,54.6,91,0.513,3,32,3,46,0.0001,binom 5e-2,none,73.0,55.0,2351.0
+MDA_PT,QC 0.0001 | geno binom 5e-2 | abstain tau,1273,46.2,91,0.576,3,32,3,46,0.0001,binom 5e-2,tau,73.0,55.0,2351.0
+MDA_PT,QC 0.0001 | geno AD>=1 | abstain none,1504,54.6,91,0.513,3,32,3,46,0.0001,AD>=1,none,73.0,55.0,2351.0
+MDA_PT,QC 0.0001 | geno AD>=1 | abstain tau,1273,46.2,91,0.576,3,32,3,46,0.0001,AD>=1,tau,73.0,55.0,2351.0

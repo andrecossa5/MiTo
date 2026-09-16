@@ -1,0 +1,8 @@
+pipeline,cells,cells_pct,labels,ARI,NMI,clones_recovered,mid_clones_recovered,shared_cells_vs_guarded,ARI_shared_vs_guarded (this / ref),shared_cells_vs_SHIPPED,ARI_shared_vs_SHIPPED (this / ref)
+SHIPPED,1176,76.5,11,0.953,0.885,6,2,1115.0,0.955 / 0.962,,
+guarded (current),1251,81.4,6,0.945,0.899,6,2,,,1115.0,0.962 / 0.955
+binomial,1227,79.8,10,0.96,0.92,6,2,1189.0,0.960 / 0.959,1133.0,0.968 / 0.958
+binomial + pooled rescue a=0.01,1231,80.1,10,0.96,0.918,6,2,1192.0,0.960 / 0.956,1137.0,0.968 / 0.958
+binomial + pooled rescue a=0.001,1229,80.0,10,0.96,0.92,6,2,1190.0,0.960 / 0.958,1135.0,0.968 / 0.958
+binomial + imputation min_support=0,1276,83.0,10,0.938,0.887,6,2,1232.0,0.948 / 0.948,1139.0,0.963 / 0.958
+binomial + imputation min_support=0 + pooled rescue a=0.01,1278,83.1,10,0.938,0.885,6,2,1233.0,0.948 / 0.948,1141.0,0.963 / 0.958

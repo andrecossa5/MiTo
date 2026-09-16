@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore'); logging.disable(logging.INFO)
 import numpy as np, pandas as pd, scanpy as sc, mito as mt
 from mito.pp.filters import annotate_vars, filter_baseline, filter_MiTo
 from geno2 import em_genotype
-from grid import kernel, maxcompat, FK, SIM
+from grid import kernel, maxcompat, character_af, FK, SIM
 from impute import impute_dropouts
 from refine import split_recurrent_graph
 from joincount import carrier_nonrandomness
@@ -29,9 +29,12 @@ def graph_genotype(X, AD, COV, cols):
     return Xk, impute_dropouts(Xk, (g > 0.7).astype(np.int8), k=30, thr=0.6, min_support=1)[0]
 
 
-def downstream(cols, X, AD, COV, split=True):
+def downstream(cols, X, AD, COV, split=True, min_calls=2):
     Xk, Bk = graph_genotype(X, AD, COV, cols)
-    kv = np.flatnonzero(Bk.astype(bool).mean(0) <= 0.5)
+    prev = Bk.astype(bool).mean(0)
+    # characters with (almost) no calls after genotyping carry no information and,
+    # with no AF > 0, would give weighted_jaccard a NaN weight (see grid.character_af)
+    kv = np.flatnonzero((prev <= 0.5) & (Bk.astype(bool).sum(0) >= min_calls))
     Bp, Xp, cp = Bk[:, kv], Xk[:, kv], cols[kv]
     if split:
         Bp, origin, _ = split_recurrent_graph(Xp, Bp)
@@ -39,7 +42,7 @@ def downstream(cols, X, AD, COV, split=True):
         origin = np.arange(Bp.shape[1])
     al = maxcompat(Bp)
     Bs, origin = Bp[:, al], origin[al]
-    return cp[origin], Bs, np.where(Bs > 0, Xp[:, origin], 0.0), Xk
+    return cp[origin], Bs, character_af(Bs, Xp[:, origin]), Xk
 
 
 def front_ends(afm):

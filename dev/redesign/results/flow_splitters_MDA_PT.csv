@@ -1,0 +1,75 @@
+pipeline,clone,var,cramers_V,prev_in_clone,flow,GT,marks
+guard,ATGTATCAGGTTCGCGAA,7155_T>C,1.0,0.07,guard only,True,spread over clones (share<0.5)
+guard,ATGTATCAGGTTCGCGAA,8069_T>C,0.95,0.1,final in both,True,spread over clones (share<0.5)
+guard,ATGTATCAGGTTCGCGAA,8073_G>A,1.0,0.1,final in both,True,marks a mid clone (10-100)
+guard,ATGTATCAGGTTCGCGAA,9002_G>A,1.0,0.12,final in both,False,spread over clones (share<0.5)
+guard,ATGTATCAGGTTCGCGAA,9380_G>A,1.0,0.05,final in both,True,marks a mid clone (10-100)
+guard,ATGTATCAGGTTCGCGAA,9498_T>C,1.0,0.12,final in both,True,within a large clone (>100): whole clone
+guard,ATGTATCAGGTTCGCGAA,9528_C>T,0.95,0.17,final in both,True,within a large clone (>100): whole clone
+guard,TTCGGCCAGGCTTTCCGT,7155_T>C,1.0,0.03,guard only,True,spread over clones (share<0.5)
+guard,TTCGGCCAGGCTTTCCGT,7428_G>A,0.91,0.03,final in both,True,spread over clones (share<0.5)
+guard,TTCGGCCAGGCTTTCCGT,9002_G>A,0.57,0.03,final in both,False,spread over clones (share<0.5)
+guard,TTCGGCCAGGCTTTCCGT,9245_C>T,1.0,0.87,final in both,True,within a large clone (>100): whole clone
+guard,TTCGGCCAGGCTTTCCGT,9498_T>C,1.0,0.03,final in both,True,within a large clone (>100): whole clone
+guard,TTCGGCCAGGCTTTCCGT,9528_C>T,0.53,0.06,final in both,True,within a large clone (>100): whole clone
+guard,GCGGCCTCCCAACGAAGG,7428_G>A,0.03,0.02,final in both,True,spread over clones (share<0.5)
+guard,GCGGCCTCCCAACGAAGG,8069_T>C,0.03,0.02,final in both,True,spread over clones (share<0.5)
+guard,GCGGCCTCCCAACGAAGG,9002_G>A,0.44,0.03,final in both,False,spread over clones (share<0.5)
+guard,GCGGCCTCCCAACGAAGG,9528_C>T,1.0,0.98,final in both,True,within a large clone (>100): whole clone
+guard,GCGGCCTCCCAACGAAGG,11291_C>A,1.0,0.02,final in both,True,marks a mid clone (10-100)
+guard,CTCGGCCTGCGCTCTAAA,9528_C>T,0.53,0.05,final in both,True,within a large clone (>100): whole clone
+guard,CACGATCCGTCGGCCCAG,9528_C>T,0.6,0.08,final in both,True,within a large clone (>100): whole clone
+guard,CACGATCCGTCGGCCCAG,15132_T>C,0.97,0.92,final in both,True,within a large clone (>100): whole clone
+guard,CCCTTGCTTCCACTGTCC,9498_T>C,1.0,0.96,final in both,True,within a large clone (>100): whole clone
+guard,CCCTTGCTTCCACTGTCC,9591_G>A,0.09,0.16,final in both,True,within a large clone (>100): SUBCLONAL
+guard,TTACACGACCCGGCACGC,7428_G>A,0.06,0.03,final in both,True,spread over clones (share<0.5)
+guard,TTACACGACCCGGCACGC,15660_C>T,1.0,0.9,final in both,True,within a large clone (>100): whole clone
+guard,CTTGCCACTGATATCGAC,8878_C>T,0.78,0.16,guard only,False,spread over clones (share<0.5)
+guard,CTTGCCACTGATATCGAC,9002_G>A,1.0,0.21,final in both,False,spread over clones (share<0.5)
+guard,CTTGCCACTGATATCGAC,9498_T>C,1.0,0.21,final in both,True,within a large clone (>100): whole clone
+guard,CTTGCCACTGATATCGAC,9528_C>T,1.0,0.16,final in both,True,within a large clone (>100): whole clone
+AD>0,ATGTATCAGGTTCGCGAA,6445_C>T,1.0,0.05,AD>0 only,True,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,7719_C>T,1.0,0.04,AD>0 only,True,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,8069_T>C,0.93,0.06,final in both,True,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,8073_G>A,0.93,0.04,final in both,True,marks a mid clone (10-100)
+AD>0,ATGTATCAGGTTCGCGAA,9001_C>T,0.89,0.08,AD>0 only,True,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,9002_G>A,1.0,0.04,final in both,False,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,9380_G>A,1.0,0.03,final in both,True,marks a mid clone (10-100)
+AD>0,ATGTATCAGGTTCGCGAA,9445_G>A,0.82,0.03,AD>0 only,True,spread over clones (share<0.5)
+AD>0,ATGTATCAGGTTCGCGAA,9498_T>C,1.0,0.07,final in both,True,within a large clone (>100): whole clone
+AD>0,ATGTATCAGGTTCGCGAA,9528_C>T,0.95,0.1,final in both,True,within a large clone (>100): whole clone
+AD>0,ATGTATCAGGTTCGCGAA,12031_C>T,1.0,0.26,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,ATGTATCAGGTTCGCGAA,15428_G>A,0.88,0.04,AD>0 only,True,marks a mid clone (10-100)
+AD>0,ATGTATCAGGTTCGCGAA,15673_A>G,0.82,0.06,AD>0 only,False,spread over clones (share<0.5)
+AD>0,TTCGGCCAGGCTTTCCGT,6445_C>T,1.0,0.03,AD>0 only,True,spread over clones (share<0.5)
+AD>0,TTCGGCCAGGCTTTCCGT,9001_C>T,0.89,0.04,AD>0 only,True,spread over clones (share<0.5)
+AD>0,TTCGGCCAGGCTTTCCGT,9245_C>T,0.91,0.79,final in both,True,within a large clone (>100): whole clone
+AD>0,TTCGGCCAGGCTTTCCGT,9498_T>C,1.0,0.03,final in both,True,within a large clone (>100): whole clone
+AD>0,TTCGGCCAGGCTTTCCGT,9528_C>T,0.7,0.03,final in both,True,within a large clone (>100): whole clone
+AD>0,TTCGGCCAGGCTTTCCGT,15197_T>C,0.21,0.13,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,TTCGGCCAGGCTTTCCGT,15612_G>A,0.81,0.03,AD>0 only,True,marks a mid clone (10-100)
+AD>0,TTCGGCCAGGCTTTCCGT,15673_A>G,0.7,0.03,AD>0 only,False,spread over clones (share<0.5)
+AD>0,GCGGCCTCCCAACGAAGG,6163_T>C,1.0,0.03,final in both,True,within a large clone (>100): whole clone
+AD>0,GCGGCCTCCCAACGAAGG,9528_C>T,1.0,0.94,final in both,True,within a large clone (>100): whole clone
+AD>0,GCGGCCTCCCAACGAAGG,11291_C>A,1.0,0.02,final in both,True,marks a mid clone (10-100)
+AD>0,CTCGGCCTGCGCTCTAAA,2233_T>C,0.02,0.02,AD>0 only,False,spread over clones (share<0.5)
+AD>0,CTCGGCCTGCGCTCTAAA,6163_T>C,1.0,0.98,final in both,True,within a large clone (>100): whole clone
+AD>0,CTCGGCCTGCGCTCTAAA,6445_C>T,0.02,0.02,AD>0 only,True,spread over clones (share<0.5)
+AD>0,CTCGGCCTGCGCTCTAAA,9528_C>T,0.53,0.04,final in both,True,within a large clone (>100): whole clone
+AD>0,CACGATCCGTCGGCCCAG,5007_G>A,0.27,0.35,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,CACGATCCGTCGGCCCAG,5065_A>G,0.5,0.03,AD>0 only,False,within a large clone (>100): SUBCLONAL
+AD>0,CACGATCCGTCGGCCCAG,6445_C>T,0.57,0.02,AD>0 only,True,spread over clones (share<0.5)
+AD>0,CACGATCCGTCGGCCCAG,9001_C>T,1.0,0.02,AD>0 only,True,spread over clones (share<0.5)
+AD>0,CACGATCCGTCGGCCCAG,9528_C>T,1.0,0.02,final in both,True,within a large clone (>100): whole clone
+AD>0,CACGATCCGTCGGCCCAG,15132_T>C,0.98,0.9,final in both,True,within a large clone (>100): whole clone
+AD>0,CCCTTGCTTCCACTGTCC,9498_T>C,1.0,0.96,final in both,True,within a large clone (>100): whole clone
+AD>0,CCCTTGCTTCCACTGTCC,9591_G>A,0.22,0.16,final in both,True,within a large clone (>100): SUBCLONAL
+AD>0,TTACACGACCCGGCACGC,2397_C>T,0.17,0.18,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,TTACACGACCCGGCACGC,7638_A>G,0.57,0.03,AD>0 only,True,spread over clones (share<0.5)
+AD>0,TTACACGACCCGGCACGC,11814_T>C,1.0,0.04,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,TTACACGACCCGGCACGC,15660_C>T,0.8,0.89,final in both,True,within a large clone (>100): whole clone
+AD>0,TTACACGACCCGGCACGC,15876_T>C,0.06,0.03,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,CTTGCCACTGATATCGAC,6445_C>T,0.82,0.05,AD>0 only,True,spread over clones (share<0.5)
+AD>0,CTTGCCACTGATATCGAC,11163_G>A,1.0,0.08,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,CTTGCCACTGATATCGAC,11814_T>C,0.79,0.69,AD>0 only,True,within a large clone (>100): SUBCLONAL
+AD>0,CTTGCCACTGATATCGAC,12403_C>A,1.0,0.24,AD>0 only,True,within a large clone (>100): SUBCLONAL

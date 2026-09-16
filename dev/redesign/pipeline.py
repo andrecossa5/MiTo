@@ -29,7 +29,7 @@ from scipy.sparse import csr_matrix
 from compat import cell_membership
 from cutter import evidence_cut
 from geno2 import em_genotype
-from grid import FK, kernel, maxcompat
+from grid import FK, character_af, kernel, maxcompat
 from impute import impute_dropouts
 from joincount import carrier_nonrandomness
 from refine import split_recurrent_graph
@@ -49,6 +49,7 @@ def run_pipeline(
     filter_kwargs=None,
     impute_thr=0.6,
     max_prevalence=0.5,
+    min_calls=2,
     ncores=8,
 ):
     """
@@ -99,14 +100,16 @@ def run_pipeline(
     Bk = impute_dropouts(Xk, (g > 0.7).astype(np.int8), k=30, thr=impute_thr, min_support=1)[0]
 
     # 3. character filters
-    kv = np.flatnonzero(Bk.astype(bool).mean(0) <= max_prevalence)
+    # characters with (almost) no calls left carry no information and would give
+    # weighted_jaccard a NaN weight, which turns every distance NaN
+    kv = np.flatnonzero((Bk.astype(bool).mean(0) <= max_prevalence) & (Bk.astype(bool).sum(0) >= min_calls))
     Bp, Xp, cp = Bk[:, kv], Xk[:, kv], cols[kv]
     origin = np.arange(Bp.shape[1])
     if split:
         Bp, origin, _ = split_recurrent_graph(Xp, Bp)
     alive = maxcompat(Bp)
     Bs, origin = Bp[:, alive], origin[alive]
-    Xs = np.where(Bs > 0, Xp[:, origin], 0.0)
+    Xs = character_af(Bs, Xp[:, origin])
     char_vars = c.var_names[cp[origin]]
     qc['in_final'] = qc.index.isin(char_vars)
 

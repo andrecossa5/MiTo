@@ -50,9 +50,15 @@ print(rows[-1], flush=True)
 
 b = base.copy(); annotate_vars(b); b = filter_baseline(b); c = filter_MiTo(b, **FK)
 X = c.X.toarray(); AD = c.layers['AD'].toarray(); COV = c.layers['site_coverage'].toarray().astype(np.int64); n, m = X.shape
-QC_CARRIERS = {'AD>=2': (AD >= 2).astype(np.int8), 'AD>=1': (AD >= 1).astype(np.int8)}
+import os
+MINC = None if os.environ.get('MINC', '0.5') == 'None' else float(os.environ.get('MINC', '0.5'))
+TAG = os.environ.get('TAG', '')
+from carriers import binomial_carriers
+_ALL = {'AD>=2': lambda: (AD >= 2).astype(np.int8), 'AD>=1': lambda: (AD >= 1).astype(np.int8),
+        'binom0.001': lambda: binomial_carriers(AD, COV, alpha_cell=0.001), 'binom0.01': lambda: binomial_carriers(AD, COV, alpha_cell=0.01)}
+QC_CARRIERS = {k_: _ALL[k_]() for k_ in os.environ.get('QCDEFS', 'AD>=2,AD>=1').split(',')}
 for qc_name, Bq in QC_CARRIERS.items():
-  keep, pj, pe = carrier_nonrandomness(X, Bq, cell_depth=COV.mean(1), alpha=0.05)
+  keep, pj, pe = carrier_nonrandomness(X, Bq, cell_depth=COV.mean(1), alpha=0.05, min_concentration=MINC)
   cols = np.flatnonzero(keep)
   print(f'QC [{qc_name}] keeps {cols.size} ({sum(v in GT for v in c.var_names[cols])} GT of {len(GT)})', flush=True)
   for split in (False,):
@@ -66,7 +72,7 @@ for qc_name, Bq in QC_CARRIERS.items():
       tree = mt.tl.build_tree(a, precomputed=True, solver='UPMGA')
       Bk = a.layers['bin'].toarray() > 0
       vk = set(c.var_names[cols_f]); info = dict(n_vars=len(vk), n_chars=int(Bs.shape[1]), GT_kept=len(vk & GT))
-      name = f'QC2 a=0.05 [{qc_name}] no split'
+      name = f'QC2 a=0.05 [{qc_name}] conc={MINC} no split'
       lab = evidence_cut(tree, Bk.astype(float), list(a.obs_names), min_in=0.25, ratio=3.0, self_min_in=0.85, ladder='descend', one_sided=False)
       _, core = cell_membership(kernel(Xk, raw=True), Bs > 0, tau=0.0)
       bad = ~(Bk & (core[kc] >= 0.25)).any(1)
@@ -79,5 +85,5 @@ for qc_name, Bq in QC_CARRIERS.items():
           rows.append(metrics(full(l_), pipeline=name, caller='MiToTreeAnnotator', **info)); print(rows[-1], flush=True)
       except Exception as e:
           print(name, 'annotator failed:', str(e).strip()[:60], flush=True)
-      pd.DataFrame(rows).to_csv(f'adqc_real_{ds}.csv', index=False)
+      pd.DataFrame(rows).to_csv(f'adqc_real{TAG}_{ds}.csv', index=False)
 print('ALL DONE', flush=True)

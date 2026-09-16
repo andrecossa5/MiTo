@@ -1,0 +1,7 @@
+dataset,alpha_cell,genotypes,qc_kept,final_vars,GT_final,calls,cells_pct,labels,ARI,homog,compl,big_recovered
+MDA_clones,0.001,graph EM + imputation (current),28,26,21,857,79.5,10,0.926,0.907,0.865,1/1
+MDA_clones,0.001,binomial,28,26,21,564,58.7,9,0.834,0.885,0.782,1/1
+MDA_clones,0.001,binomial + imputation,28,27,22,768,72.8,6,0.91,0.884,0.88,1/1
+MDA_clones,0.01,graph EM + imputation (current),32,30,21,914,78.7,9,0.9,0.854,0.854,1/1
+MDA_clones,0.01,binomial,32,30,21,694,70.4,6,0.923,0.889,0.91,1/1
+MDA_clones,0.01,binomial + imputation,32,31,22,889,72.0,6,0.926,0.89,0.91,1/1

@@ -30,6 +30,25 @@ def votes(a, min_cells=5):
     return lab
 
 
+def character_af(B, X):
+    """
+    Allele frequencies for the tree's characters, defined on every call.
+
+    weighted_jaccard weights a character by the median AF of its cells with AF > 0.
+    Imputed calls have no reads (AF = 0), so a character whose calls are all imputed
+    or absent gets a NaN weight, and a single NaN weight makes EVERY cell-cell
+    distance NaN (MDA_lung: 1.85M NaN distances, degenerate tree, ARI 0). Calls
+    without reads therefore take the character's median positive AF.
+    """
+    Bb = B > 0
+    Xa = np.where(Bb, X, 0.0)
+    pos = np.where(Bb & (X > 0), X, np.nan)
+    med = np.nanmedian(pos, axis=0) if Bb.any() else np.zeros(B.shape[1])
+    fallback = np.nanmedian(np.where(X > 0, X, np.nan), axis=0)
+    med = np.where(np.isfinite(med), med, np.where(np.isfinite(fallback), fallback, 1e-3))
+    return np.where(Bb & (Xa == 0), med[None, :], Xa)
+
+
 def maxcompat(B, min_gamete=10):
     """Greedy four-gamete filter; drops the variant involved in most conflicts."""
     B0 = B[B.sum(1) >= 1] > 0

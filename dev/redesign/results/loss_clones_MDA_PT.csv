@@ -1,0 +1,39 @@
+clone,size,n_markers,n_weak,best_marker_prev,guarded_status,guarded_frac_assigned,guarded_markers_final,guarded_markers_lost_at,binomial_status,binomial_frac_assigned,binomial_markers_final,binomial_markers_lost_at,shipped_status,shipped_frac_assigned
+ATGTATCAGGTTCGCGAA,256,0,0,0.0,partial,0.23,0,,partial,0.07,0,,partial,0.19
+TTCGGCCAGGCTTTCCGT,194,1,0,0.32,recovered,0.58,1,,partial,0.33,1,,partial,0.41
+GCGGCCTCCCAACGAAGG,194,1,0,0.71,recovered,0.88,1,,recovered,0.72,1,,partial,0.84
+CTCGGCCTGCGCTCTAAA,176,2,0,0.81,recovered,0.88,1,lost: four-gamete:1,recovered,0.73,1,lost: four-gamete:1,recovered,0.92
+CACGATCCGTCGGCCCAG,149,1,0,0.64,recovered,0.71,1,,recovered,0.63,1,,recovered,0.72
+CCCTTGCTTCCACTGTCC,138,2,1,0.86,recovered,0.99,2,lost: four-gamete:1,recovered,0.91,3,,recovered,0.92
+TTACACGACCCGGCACGC,137,1,0,0.58,recovered,0.79,1,,partial,0.55,1,,recovered,0.66
+GCTATAACAAATTACATC,114,1,1,0.98,recovered,1.0,2,,recovered,0.98,2,,recovered,0.98
+GTCGCTGTCCTGCTCCCG,113,2,2,0.96,recovered,1.0,2,lost: QC:2,recovered,1.0,4,,recovered,1.0
+CTTGCCACTGATATCGAC,105,1,1,0.32,partial,0.18,0,lost: QC:2,partial,0.48,2,,recovered,0.51
+CTCAGTTATATGGCACTG,82,0,0,0.0,partial,0.12,0,,partial,0.04,0,,partial,0.05
+GTCTGGGCTTACTGGGCC,69,0,1,0.12,partial,0.14,0,lost: QC:1,partial,0.16,1,,partial,0.17
+CCCCTGCACTTATTTTGG,56,0,2,0.29,partial,0.39,0,lost: QC:2,partial,0.18,2,,partial,0.54
+CGTACAGGATCCCCAAGT,49,0,1,0.16,partial,0.33,1,,partial,0.18,1,,partial,0.27
+CATTGGATGGCGGTCACC,47,2,1,0.85,partial,0.96,2,lost: QC:1,recovered,0.87,3,,recovered,0.89
+CTGCCTCCAACTAGCACC,47,2,3,0.57,partial,0.32,0,lost: QC:4;lost: four-gamete:1,partial,0.49,4,lost: four-gamete:1,recovered,0.77
+TGTCCTCGGGTGAAACAC,32,1,1,0.44,partial,0.28,0,lost: QC:2,partial,0.38,2,,partial,0.62
+GTGCAGCTGGGCACGTGG,28,2,2,0.96,partial,0.96,1,lost: QC:3,partial,0.96,4,,partial,0.96
+CCCTTCCCCATCCTGGAG,25,1,1,0.6,partial,0.6,1,lost: QC:1,partial,0.72,1,lost: QC:1,partial,0.84
+CTAGTTTCCGGGGATACT,24,1,0,0.75,partial,0.88,1,,recovered,0.75,1,,recovered,0.75
+TTTGCCCCTGACATCTGG,21,0,1,0.19,partial,0.86,0,lost: filter_MiTo:1,partial,0.76,0,lost: filter_MiTo:1,partial,0.76
+CGAGTTGACTGCTGAACC,19,1,1,0.84,partial,0.89,1,lost: QC:1,partial,0.89,1,lost: QC:1,partial,0.74
+CCTACAGAACGAGTCTGG,18,0,0,0.0,partial,0.28,0,,lost (no cell assigned),0.0,0,,partial,0.11
+GAAGTAACGTCGCAGATC,17,1,1,0.65,partial,0.88,1,lost: filter_MiTo:1,partial,0.06,0,lost: QC:1;lost: filter_MiTo:1,partial,0.71
+CCATCATAGACCTGCGCT,17,0,1,0.12,partial,0.12,0,lost: filter_MiTo:1,lost (no cell assigned),0.0,0,lost: filter_MiTo:1,partial,0.12
+AATTGCTCGACGTGGCTT,16,1,0,1.0,partial,1.0,1,,recovered,0.94,1,,recovered,1.0
+ATCCGCTGCCATAAAAAG,16,1,0,0.5,partial,0.19,0,lost: QC:1,recovered,0.5,1,,partial,0.62
+CCTGCCCCTAACCAGACT,16,0,1,0.19,partial,0.31,0,lost: QC:1,lost (no cell assigned),0.0,0,lost: QC:1,partial,0.19
+TCCTTACGCCTTATTCCG,16,1,0,0.38,partial,0.12,0,lost: QC:1,partial,0.44,1,,partial,0.06
+ATAGGCTTGCTCTTACAC,15,1,0,0.47,partial,0.13,0,lost: QC:1,partial,0.4,1,,partial,0.2
+CAAACTCCCCTAGGCGCG,15,0,2,0.27,partial,0.13,0,lost: QC:1;lost: filter_MiTo:1,lost (no cell assigned),0.0,0,lost: QC:1;lost: filter_MiTo:1,partial,0.6
+CCCTAGCGATTTGTGCTT,14,1,0,0.36,partial,0.14,0,lost: QC:1,partial,0.07,0,lost: QC:1,partial,0.57
+GATAGCGTCTCTCCGGCG,14,0,0,0.0,partial,0.07,0,,lost (no cell assigned),0.0,0,,partial,0.14
+CGTCTCTAAGCGTGAGTC,13,2,1,1.0,partial,1.0,2,lost: QC:1,recovered,1.0,2,lost: QC:1,recovered,0.62
+CGCGCCTCTGAATAGTTG,11,0,0,0.0,partial,0.36,0,,lost (no cell assigned),0.0,0,,partial,0.09
+CCTGCTTCTAGCGGGCTT,10,0,0,0.0,partial,0.4,0,,partial,0.1,0,,partial,0.3
+CCCTGCATTCGGGCGCGG,10,0,0,0.0,lost (no cell assigned),0.0,0,,lost (no cell assigned),0.0,0,,partial,0.2
+CCATAGTATGACACTTGC,10,0,0,0.0,partial,0.1,0,,lost (no cell assigned),0.0,0,,partial,0.2

@@ -1,0 +1,19 @@
+condition,abstain,qc_vars,final_vars,spread_in_final,subclonal_in_final,mid_in_final,cells_pct,labels,ARI,homog,compl,big_recovered,big_labels_per_clone
+1 AD>0: all kept,none,70,59,16,12,16,63.5,73,0.603,0.698,0.689,4/10,14.8
+1 AD>0: all kept,tau,70,59,16,12,16,61.4,73,0.609,0.702,0.693,4/10,14.0
+2 - AD>0-only spread,none,58,48,4,11,16,61.8,45,0.73,0.722,0.797,7/10,9.5
+2 - AD>0-only spread,tau,58,48,4,11,16,60.6,45,0.746,0.732,0.8,8/10,9.4
+3 - all spread,none,51,43,0,11,16,50.5,38,0.733,0.739,0.81,4/10,8.0
+3 - all spread,tau,51,43,0,11,16,49.3,38,0.75,0.75,0.813,6/10,7.9
+4 - AD>0-only subclonal,none,60,51,16,3,16,64.4,65,0.601,0.682,0.688,5/10,15.9
+4 - AD>0-only subclonal,tau,60,51,16,3,16,63.1,65,0.61,0.688,0.695,5/10,15.3
+5 - all subclonal,none,56,49,16,0,16,62.8,65,0.615,0.684,0.692,4/10,15.6
+5 - all subclonal,tau,56,49,16,0,16,61.6,65,0.622,0.689,0.698,4/10,15.1
+6 - AD>0-only spread & subclonal,none,48,40,4,3,16,59.1,36,0.743,0.713,0.812,7/10,9.1
+6 - AD>0-only spread & subclonal,tau,48,40,4,3,16,57.6,36,0.765,0.725,0.819,7/10,9.0
+7 - all AD>0-only,none,37,29,4,3,7,56.3,23,0.758,0.705,0.844,7/10,7.3
+7 - all AD>0-only,tau,37,29,4,3,7,55.1,23,0.774,0.718,0.85,7/10,7.2
+8 guard final + AD>0-only mid-clone markers,none,41,40,7,2,16,58.3,58,0.667,0.708,0.717,4/10,13.0
+8 guard final + AD>0-only mid-clone markers,tau,41,40,7,2,16,58.1,58,0.669,0.709,0.719,4/10,13.0
+"9 guard final (reference, re-run)",none,32,32,7,2,8,56.8,41,0.713,0.708,0.766,5/10,10.9
+"9 guard final (reference, re-run)",tau,32,32,7,2,8,56.8,41,0.713,0.708,0.767,5/10,10.9

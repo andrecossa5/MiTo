@@ -12,6 +12,7 @@ dense cluster is significant whatever happens elsewhere in the graph.
 """
 import numpy as np
 from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 from caller import _cosine_D
 
@@ -81,8 +82,29 @@ def _stratified_sets(strata, carriers, n_perm, rng):
     return R
 
 
+def carrier_concentration(A, carriers):
+    """
+    Share of connected carriers that sit in ONE lineage region of the kNN graph.
+
+    Carriers are linked by DIRECT kNN edges (graph built without the variant). Linking
+    through overlapping neighbourhoods was tried first and chains across lineages:
+    on MDA_PT variants spread over several barcode clones scored 0.93, like clone
+    markers. With direct edges: spread 0.35, mid-clone markers 0.83, whole large
+    clones 0.80, tiny clones 1.00, subclones 0.52 (removing those is harmless).
+    Carriers linked to nobody (stray calls) are ignored. Returns largest connected
+    group / carriers in groups of size >= 2 (NaN if no group).
+    """
+    C = np.flatnonzero(carriers)
+    if C.size < 2:
+        return np.nan
+    _, lab = connected_components(A[C][:, C], directed=False)
+    sizes = np.bincount(lab)
+    grouped = sizes[sizes >= 2]
+    return float(grouped.max()/grouped.sum()) if grouped.size else np.nan
+
+
 def carrier_nonrandomness(X, B, cell_depth=None, k=15, alpha=0.01, n_perm=999, n_strata=5, seed=0,
-                          n_rounds=1, ref=None):
+                          n_rounds=1, ref=None, min_concentration=None, return_concentration=False):
     """
     Keep a variant if its carriers are non-random with respect to the REST of the data.
 
@@ -96,8 +118,24 @@ def carrier_nonrandomness(X, B, cell_depth=None, k=15, alpha=0.01, n_perm=999, n
                     -> clones marked by j alone: their cells lack every other
                        clone's markers, while noise carriers are ordinary cells
 
-    Scattered noise is neither. keep if min(p_join, p_excl) <= alpha/2 (Bonferroni over
-    the two tests), so the rule is a single threshold.
+    Scattered noise is neither. A variant passes a test if its p <= alpha/2 (Bonferroni
+    over the two tests).
+
+    Concentration (min_concentration, default None = off). Variants carried by SEVERAL
+    lineages are non-random too -- dense in each -- so the join count keeps them, but in
+    the tree they tie unrelated clones together and fragment large ones (MDA_PT oracle
+    ablation: removing 12 such variants took ARI 0.61 -> 0.75, large clones recovered
+    4/10 -> 8/10). A variant kept by the join count must therefore have most of its
+    linked carriers in one lineage region (carrier_concentration >= min_concentration).
+    Variants kept by exclusivity are exempt: sole-marker carriers have no other calls,
+    so their neighbourhoods -- and hence their concentration -- are undefined.
+    min_concentration=None disables the criterion. It is OFF by default: baked into the
+    QC at 0.5 it removed 11/19 spread variants on MDA_PT but also a whole-clone marker
+    and spread variants that carry real signal, with no ARI gain on MDA_PT (AD>0
+    carriers 0.609 -> 0.603, cells 61% -> 50%), none on MDA_clones / MDA_lung, and a
+    loss on 50-clone simulated polytomies (0.75 -> 0.66).
+
+      keep = (p_excl <= alpha/2) | ((p_join <= alpha/2) & (concentration >= min_concentration))
 
     "The rest of the data" is only as good as the variants it is made of: when most
     candidates are noise (MDA_PT: ~60%), cells are placed and counted by noise calls
@@ -105,7 +143,7 @@ def carrier_nonrandomness(X, B, cell_depth=None, k=15, alpha=0.01, n_perm=999, n
     counts of the next round are built only from the variants kept in the previous
     one, and EVERY variant is retested against them. Stops when the kept set repeats.
 
-    Returns keep (bool), p_join, p_excl.
+    Returns keep (bool), p_join, p_excl [, concentration].
     """
     rng = np.random.default_rng(seed)
     Bb = B > 0
@@ -122,7 +160,7 @@ def carrier_nonrandomness(X, B, cell_depth=None, k=15, alpha=0.01, n_perm=999, n
         total_calls = (Bb & ref[None, :]).sum(1).astype(float)
         G = Xr @ Xr.T
         sq = (Xr**2).sum(1)
-        p_join = np.ones(m); p_excl = np.ones(m)
+        p_join = np.ones(m); p_excl = np.ones(m); conc = np.full(m, np.nan)
         for j in range(m):
             x = Bb[:, j].astype(float)
             if x.sum() < 2:
@@ -137,12 +175,16 @@ def carrier_nonrandomness(X, B, cell_depth=None, k=15, alpha=0.01, n_perm=999, n
             ex_obs = (x @ other)/x.sum()
             ex_null = (R @ other)/R.sum(1)
             p_excl[j] = (1 + (ex_null <= ex_obs).sum())/(1 + n_perm)
-        keep = np.minimum(p_join, p_excl) <= alpha/2
+            conc[j] = carrier_concentration(A, Bb[:, j])
+        by_join = p_join <= alpha/2
+        if min_concentration is not None:
+            by_join &= np.nan_to_num(conc, nan=0.0) >= min_concentration
+        keep = (p_excl <= alpha/2) | by_join
         if any((keep == s_).all() for s_ in seen) or keep.sum() < 2:
             break
         seen.append(keep.copy())
         ref = keep.copy()
-    return keep, p_join, p_excl
+    return (keep, p_join, p_excl, conc) if return_concentration else (keep, p_join, p_excl)
 
 
 def morans_i_test(D, B, n_perm=999, seed=0):

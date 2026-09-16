@@ -1,8 +1,8 @@
 cells_pct,labels,ARI,NMI,homog,compl,big_recovered,pipeline,caller,n_vars,GT_kept,n_chars,common_cells,ARI_common,SHIPPED_ARI_common
 76.4,11,0.953,0.885,0.893,0.877,4/5,SHIPPED (mfu=0.1),MiToTreeAnnotator,56,29,,,,
-88.3,170,0.0,0.133,0.293,0.086,0/5,QC2 a=0.05 [AD>=2] no split,evidence_cut,33,26,33.0,1153.0,0.0,0.953
-87.6,170,0.0,0.128,0.286,0.082,0/5,QC2 a=0.05 [AD>=2] no split,evidence_cut + tau,33,26,33.0,1151.0,0.0,0.953
-88.3,1,0.0,0.0,0.0,1.0,0/5,QC2 a=0.05 [AD>=2] no split,MiToTreeAnnotator,33,26,33.0,1153.0,0.0,0.953
-88.6,170,0.0,0.131,0.287,0.085,0/5,QC2 a=0.05 [AD>=1] no split,evidence_cut,32,24,32.0,1153.0,0.0,0.953
-88.0,170,0.0,0.126,0.281,0.082,0/5,QC2 a=0.05 [AD>=1] no split,evidence_cut + tau,32,24,32.0,1152.0,0.0,0.953
-88.6,1,0.0,0.0,0.0,1.0,0/5,QC2 a=0.05 [AD>=1] no split,MiToTreeAnnotator,32,24,32.0,1153.0,0.0,0.953
+86.9,13,0.934,0.87,0.868,0.872,4/5,QC2 a=0.05 [AD>=2] no split,evidence_cut,32,26,32.0,1149.0,0.963,0.953
+86.9,13,0.934,0.87,0.868,0.872,4/5,QC2 a=0.05 [AD>=2] no split,evidence_cut + tau,32,26,32.0,1149.0,0.963,0.953
+85.2,10,0.948,0.895,0.892,0.899,4/5,QC2 a=0.05 [AD>=2] no split,MiToTreeAnnotator,32,26,32.0,1136.0,0.963,0.955
+87.2,13,0.936,0.874,0.872,0.876,4/5,QC2 a=0.05 [AD>=1] no split,evidence_cut,31,24,31.0,1149.0,0.965,0.955
+87.2,13,0.936,0.874,0.872,0.876,4/5,QC2 a=0.05 [AD>=1] no split,evidence_cut + tau,31,24,31.0,1149.0,0.965,0.955
+85.9,11,0.9,0.847,0.894,0.806,3/5,QC2 a=0.05 [AD>=1] no split,MiToTreeAnnotator,31,24,31.0,1143.0,0.916,0.958

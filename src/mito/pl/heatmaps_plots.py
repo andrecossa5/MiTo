@@ -8,14 +8,14 @@ from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotting_utils as plu
 import scanpy as sc
 from anndata import AnnData
 from cassiopeia.data import CassiopeiaTree
 
-from mito.tl.annotate import _get_muts_order
-from mito.tl.phylo import _get_leaves_order, build_tree
+from mito.tl.phylo import _get_leaves_order, _get_muts_order, build_tree
 
 ##
 
@@ -55,11 +55,16 @@ def heatmap_distances(
     """
 
     if distance_key not in afm.obsp:
-        raise ValueError('Compute distances first!')
+        raise ValueError(
+            f'No distances in afm.obsp["{distance_key}"]: run mito.pp.compute_distances '
+            f'(or mito.pp.filter_afm) first.'
+        )
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5))
 
     if tree is None:
         logging.info('Compute tree from precomputed cell-cell distances...')
-        tree = build_tree(afm, precomputed=True)
+        tree = build_tree(afm)
 
     order = _get_leaves_order(tree)
     D = afm[order].obsp[distance_key].toarray()
@@ -130,11 +135,16 @@ def heatmap_variants(
     if kwargs is None:
         kwargs = {}
     if 'distances' not in afm.obsp:
-        raise ValueError('Compute distances first!')
+        raise ValueError(
+            'No distances in afm.obsp["distances"]: run mito.pp.compute_distances '
+            '(or mito.pp.filter_afm) first.'
+        )
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 5))
 
     if tree is None:
         logging.info('Compute tree from precomputed cell-cell distances...')
-        tree = build_tree(afm, precomputed=True)
+        tree = build_tree(afm)
 
     cell_order = _get_leaves_order(tree)
     mut_order = _get_muts_order(tree)
@@ -143,6 +153,7 @@ def heatmap_variants(
         X = afm.X.toarray()
     elif layer in afm.layers:
         X = afm.layers[layer]
+        X = X.toarray() if hasattr(X, 'toarray') else np.asarray(X)   # AD/bin sparse, DP dense
     else:
         raise KeyError(f'Layer {layer} not present in afm.layers')
 

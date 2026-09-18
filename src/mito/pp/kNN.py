@@ -1,10 +1,12 @@
 """
-Nearest neighbors utils.
+Nearest neighbours of cells, from their pairwise distances.
 """
 
+import logging
 from typing import Any
 
 import numpy as np
+from anndata import AnnData
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 from umap.umap_ import fuzzy_simplicial_set, nearest_neighbors
 
@@ -104,7 +106,7 @@ def get_idx_from_simmetric_matrix(X, k=15):
 ##
 
 
-def kNN_graph(
+def _kNN_graph(
     X: np.array = None,
     D: np.array = None,
     k: int = 10,
@@ -112,7 +114,7 @@ def kNN_graph(
     nn_kwargs: dict[str,Any] = None
     ) -> tuple[np.array,csr_matrix,csr_matrix]:
     """
-    kNN graph computation.
+    kNN graph computation on arrays. `mito.pp.kNN_graph` is the AnnData interface.
 
     Parameters
     ----------
@@ -172,12 +174,57 @@ def kNN_graph(
 ##
 
 
-def spatial_w_from_idx(idx):
-    n = idx.shape[0]
-    spw = np.zeros((n,n))
-    for i in range(n):
-        spw[i,idx[i,1:]] = 1
-    return spw
+def kNN_graph(
+    afm: AnnData,
+    k: int = 15,
+    distance_key: str = 'distances',
+    key_added: str = 'neighbours',
+    copy: bool = False
+    ) -> AnnData | None:
+    """
+    Nearest-neighbour graph of the cells, from the distances in .obsp[`distance_key`].
+
+    Parameters
+    ----------
+    afm : AnnData
+        AFM with cell-cell distances (see `mito.pp.compute_distances`).
+    k : int, optional
+        Number of neighbours. Default is 15.
+    distance_key : str, optional
+        .obsp key holding the distances. Default is "distances".
+    key_added : str, optional
+        .uns key for the graph's parameters; the matrices are stored as
+        .obsp["<key_added>_distances"] and .obsp["<key_added>_connectivities"].
+        Default is "neighbours".
+    copy : bool, optional
+        Return a modified copy instead of updating `afm` in place. Default is False.
+
+    Returns
+    -------
+    AnnData | None
+        Updated AFM if `copy` is True, otherwise None.
+    """
+
+    afm = afm.copy() if copy else afm
+    if distance_key not in afm.obsp:
+        raise ValueError(
+            f'No distances in afm.obsp["{distance_key}"]: run mito.pp.compute_distances '
+            f'(or mito.pp.filter_afm) first.'
+        )
+
+    idx, distances, connectivities = _kNN_graph(
+        D=afm.obsp[distance_key].toarray(), k=k, from_distances=True
+    )
+    afm.obsp[f'{key_added}_distances'] = distances
+    afm.obsp[f'{key_added}_connectivities'] = connectivities
+    afm.uns[key_added] = {
+        'params' : {'k':k, 'metric':afm.uns.get('distances', {}).get(distance_key, {}).get('metric')},
+        'distances_key' : f'{key_added}_distances',
+        'connectivities_key' : f'{key_added}_connectivities'
+    }
+    logging.info(f'kNN graph (k={k}) from afm.obsp["{distance_key}"]')
+
+    return afm if copy else None
 
 
 ##

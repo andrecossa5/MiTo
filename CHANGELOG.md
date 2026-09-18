@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-09-18
+### Changed
+- **MT-only scope.** MiTo now covers MAESTER, mtscATAC and ReDeeM data
+  (`pp_method`: `maegatk`, `mgatk`, `redeem-v`); the Cas9, scWGS and EPI-clone
+  readers and their metrics are gone. Functions dispatch on what an AFM carries
+  rather than on `uns['scLT_system']`, so a new pre-processing pipeline only has
+  to produce the object contract.
+- **AFM contract.** One dense integer `DP` layer holds the coverage of each
+  variant's site, defined for every cell; `site_coverage` and the `qual` layer
+  are gone (base quality is a `.var` column). An unfiltered MAESTER AFM shrank
+  from 123 MB to ~24 MB.
+- **`filter_afm` implements the new variant pipeline**: candidate MT-SNVs ->
+  read-level genotyping against each variant's own error rate -> clonality QC on
+  the cell kNN graph -> signal over background -> optional dropout imputation ->
+  prevalence / four-gamete characters -> distances. 16 documented parameters,
+  keyword-only, in pipeline order.
+- **`mt.tl.annotate_clones`** replaces `MiToTreeAnnotator.clonal_inference`: the
+  tree is cut where the characters pay for the split, and cells whose calls their
+  neighbourhood does not corroborate are left `unassigned`.
+- **`mt.pl.plot_tree` rewritten**: annotations are named once in `annot`
+  (metadata column or character), coloured through `cmaps` / `limits`, and each
+  tree element is configured by one dictionary. 44 parameters -> 14, with
+  renamed arguments reported by name.
+- **scverse conventions**: `mt.pp` / `mt.tl` functions modify the AnnData in
+  place and take `copy=`; `mt.pp.kNN_graph` writes `.obsp` / `.uns` like
+  `sc.pp.neighbors`; provenance lives in one `.uns['mito']` namespace, one
+  record per public function.
+
+### Added
+- `mt.pp.call_genotypes` (per-cell binomial test against the variant's own,
+  iteratively estimated error rate), `filter_non_clonal_variants` (join count /
+  exclusivity on the leave-one-out kNN graph), `filter_low_signal_variants`,
+  `impute_dropouts`, `filter_incompatible_variants`.
+- `mt.tl.evidence_cut`, `clone_support`, `rescue_unassigned`, `compute_fitness`,
+  `compute_expansions`; `mt.ut.dataset_metrics`.
+
+### Removed
+- Feature-selection strategies superseded by the clonality QC: `MQuad`,
+  `weng2024`, `miller2022`, `CV`, and the Moran's I filter (it included the
+  variant under test in the distances, so 96% of scattered noise passed).
+- The binomial-mixture genotyper (it called cells with zero alternative reads),
+  `mt.tl._classification`, `mt.ut.de_utils`, `mt.ut.stats_utils` and unused
+  helpers; dependencies `mquad`, `bbmix`, `lightgbm`, `shap`, `gseapy`.
+
+### Fixed
+- One character without a positive allele frequency made *every* cell-cell
+  distance NaN; weights are now taken over called cells, with a fallback.
+- The four-gamete filter resolved conflicts by count alone, deleting prevalent
+  real markers in favour of sparse noise (613 of 1272 genotyped cells lost their
+  only character on one dataset); it now drops the variant with the least signal.
+- Bootstrap replicates dropped the genotypes, so `compute_distances` failed on
+  them; they are now seeded and carry every layer.
+- Plotting: categorical legends in `draw_embedding`, every `layer=` in
+  `heatmap_variants`, `matplotlib.cm.get_cmap` (removed in matplotlib 3.9),
+  axes creation when `ax` is not given.
+
 ## [0.2.1] - 2026-08-06
 ### Fixed
 - Documentation URL in the package metadata pointed at a Read the Docs slug

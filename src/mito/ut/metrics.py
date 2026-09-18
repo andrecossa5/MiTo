@@ -19,7 +19,7 @@ from sklearn.metrics import (  # noqa: F401  -- re-exported via mito.ut
     recall_score,
 )
 
-from mito.pp.kNN import kNN_graph
+from mito.pp.kNN import _kNN_graph
 
 from .utils import rescale
 
@@ -185,7 +185,7 @@ def NN_purity(index: np.array, labels: np.array) -> float:
 
     """
 
-    # Positional indexing: see the note in kbet. mito.pp.kNN_graph returns
+    # Positional indexing: see the note in kbet. The kNN helper returns
     # neighbour indices that already exclude the cell itself, so every column
     # counts towards purity.
     labels = np.asarray(labels)
@@ -383,7 +383,7 @@ def AOC(D1: np.array, D2: np.array, k: int = 10, n_trials: int = 1000):
     """
 
     n = D1.shape[0]
-    idx_D2, _, _ = kNN_graph(D=D2, k=k, from_distances=True)
+    idx_D2, _, _ = _kNN_graph(D=D2, k=k, from_distances=True)
 
     AOC = np.zeros(n)
     pvals = np.zeros(n)

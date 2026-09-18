@@ -1,8 +1,8 @@
 """
 mito.pp.kNN_graph
 
-Light coverage: both entry points (feature matrix and precomputed distances),
-the k parameter, and the shape contract of the returned triple.
+AnnData-first, like ``sc.pp.neighbors``: the graph is written onto the object, so what
+computed it and with which parameters is recoverable from the object alone.
 """
 
 import numpy as np
@@ -11,77 +11,63 @@ import pytest
 import mito as mt
 
 
-def test_from_distances_returns_triple(distance_matrix):
-    out = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    assert isinstance(out, tuple) and len(out) == 3
+def test_writes_the_graph_onto_the_object(afm_filtered):
+    mt.pp.kNN_graph(afm_filtered, k=10)
+
+    assert {"neighbours_distances", "neighbours_connectivities"} <= set(afm_filtered.obsp)
+    record = afm_filtered.uns["neighbours"]
+    assert record["params"]["k"] == 10
+    assert record["params"]["metric"] == "weighted_jaccard"
+    assert record["distances_key"] == "neighbours_distances"
+    assert record["connectivities_key"] == "neighbours_connectivities"
 
 
-def test_from_distances_index_shape(distance_matrix):
-    idx, dists, conn = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    assert idx.shape == (distance_matrix.shape[0], 5)
+def test_no_cell_has_more_than_k_neighbours(afm_filtered):
+    """
+    k is an upper bound on the stored distances, not an exact count: cells with an
+    identical genotype profile are at distance 0 from each other, and those entries are
+    dropped from the sparse matrix. The connectivities are the graph to reason about.
+    """
+    k = 8
+    mt.pp.kNN_graph(afm_filtered, k=k)
+
+    stored = np.diff(afm_filtered.obsp["neighbours_distances"].indptr)
+    assert stored.max() <= k
+
+    neighbours = np.diff(afm_filtered.obsp["neighbours_connectivities"].indptr)
+    assert (neighbours > 0).all(), "every cell must be connected to something"
 
 
-@pytest.mark.parametrize("k", [3, 5, 10, 15])
-def test_k_controls_neighbour_count(distance_matrix, k):
-    """Regression: k used to be ignored, returning all n-1 neighbours."""
-    idx, _, _ = mt.pp.kNN_graph(D=distance_matrix, k=k, from_distances=True)
-    assert idx.shape[1] == k
+def test_connectivities_are_symmetric_and_non_negative(afm_filtered):
+    mt.pp.kNN_graph(afm_filtered, k=10)
+    C = afm_filtered.obsp["neighbours_connectivities"].toarray()
+    assert (C >= 0).all()
+    assert np.allclose(C, C.T, atol=1e-8)
 
 
-def test_self_is_excluded(distance_matrix):
-    idx, _, _ = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    for i in range(distance_matrix.shape[0]):
-        assert i not in idx[i, :]
+def test_key_added_lets_several_graphs_coexist(afm_filtered):
+    mt.pp.kNN_graph(afm_filtered, k=5, key_added="knn5")
+    mt.pp.kNN_graph(afm_filtered, k=15, key_added="knn15")
+    assert afm_filtered.uns["knn5"]["params"]["k"] == 5
+    assert afm_filtered.uns["knn15"]["params"]["k"] == 15
+    assert {"knn5_distances", "knn15_distances"} <= set(afm_filtered.obsp)
 
 
-def test_neighbours_are_the_nearest_ones(distance_matrix):
-    """The returned neighbours must be the k smallest distances for each row."""
-    k = 5
-    idx, _, _ = mt.pp.kNN_graph(D=distance_matrix, k=k, from_distances=True)
-    for i in range(distance_matrix.shape[0]):
-        expected = set(np.argsort(distance_matrix[i, :])[1:k + 1])
-        assert set(idx[i, :]) == expected
+def test_needs_distances_and_says_where_they_come_from(afm):
+    with pytest.raises(ValueError, match="compute_distances"):
+        mt.pp.kNN_graph(afm)
 
 
-def test_indices_are_in_range(distance_matrix):
-    idx, _, _ = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    n = distance_matrix.shape[0]
-    assert idx.min() >= 0 and idx.max() < n
+def test_k_larger_than_the_dataset_is_refused(afm_filtered):
+    with pytest.raises(ValueError, match="observations"):
+        mt.pp.kNN_graph(afm_filtered, k=afm_filtered.shape[0] + 5)
 
 
-def test_from_feature_matrix():
-    rng = np.random.default_rng(1)
-    X = rng.random((40, 6))
-    idx, dists, conn = mt.pp.kNN_graph(X=X, k=5)
-    assert idx.shape[0] == 40
+def test_copy_semantics(afm_filtered):
+    out = mt.pp.kNN_graph(afm_filtered, k=10, copy=True)
+    assert out is not afm_filtered
+    assert "neighbours" in out.uns and "neighbours" not in afm_filtered.uns
 
 
-def test_distances_matrix_is_sparse_and_non_negative(distance_matrix):
-    _, dists, _ = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    n = distance_matrix.shape[0]
-    assert dists.shape == (n, n)
-    assert (dists.toarray() >= 0).all()
-
-
-def test_connectivities_shape(distance_matrix):
-    _, _, conn = mt.pp.kNN_graph(D=distance_matrix, k=5, from_distances=True)
-    n = distance_matrix.shape[0]
-    assert conn.shape == (n, n)
-
-
-def test_on_pipeline_distances(afm_filtered):
-    D = afm_filtered.obsp["distances"].toarray()
-    idx, _, _ = mt.pp.kNN_graph(D=D, k=5, from_distances=True)
-    assert idx.shape[0] == afm_filtered.shape[0]
-
-
-def test_k_larger_than_sample_count_raises(distance_matrix):
-    with pytest.raises(ValueError, match="not smaller than the number of observations"):
-        mt.pp.kNN_graph(D=distance_matrix, k=distance_matrix.shape[0] + 10,
-                        from_distances=True)
-
-
-def test_k_equal_to_sample_count_raises(distance_matrix):
-    with pytest.raises(ValueError):
-        mt.pp.kNN_graph(D=distance_matrix, k=distance_matrix.shape[0],
-                        from_distances=True)
+def test_in_place_returns_none(afm_filtered):
+    assert mt.pp.kNN_graph(afm_filtered, k=10) is None

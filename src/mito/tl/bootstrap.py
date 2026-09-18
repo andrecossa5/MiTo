@@ -2,59 +2,56 @@
 Bootstrap utils.
 """
 
+import warnings
+from copy import deepcopy
+
 import numpy as np
 from anndata import AnnData
-from scipy.sparse import csr_matrix, issparse
 
 ##
 
 
-def bootstrap_allele_tables(afm, layer='AD', frac_char_resampling=.8):
+def _resample_characters(n, strategy, frac_char_resampling, rng):
     """
-    Bootstrap of an Allele Frequency Matrix (AFM) layer.
-    Both sparse matrices and dense .layers can be passed.
+    Character (i.e. .var) indices of one bootstrap replicate.
+
+    "feature_resampling" draws a fraction of the characters without replacement;
+    "jacknife" drops exactly one.
     """
 
-    # Get layer
-    if layer in afm.layers:
-        X = afm.layers[layer]
-        X = X if not issparse(X) else X.toarray()
-    else:
-        raise KeyError(f'{layer} not present in afm! Check your inputs...')
+    if strategy == 'feature_resampling':
+        if frac_char_resampling == 1:
+            return rng.choice(np.arange(n), n, replace=True)
+        return rng.choice(np.arange(n), round(n*frac_char_resampling), replace=False)
 
-    # Resample afm.var index
-    n = X.shape[1]
-    if frac_char_resampling == 1:
-        resampled_idx = np.random.choice(np.arange(n), n, replace=True)
-    else:
-        resampled_idx = np.random.choice(np.arange(n), round(n*frac_char_resampling), replace=False)
+    if strategy == 'jacknife':
+        excluded = rng.choice(np.arange(n), 1)[0]
+        return np.array([ x for x in np.arange(n) if x != excluded ])
 
-    return X[:,resampled_idx], resampled_idx
-
+    raise ValueError(
+        f'{strategy} boot_strategy is not supported. Choose "feature_resampling" or "jacknife".'
+    )
 
 
 ##
 
 
-def jackknife_allele_tables(afm, layer='AD'):
+def _subset_characters(afm, idx):
     """
-    Jackknife of an Allele Frequency Matrix (AFM) layer.
-    Both sparse matrices and dense .layers can be passed.
+    A new AFM holding the resampled characters, with every layer, .X and .var subset
+    consistently, and its own .uns (so replicates cannot write into each other's).
     """
 
-    # Get layer
-    if layer in afm.layers:
-        X = afm.layers[layer]
-        X = X if not issparse(X) else X.toarray()
-    else:
-        raise KeyError(f'{layer} not present in afm! Check your inputs...')
+    # Resampling with replacement draws a character more than once: AnnData warns about
+    # the duplicate names, which are made unique right after (the tree solvers index
+    # characters by name).
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        afm_new = afm[:, idx].copy()
+    afm_new.uns = deepcopy(dict(afm.uns))
+    afm_new.var_names_make_unique()
 
-    # Resample afm.var index
-    n = X.shape[1]
-    to_exclude = np.random.choice(np.arange(n), 1)[0]
-    resampled_idx = [ x for x in np.arange(n) if x != to_exclude ]
-
-    return X[:,resampled_idx], resampled_idx
+    return afm_new
 
 
 ##
@@ -63,36 +60,45 @@ def jackknife_allele_tables(afm, layer='AD'):
 def bootstrap_MiTo(
     afm: AnnData,
     boot_replicate: str = 'observed',
-    boot_strategy: str ='feature_resampling',
-    frac_char_resampling: float = .8
+    boot_strategy: str = 'feature_resampling',
+    frac_char_resampling: float = .8,
+    seed: int = None
     ) -> AnnData:
     """
-    Bootstrap MAESTER/RedeeM Allele Frequency matrices.
+    One bootstrap replicate of an AFM, resampling MT-SNVs (characters).
+
+    Read counts, allele frequencies and genotypes are all carried over for the resampled
+    characters, so the replicate can go straight into `mito.pp.compute_distances` and
+    `mito.tl.build_tree`. `boot_replicate="observed"` returns the AFM unchanged, which is
+    how the point estimate is obtained in the same loop as the replicates.
+
+    Parameters
+    ----------
+    afm : AnnData
+        Filtered AFM.
+    boot_replicate : str, optional
+        Replicate name; "observed" returns a copy of the input. Default is "observed".
+    boot_strategy : str, optional
+        "feature_resampling" or "jacknife". Default is "feature_resampling".
+    frac_char_resampling : float, optional
+        Fraction of characters to draw (1 resamples with replacement). Default is 0.8.
+    seed : int, optional
+        Random seed of this replicate. Pass one (e.g. the replicate index) for a
+        reproducible bootstrap. Default is None.
+
+    Returns
+    -------
+    AnnData
+        The replicate.
     """
 
-    if boot_replicate != 'observed':
+    if boot_replicate == 'observed':
+        return afm.copy()
 
-        cov_layer = 'site_coverage' if 'site_coverage' in afm.layers else 'DP'
-        if boot_strategy == 'jacknife':
-            AD, _ = jackknife_allele_tables(afm, layer='AD')
-            cov, idx = jackknife_allele_tables(afm, layer=cov_layer)                                              # USE SITE, NBBB
-        elif boot_strategy == 'feature_resampling':
-            AD, _ = bootstrap_allele_tables(afm, layer='AD', frac_char_resampling=frac_char_resampling)
-            cov, idx = bootstrap_allele_tables(afm, layer=cov_layer, frac_char_resampling=frac_char_resampling)    # USE SITE, NBBB
-        elif boot_strategy == 'counts_resampling':
-            raise ValueError(f'#TODO: {boot_strategy} boot_strategy. This strategy is not supported yet.')
-        else:
-            raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
+    rng = np.random.default_rng(seed)
+    idx = _resample_characters(afm.shape[1], boot_strategy, frac_char_resampling, rng)
 
-        AF = csr_matrix(np.divide(AD, (cov+.0000001)))
-        AD = csr_matrix(AD)
-        cov = csr_matrix(cov)
-        afm_new = AnnData(X=AF, obs=afm.obs, var=afm.var.iloc[idx,:], uns=afm.uns, layers={'AD':AD, cov_layer:cov})
-
-    else:
-        afm_new = afm.copy()
-
-    return afm_new
+    return _subset_characters(afm, idx)
 
 
 ##
@@ -101,37 +107,24 @@ def bootstrap_MiTo(
 def bootstrap_bin(
     afm: AnnData,
     boot_replicate: str = 'observed',
-    boot_strategy: str ='feature_resampling',
-    frac_char_resampling: float = .8
+    boot_strategy: str = 'feature_resampling',
+    frac_char_resampling: float = .8,
+    seed: int = None
     ) -> AnnData:
     """
-    Bootstrap scWGS/Cas9 AFMs.
+    Bootstrap replicate of an AFM whose characters are already binary (i.e. only
+    .layers["bin"] is meaningful). Same semantics as `bootstrap_MiTo`.
     """
 
-    if boot_replicate != 'observed':
+    if boot_replicate == 'observed':
+        return afm.copy()
+    if 'bin' not in afm.layers:
+        raise ValueError('bootstrap_bin needs genotypes in afm.layers["bin"].')
 
-        if boot_strategy == 'jacknife':
-            X_new, idx = jackknife_allele_tables(afm, layer='bin')
-        elif boot_strategy == 'feature_resampling':
-            X_new, idx = bootstrap_allele_tables(afm, layer='bin', frac_char_resampling=frac_char_resampling)
-        else:
-            raise ValueError(f'{boot_strategy} boot_strategy is not supported...')
+    rng = np.random.default_rng(seed)
+    idx = _resample_characters(afm.shape[1], boot_strategy, frac_char_resampling, rng)
 
-        X_new = csr_matrix(X_new)
-        afm_new = AnnData(
-            obs=afm.obs,
-            var=afm.var.iloc[idx,:],
-            uns=afm.uns,
-            layers={'bin':X_new}
-        )
-
-        if 'priors' in afm.varm:
-            afm_new.varm['priors'] = afm.varm['priors'][idx,:]
-
-    else:
-        afm_new = afm.copy()
-
-    return afm_new
+    return _subset_characters(afm, idx)
 
 
 ##

@@ -73,14 +73,13 @@ At a glance
 
    afm = sc.read('afm_unfiltered.h5ad')
 
-   afm = mt.pp.filter_cells(afm, cell_filter='filter2')
-   afm = mt.pp.filter_afm(afm, filtering='MiTo')
+   mt.pp.filter_cells(afm, cell_filter='filter2')
+   mt.pp.filter_afm(afm)
 
-   tree = mt.tl.build_tree(afm, precomputed=True, solver='UPMGA')
-   annotator = mt.tl.MiToTreeAnnotator(tree)
-   annotator.clonal_inference()
+   tree = mt.tl.build_tree(afm, solver='UPMGA')
+   mt.tl.annotate_clones(tree, afm)
 
-   mt.pl.plot_tree(tree, features=['MiTo clone'])
+   mt.pl.plot_tree(tree, annot='MiTo_clone')
 
 .. toctree::
    :hidden:

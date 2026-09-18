@@ -28,7 +28,20 @@ def packed_circle_plot(
     ) -> matplotlib.axes.Axes:
     """
     Circle plot. Packed.
+
+    `df` is either a DataFrame with the sizes in column `covariate`, or a Series of
+    sizes (e.g. `afm.obs["MiTo_clone"].value_counts()`).
     """
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5))
+    if isinstance(df, pd.Series):
+        covariate = covariate or (df.name or 'size')
+        df = df.to_frame(covariate)
+    elif covariate is None:
+        if df.shape[1] != 1:
+            raise ValueError('With a DataFrame of several columns, name the one to plot in `covariate`.')
+        covariate = df.columns[0]
 
     df = df.sort_values(covariate, ascending=False)
     circles = circlify(

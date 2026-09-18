@@ -1,8 +1,9 @@
 """
 mito.pp.reduce_dimensions
 
-Light coverage: the heavy input validation happens upstream in filter_afm, so
-this checks the embedding methods, their output slots and the main knobs.
+Embeddings have to be reproducible: a figure regenerated on another day, or on another
+machine, must be the same figure. For UMAP that depends on the layout optimisation
+running single-threaded, which the implementation pins explicitly.
 """
 
 import numpy as np
@@ -11,106 +12,80 @@ import pytest
 import mito as mt
 
 METHODS = ["PCA", "UMAP", "diffmap"]
-SLOTS = {"PCA": "X_pca", "UMAP": "X_umap", "diffmap": "X_diffmap"}
+KEYS = {"PCA": "X_pca", "UMAP": "X_umap", "diffmap": "X_diffmap"}
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_each_method_writes_its_obsm_slot(afm_filtered, method):
-    mt.pp.reduce_dimensions(afm_filtered, method=method, ncores=1)
-    assert SLOTS[method] in afm_filtered.obsm
-
-
-@pytest.mark.parametrize("method", METHODS)
-def test_embedding_shape(afm_filtered, method):
+def test_writes_the_embedding_with_the_scanpy_key(afm_filtered, method):
     mt.pp.reduce_dimensions(afm_filtered, method=method, n_comps=2, ncores=1)
-    X = afm_filtered.obsm[SLOTS[method]]
-    assert X.shape[0] == afm_filtered.shape[0]
-    assert X.shape[1] >= 2
+    X = afm_filtered.obsm[KEYS[method]]
+    assert X.shape == (afm_filtered.shape[0], 2)
+    assert np.isfinite(X).all()
 
 
-@pytest.mark.parametrize("n_comps", [2, 3, 5])
-def test_n_comps(afm_filtered, n_comps):
+@pytest.mark.parametrize("n_comps", [2, 3])
+def test_n_comps_is_respected(afm_filtered, n_comps):
     mt.pp.reduce_dimensions(afm_filtered, method="PCA", n_comps=n_comps, ncores=1)
-    assert afm_filtered.obsm["X_pca"].shape[1] >= n_comps
+    assert afm_filtered.obsm["X_pca"].shape[1] == n_comps
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_embedding_is_finite(afm_filtered, method):
-    mt.pp.reduce_dimensions(afm_filtered, method=method, ncores=1)
-    assert np.isfinite(afm_filtered.obsm[SLOTS[method]]).all()
+def test_the_same_seed_gives_the_same_embedding(afm_filtered, method):
+    first = mt.pp.reduce_dimensions(afm_filtered, method=method, seed=42, ncores=1, copy=True)
+    second = mt.pp.reduce_dimensions(afm_filtered, method=method, seed=42, ncores=1, copy=True)
+    assert np.allclose(first.obsm[KEYS[method]], second.obsm[KEYS[method]])
 
 
-@pytest.mark.parametrize("k", [5, 15])
-def test_k_neighbours(afm_filtered, k):
-    mt.pp.reduce_dimensions(afm_filtered, method="UMAP", k=k, ncores=1)
-    assert "X_umap" in afm_filtered.obsm
-
-
-def test_unknown_method_raises(afm_filtered):
-    with pytest.raises((ValueError, KeyError, UnboundLocalError)):
-        mt.pp.reduce_dimensions(afm_filtered, method="not_a_method", ncores=1)
-
-
-def test_is_deterministic_given_a_seed(afm_filtered):
-    a = afm_filtered
+def test_umap_is_reproducible_across_objects(afm_filtered):
+    """
+    The layout must depend on the data and the seed only. If the numba optimisation ran
+    in parallel, two runs of the same seed would differ by a little - which is exactly
+    the kind of irreproducibility that is never noticed until a figure changes.
+    """
+    a = afm_filtered.copy()
     b = afm_filtered.copy()
-    mt.pp.reduce_dimensions(a, method="PCA", seed=0, ncores=1)
-    mt.pp.reduce_dimensions(b, method="PCA", seed=0, ncores=1)
-    assert np.allclose(a.obsm["X_pca"], b.obsm["X_pca"])
+    mt.pp.reduce_dimensions(a, method="UMAP", seed=7, ncores=1)
+    mt.pp.reduce_dimensions(b, method="UMAP", seed=7, ncores=1)
+    assert np.array_equal(a.obsm["X_umap"], b.obsm["X_umap"])
 
 
-def test_does_not_disturb_the_matrix(afm_filtered):
-    shape, n_layers = afm_filtered.shape, len(afm_filtered.layers)
-    mt.pp.reduce_dimensions(afm_filtered, method="PCA", ncores=1)
-    assert afm_filtered.shape == shape
-    assert len(afm_filtered.layers) == n_layers
+def test_a_different_seed_gives_a_different_umap(afm_filtered):
+    a = mt.pp.reduce_dimensions(afm_filtered, method="UMAP", seed=1, ncores=1, copy=True)
+    b = mt.pp.reduce_dimensions(afm_filtered, method="UMAP", seed=2, ncores=1, copy=True)
+    assert not np.allclose(a.obsm["X_umap"], b.obsm["X_umap"])
 
 
-# -- disconnected graphs ----------------------------------------------------
-# UMAP falls back to a multi-component spectral layout when the kNN graph is
-# disconnected, and forwards `metric` to sklearn.pairwise_distances there.
-# MiTo's own metric names are unknown to sklearn, which used to raise.
-
-def _disconnected_afm(**overrides):
-    from conftest import build_afm
-    cfg = {"n_cells": 60, "n_vars": 24, "n_clones": 6, "clone_specific_frac": 1.0, "seed": 101}
-    cfg.update(overrides)
-    a = build_afm(**cfg)
-    mt.pp.annotate_vars(a)
-    return mt.pp.filter_afm(a, filtering="baseline", compute_enrichment=False, ncores=1)
+def test_precomputed_distances_are_reused(afm_filtered):
+    D = afm_filtered.obsp["distances"].toarray().copy()
+    mt.pp.reduce_dimensions(afm_filtered, method="UMAP", metric="weighted_jaccard", ncores=1)
+    assert np.allclose(afm_filtered.obsp["distances"].toarray(), D)
 
 
-def test_fixture_really_is_disconnected():
-    """Guard: if this graph ever becomes connected, the tests below stop testing anything."""
-    from scipy.sparse.csgraph import connected_components
-    afm = _disconnected_afm()
-    _, _, conn = mt.pp.kNN_graph(D=afm.obsp["distances"].toarray(), k=5, from_distances=True)
-    n_components, _ = connected_components(conn, directed=False)
-    assert n_components > 1
+def test_distances_are_computed_when_the_metric_differs(afm_filtered):
+    """A different metric is a different graph: it must not silently reuse the old one."""
+    D = afm_filtered.obsp["distances"].toarray().copy()
+    mt.pp.reduce_dimensions(afm_filtered, method="UMAP", metric="jaccard", ncores=1)
+    assert not np.allclose(afm_filtered.obsp["distances"].toarray(), D)
+    assert afm_filtered.uns["distances"]["distances"]["metric"] == "jaccard"
 
 
-@pytest.mark.parametrize("metric", ["weighted_jaccard", "weighted_hamming"])
-def test_umap_with_custom_metric_on_disconnected_graph(metric):
-    """Regression: MiTo's custom metrics used to reach sklearn and raise."""
-    afm = _disconnected_afm()
-    if metric == "weighted_hamming":
-        pytest.skip("weighted_hamming needs per-character priors in .varm")
-    mt.pp.reduce_dimensions(afm, method="UMAP", metric=metric, k=5, ncores=1)
-    assert "X_umap" in afm.obsm
-    assert np.isfinite(afm.obsm["X_umap"]).all()
+def test_records_what_it_did(afm_filtered):
+    mt.pp.reduce_dimensions(afm_filtered, method="UMAP", n_comps=2, k=7, seed=3, ncores=1)
+    record = afm_filtered.uns["mito"]["reduce_dimensions"]
+    assert record == {"method": "UMAP", "n_comps": 2, "k": 7, "layer": "bin",
+                      "metric": "weighted_jaccard", "seed": 3}
 
 
-@pytest.mark.parametrize("metric", ["euclidean", "cosine", "jaccard"])
-def test_umap_with_sklearn_metric_on_disconnected_graph(metric):
-    """Metrics sklearn knows are passed through unchanged."""
-    afm = _disconnected_afm()
-    mt.pp.reduce_dimensions(afm, method="UMAP", metric=metric, k=5, ncores=1)
-    assert "X_umap" in afm.obsm
+def test_unknown_method_lists_the_alternatives(afm_filtered):
+    with pytest.raises(ValueError, match="PCA"):
+        mt.pp.reduce_dimensions(afm_filtered, method="tSNE", ncores=1)
 
 
-def test_umap_metric_fallback_is_only_for_unknown_metrics():
-    from mito.pp.dimred import _UMAP_SAFE_METRICS
-    assert "euclidean" in _UMAP_SAFE_METRICS
-    assert "jaccard" in _UMAP_SAFE_METRICS
-    assert "weighted_jaccard" not in _UMAP_SAFE_METRICS
-    assert "weighted_hamming" not in _UMAP_SAFE_METRICS
+def test_copy_semantics(afm_filtered):
+    out = mt.pp.reduce_dimensions(afm_filtered, method="PCA", ncores=1, copy=True)
+    assert out is not afm_filtered
+    assert "X_pca" in out.obsm and "X_pca" not in afm_filtered.obsm
+
+
+def test_in_place_returns_none(afm_filtered):
+    assert mt.pp.reduce_dimensions(afm_filtered, method="PCA", ncores=1) is None

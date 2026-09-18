@@ -15,10 +15,42 @@ import scanpy as sc
 from anndata import AnnData
 from matplotlib.ticker import FixedLocator, FuncFormatter
 
-from mito.pp.filters import mask_mt_sites
+from mito.ut.positions import mask_mt_sites
 from mito.pp.preprocessing import annotate_vars
 from mito.ut.positions import MAESTER_genes_positions
 from mito.ut.utils import load_mut_spectrum_ref
+
+##
+
+
+def _get_polar_ax(ax):
+    """A polar axes to draw on, created if the caller did not pass one."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5), subplot_kw={'projection':'polar'})
+    return ax
+
+
+##
+
+
+def _coverage_wide(cov, subset=None, n_positions=16569):
+    """
+    Cells x MT-positions coverage, from the long table `mito.io.read_coverage` returns
+    (columns cell, pos, coverage). A wide table is accepted as is.
+    """
+
+    if not {'cell', 'pos'}.issubset(cov.columns):
+        return cov                                  # already cells x positions
+
+    if subset is not None:
+        cov = cov.loc[cov['cell'].isin(subset)]
+    value = 'coverage' if 'coverage' in cov.columns else cov.columns[-1]
+    cov = cov.copy()
+    cov['pos'] = pd.Categorical(cov['pos'], categories=range(1, n_positions+1))
+
+    return cov.pivot_table(index='cell', columns='pos', values=value,
+                           dropna=False, fill_value=0, observed=False)
+
 
 ##
 
@@ -33,6 +65,8 @@ def vars_AF_spectrum(
     Ranked AF distributions (as in Miller et al., 2022).
     """
 
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5))
     X = afm.X.toarray()
     for i in range(X.shape[1]):
         x = X[:,i]
@@ -64,8 +98,10 @@ def plot_ncells_nAD(
     vs mean number of AD in positive cells (y-axis).
     """
 
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5))
     annotate_vars(afm, overwrite=True)
-    ax.plot(afm.var['Variant_CellN'], afm.var['mean_AD_in_positives'], 'o', c=color, markersize=s, alpha=alpha, **kwargs)
+    ax.plot(afm.var['n_cells'], afm.var['mean_AD_in_positives'], 'o', c=color, markersize=s, alpha=alpha, **kwargs)
     ax.set_yscale('log', base=2)
     ax.set_xscale('log', base=2)
     xticks = [0,1,2,5,10,20,40,80,160,320,640] if xticks is None else xticks
@@ -176,12 +212,14 @@ def MT_coverage_polar(
         kwargs_subset = {}
     if kwargs_main is None:
         kwargs_main = {}
+    ax = _get_polar_ax(ax)
+    cov = _coverage_wide(cov)
     kwargs_main_ = {'c':'#494444', 'linestyle':'-', 'linewidth':.7}
     kwargs_subset_ = {'c':'r', 'marker':'+', 'markersize':10, 'linestyle':''}
     kwargs_main_.update(kwargs_main)
     kwargs_subset_.update(kwargs_subset)
 
-    x = cov.mean(axis=0)
+    x = cov.mean(axis=0).clip(lower=1e-3)     # uncovered positions: log10 needs a floor
 
     theta = np.linspace(0, 2*np.pi, len(x))
     ticks = [
@@ -192,9 +230,8 @@ def MT_coverage_polar(
     ax.plot(theta, np.log10(x), **kwargs_main_)
 
     if var_subset is not None:
-        var_pos = var_subset.map(lambda x: int(x.split('_')[0]))
+        var_pos = pd.Index(var_subset).map(lambda x: int(x.split('_')[0]))
         test = x.index.isin(var_pos)
-        print(test.sum())
         ax.plot(theta[test], np.log10(x[test]), **kwargs_subset_)
 
     ax.set_theta_offset(np.pi/2)
@@ -227,10 +264,8 @@ def MT_coverage_by_gene_polar(
     Plot coverage and muts across MT-genome positions, with annotated genes.
     """
 
-    if subset is not None:
-        cov = cov.query('cell in @subset')
-    cov['pos'] = pd.Categorical(cov['pos'], categories=range(1,16569+1))
-    cov = cov.pivot_table(index='cell', columns='pos', values='n', dropna=False, fill_value=0)
+    ax = _get_polar_ax(ax)
+    cov = _coverage_wide(cov, subset=subset)
     df_mt = (
         pd.DataFrame(
             MAESTER_genes_positions,
@@ -240,9 +275,12 @@ def MT_coverage_by_gene_polar(
         .sort_values('start')
     )
 
-    x = cov.mean(axis=0)
-    median_target = cov.loc[:,mask_mt_sites(cov.columns)].median(axis=0).median()
-    median_untarget = cov.loc[:,~mask_mt_sites(cov.columns)].median(axis=0).median()
+    x = cov.mean(axis=0).clip(lower=1e-3)     # uncovered positions: log10 needs a floor
+    # Target vs un-target only means something for an assay that enriches the gene bodies
+    target = mask_mt_sites(cov.columns)
+    median_target = cov.loc[:,target].median(axis=0).median()
+    median_untarget = cov.loc[:,~target].median(axis=0).median()
+    enriched = np.isfinite(median_untarget) and median_untarget>0 and median_target/median_untarget>2
     theta = np.linspace(0, 2*np.pi, cov.shape[1])
     colors = dict(zip(df_mt.index, sc.pl.palettes.default_102[:df_mt.shape[0]], strict=False))
     ax.plot(theta, np.log10(x), '-', linewidth=.7, color='grey')
@@ -260,7 +298,9 @@ def MT_coverage_by_gene_polar(
     ax.xaxis.set_tick_params(labelsize=7)
     ax.yaxis.set_tick_params(labelsize=7)
     ax.set_rlabel_position(0)
-    ax.set(xlabel='Position (bp)', title=f'{sample}\nTarget: {median_target:.2f}, untarget: {median_untarget:.2f}')
+    title = (f'{sample}\nTarget: {median_target:.2f}, untarget: {median_untarget:.2f}'
+             if enriched else f'{sample}\nMedian coverage: {cov.median(axis=0).median():.2f}')
+    ax.set(xlabel='Position (bp)', title=title)
 
     return ax
 

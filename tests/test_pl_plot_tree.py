@@ -1,368 +1,214 @@
 """
 mito.pl.plot_tree
 
-The widest plotting surface in the package (~40 arguments). Covers orientation,
-branch styling, the feature/character colour strips, leaf and internal-node
-annotation, colour scaling, and the kwargs pass-throughs.
-
-Assertions stay at the level a plotting wrapper can honestly guarantee: the call
-succeeds, returns an Axes, and puts artists on it. Where a parameter has an
-observable effect on the axes, that effect is asserted directly.
+Annotations are named once in ``annot`` (a cell_meta column or a character), their colors
+and ranges come from ``cmaps`` / ``limits``, and each tree element is configured by one
+dictionary. These tests cover every colour-bearing argument, because colour resolution is
+where this function used to rot: each element had its own rules, and paths nobody
+exercised broke silently.
 """
 
-import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pytest
 
 import mito as mt
 
 
-def _ax():
-    fig, ax = plt.subplots(figsize=(4, 4))
+@pytest.fixture
+def annotated_with_states(annotated):
+    """A tree carrying a categorical, a continuous and a NaN-bearing annotation."""
+    afm, tree = annotated
+    support = tree.cell_meta["clone_support"]
+    tree.cell_meta["state"] = pd.Categorical(np.where(support > 0.9, "high", "low"))
+    tree.cell_meta["clone_str"] = tree.cell_meta["MiTo_clone"].astype(str)
+    tree.cell_meta["with_na"] = pd.Categorical(
+        [x if x == "high" else None for x in tree.cell_meta["state"]]
+    )
+    return afm, tree
+
+
+def _ax(polar=False):
+    _, ax = plt.subplots(figsize=(3, 3), subplot_kw={"projection": "polar"} if polar else None)
     return ax
 
 
-def _n_artists(ax):
-    return len(ax.lines) + len(ax.collections) + len(ax.patches) + len(ax.texts)
+# -- the basics -------------------------------------------------------------
 
 
-# -- baseline ---------------------------------------------------------------
-
-def test_returns_an_axes(tree):
+def test_returns_the_axes_it_drew_on(annotated_tree):
     ax = _ax()
-    out = mt.pl.plot_tree(tree, ax=ax)
-    assert isinstance(out, matplotlib.axes.Axes)
+    assert mt.pl.plot_tree(annotated_tree, ax=ax) is ax
 
 
-def test_draws_something(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax)
-    assert _n_artists(ax) > 0
+def test_creates_an_axes_when_none_is_given(annotated_tree):
+    assert mt.pl.plot_tree(annotated_tree) is not None
 
 
-def test_draws_one_branch_per_edge(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax)
-    assert len(ax.lines) >= len(tree.leaves)
+@pytest.mark.parametrize("orient", [90, 0, "down", "right", "up", "left"])
+def test_every_orientation_draws(annotated_tree, orient):
+    mt.pl.plot_tree(annotated_tree, ax=_ax(), orient=orient)
 
 
-def test_creates_its_own_axes_when_none_given(tree):
-    out = mt.pl.plot_tree(tree)
-    assert isinstance(out, matplotlib.axes.Axes)
-    plt.close("all")
+@pytest.mark.parametrize("extend,angled,root", [(True, True, False), (False, False, True)])
+def test_branch_layouts(annotated_tree, extend, angled, root):
+    mt.pl.plot_tree(annotated_tree, ax=_ax(), extend_branches=extend,
+                    angled_branches=angled, add_root=root)
 
 
-def test_does_not_mutate_the_tree(tree):
-    n_leaves, n_internal = len(tree.leaves), len(tree.internal_nodes)
-    mt.pl.plot_tree(tree, ax=_ax())
-    assert len(tree.leaves) == n_leaves
-    assert len(tree.internal_nodes) == n_internal
+# -- annot: one name, resolved wherever it lives ----------------------------
 
 
-# -- orientation and layout -------------------------------------------------
-
-@pytest.mark.parametrize("orient", [90, 180, 270, 360, "right", "left", "up", "down"])
-def test_orientations(tree, orient):
-    ax = _ax()
-    out = mt.pl.plot_tree(tree, ax=ax, orient=orient)
-    assert isinstance(out, matplotlib.axes.Axes)
-    assert _n_artists(ax) > 0
+def test_a_single_annotation_can_be_a_string(annotated_tree):
+    mt.pl.plot_tree(annotated_tree, annot="MiTo_clone", ax=_ax())
 
 
-@pytest.mark.parametrize("extend_branches", [True, False])
-def test_extend_branches(tree, extend_branches):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, extend_branches=extend_branches)
-    assert _n_artists(ax) > 0
+def test_features_and_characters_can_be_mixed(annotated, annotated_tree):
+    afm, _ = annotated
+    character = str(afm.var_names[0])
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone", character], ax=_ax())
 
 
-@pytest.mark.parametrize("angled_branches", [True, False])
-def test_angled_branches(tree, angled_branches):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, angled_branches=angled_branches)
-    assert _n_artists(ax) > 0
+def test_categorical_and_continuous_annotations_together(annotated_with_states):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, annot=["state", "clone_support"], ax=_ax())
 
 
-@pytest.mark.parametrize("add_root", [True, False])
-def test_add_root(tree, add_root):
-    """Regression: add_root=True used to raise, because the plotting root is not
-    a node of the tree network and was queried before being excluded."""
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, add_root=add_root)
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("x_space", [0.5, 1.5, 4.0])
-def test_x_space(tree, x_space):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, x_space=x_space)
-    assert _n_artists(ax) > 0
-
-
-# -- feature colour strips --------------------------------------------------
-
-def test_single_categorical_feature(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"])
-    assert _n_artists(ax) > 0
-
-
-def test_single_continuous_feature(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["mean_site_coverage"])
-    assert _n_artists(ax) > 0
-
-
-def test_multiple_features(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC", "mean_site_coverage", "nUMIs"])
-    assert _n_artists(ax) > 0
-
-
-def test_feature_with_explicit_categorical_cmap(tree):
-    ax = _ax()
-    categories = tree.cell_meta["GBC"].unique()
-    cmap = dict(zip(categories, ["#e41a1c", "#377eb8", "#4daf4a"], strict=False))
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"], categorical_cmaps={"GBC": cmap})
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("cmap", ["viridis", "mako", "Spectral_r"])
-def test_feature_with_continuous_cmap(tree, cmap):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["nUMIs"], continuous_cmaps={"nUMIs": cmap})
-    assert _n_artists(ax) > 0
-
-
-def test_unknown_feature_raises(tree):
-    with pytest.raises(KeyError):
-        mt.pl.plot_tree(tree, ax=_ax(), features=["not_a_column"])
-
-
-@pytest.mark.parametrize("colorstrip_width", [0.5, 1.5, 3.0])
-def test_colorstrip_width(tree, colorstrip_width):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"], colorstrip_width=colorstrip_width)
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("colorstrip_spacing", [0.0, 0.25, 1.0])
-def test_colorstrip_spacing(tree, colorstrip_spacing):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"], colorstrip_spacing=colorstrip_spacing)
-    assert _n_artists(ax) > 0
-
-
-# -- character (MT-SNV) strips ----------------------------------------------
-
-def test_characters(tree):
-    ax = _ax()
-    chars = list(tree.character_matrix.columns[:3])
-    mt.pl.plot_tree(tree, ax=ax, characters=chars)
-    assert _n_artists(ax) > 0
-
-
-def test_all_characters(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, characters=list(tree.character_matrix.columns))
-    assert _n_artists(ax) > 0
+def test_an_annotation_with_missing_values_is_drawn(annotated_with_states):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, annot=["with_na"], ax=_ax())
 
 
 @pytest.mark.parametrize("layer", ["raw", "transformed"])
-def test_character_layers(tree, layer):
-    ax = _ax()
-    chars = list(tree.character_matrix.columns[:2])
-    mt.pl.plot_tree(tree, ax=ax, characters=chars, layer=layer)
-    assert _n_artists(ax) > 0
+def test_characters_from_either_layer(annotated, annotated_tree, layer):
+    afm, _ = annotated
+    mt.pl.plot_tree(annotated_tree, annot=list(afm.var_names[:3]), layer=layer, ax=_ax())
 
 
-@pytest.mark.parametrize("cont_character_cmap", ["mako", "viridis"])
-def test_character_colormap(tree, cont_character_cmap):
-    ax = _ax()
-    chars = list(tree.character_matrix.columns[:2])
-    mt.pl.plot_tree(tree, ax=ax, characters=chars,
-                    cont_character_cmap=cont_character_cmap)
-    assert _n_artists(ax) > 0
+def test_an_unknown_annotation_names_both_namespaces(annotated_tree):
+    with pytest.raises(KeyError, match="cell_meta"):
+        mt.pl.plot_tree(annotated_tree, annot=["not_a_thing"], ax=_ax())
 
 
-@pytest.mark.parametrize("vmin_characters,vmax_characters",
-                         [(0, 0.01), (0, 0.05), (0.01, 0.5)])
-def test_character_value_limits(tree, vmin_characters, vmax_characters):
-    ax = _ax()
-    chars = list(tree.character_matrix.columns[:2])
-    mt.pl.plot_tree(tree, ax=ax, characters=chars,
-                    vmin_characters=vmin_characters, vmax_characters=vmax_characters)
-    assert _n_artists(ax) > 0
+def test_a_missing_layer_says_which_characters_it_could_not_draw(annotated, annotated_tree):
+    afm, _ = annotated
+    with pytest.raises(KeyError, match="tree.layers"):
+        mt.pl.plot_tree(annotated_tree, annot=list(afm.var_names[:2]), layer="nope", ax=_ax())
 
 
-def test_features_and_characters_together(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"],
-                    characters=list(tree.character_matrix.columns[:2]))
-    assert _n_artists(ax) > 0
+# -- cmaps and limits -------------------------------------------------------
 
 
-# -- labels -----------------------------------------------------------------
-
-@pytest.mark.parametrize("labels", [True, False])
-def test_labels_toggle(tree, labels):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"], labels=labels)
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("label_size", [4, 10, 16])
-def test_label_size(tree, label_size):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"], label_size=label_size)
-    assert _n_artists(ax) > 0
+@pytest.mark.parametrize("spec", [
+    {"state": "tab10"},                               # a palette name
+    {"state": ["#111111", "#eeeeee"]},                # a list of colors
+    {"state": {"high": "r", "low": "grey"}},          # an explicit mapping
+    {"state": {"high": "r"}},                         # a partial mapping: filled in
+])
+def test_every_way_of_specifying_categorical_colors(annotated_with_states, spec):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, annot=["state"], cmaps=spec, ax=_ax())
 
 
-def test_leaves_labels_require_right_orient(tree):
-    """Documented restriction: leaf labels are only placed for orient='right'."""
-    with pytest.raises(ValueError, match="right orient"):
-        mt.pl.plot_tree(tree, ax=_ax(), leaves_labels=True, orient=90)
+def test_continuous_colors_and_limits(annotated_with_states):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, annot=["clone_support"], cmaps={"clone_support": "viridis"},
+                    limits={"clone_support": (0, 1)}, ax=_ax())
 
 
-def test_leaves_labels_with_right_orient(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, orient="right", leaves_labels=True)
-    assert len(ax.texts) >= len(tree.leaves)
+def test_binary_characters_take_a_state_palette(annotated, annotated_tree):
+    afm, _ = annotated
+    characters = list(afm.var_names[:2])
+    mt.pl.plot_tree(annotated_tree, annot=characters, layer="transformed",
+                    cmaps={c: {1: "k", 0: "w", -1: "grey"} for c in characters}, ax=_ax())
 
 
-@pytest.mark.parametrize("leaf_label_size", [3, 8])
-def test_leaf_label_size(tree, leaf_label_size):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, orient="right", leaves_labels=True,
-                    leaf_label_size=leaf_label_size)
-    assert len(ax.texts) > 0
+# -- the element dictionaries ----------------------------------------------
 
 
-# -- internal nodes ---------------------------------------------------------
-
-@pytest.mark.parametrize("show_internal", [True, False])
-def test_show_internal(tree, show_internal):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, show_internal=show_internal)
-    assert _n_artists(ax) > 0
+def test_colorstrip_geometry_and_labels(annotated_tree):
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"], orient="down",
+                    colorstrips={"width": 2, "spacing": 0.4, "labels": True,
+                                 "label_size": 8, "label_offset": 3}, ax=_ax())
 
 
-def test_internal_node_labels(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, show_internal=True, internal_node_labels=True)
-    assert _n_artists(ax) > 0
+def test_colorstrip_style_is_forwarded_to_matplotlib(annotated_tree):
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"],
+                    colorstrips={"alpha": 0.5, "linewidth": 0.5}, ax=_ax())
 
 
-def test_internal_node_subset(tree):
-    ax = _ax()
-    subset = list(tree.internal_nodes)[:5]
-    mt.pl.plot_tree(tree, ax=ax, show_internal=True, internal_node_subset=subset)
-    assert _n_artists(ax) > 0
+@pytest.mark.parametrize("feature", ["state", "clone_support"])
+def test_branches_coloured_by_a_covariate(annotated_with_states, feature):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, branches={"feature": feature, "meta": tree.cell_meta[[feature]],
+                                    "linewidth": 2}, ax=_ax())
 
 
-@pytest.mark.parametrize("internal_node_label_size", [5, 12])
-def test_internal_node_label_size(tree, internal_node_label_size):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, show_internal=True, internal_node_labels=True,
-                    internal_node_label_size=internal_node_label_size)
-    assert _n_artists(ax) > 0
+def test_branches_without_metadata_say_what_is_missing(annotated_with_states):
+    _, tree = annotated_with_states
+    with pytest.raises(KeyError, match="meta"):
+        mt.pl.plot_tree(tree, branches={"feature": "state"}, ax=_ax())
 
 
-# -- colour scaling ---------------------------------------------------------
-
-@pytest.mark.parametrize("vmin,vmax", [(0, 1), (0.1, 0.9), (None, None)])
-def test_vmin_vmax(tree, vmin, vmax):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["nUMIs"], vmin=vmin, vmax=vmax)
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("vmin_internal_nodes,vmax_internal_nodes",
-                         [(0.0, 1.0), (0.2, 0.8)])
-def test_internal_node_value_limits(tree, vmin_internal_nodes, vmax_internal_nodes):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, show_internal=True,
-                    vmin_internal_nodes=vmin_internal_nodes,
-                    vmax_internal_nodes=vmax_internal_nodes)
-    assert _n_artists(ax) > 0
+@pytest.mark.parametrize("spec", [
+    {"feature": "MiTo_clone"},
+    {"feature": "state", "cmap": {"high": "r", "low": "grey"}},
+    {"feature": "clone_support", "cmap": "viridis", "limits": (0, 1)},
+    {"feature": "MiTo_clone", "labels": True, "markersize": 3},
+])
+def test_leaves_coloured_and_labelled(annotated_with_states, spec):
+    _, tree = annotated_with_states
+    mt.pl.plot_tree(tree, orient="right", leaves=spec, ax=_ax())
 
 
-# -- kwargs pass-throughs ---------------------------------------------------
-
-def test_branch_kwargs(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, branch_kwargs={"linewidth": 2.0, "c": "red"})
-    assert _n_artists(ax) > 0
+def test_leaf_labels_outside_the_right_orientation_are_refused(annotated_tree):
+    with pytest.raises(ValueError, match="orient"):
+        mt.pl.plot_tree(annotated_tree, leaves={"feature": "MiTo_clone", "labels": True},
+                        ax=_ax())
 
 
-def test_leaf_kwargs(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, leaf_kwargs={"markersize": 4})
-    assert _n_artists(ax) > 0
+def test_internal_nodes_need_the_attribute_and_say_where_to_get_it(annotated_tree):
+    with pytest.raises(ValueError, match="compute_fitness"):
+        mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": "support"}, ax=_ax())
 
 
-def test_internal_node_kwargs(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, show_internal=True,
-                    internal_node_kwargs={"markersize": 5})
-    assert _n_artists(ax) > 0
+@pytest.mark.parametrize("feature", ["fitness", "expansion_pvalue"])
+def test_internal_nodes_coloured_by_a_computed_attribute(annotated_tree, feature):
+    mt.tl.compute_fitness(annotated_tree)
+    mt.tl.compute_expansions(annotated_tree)
+    mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": feature, "show": True,
+                                                    "labels": True}, ax=_ax())
 
 
-def test_colorstrip_kwargs(tree):
-    ax = _ax()
-    mt.pl.plot_tree(tree, ax=ax, features=["GBC"],
-                    colorstrip_kwargs={"linewidth": 0.5})
-    assert _n_artists(ax) > 0
+def test_internal_nodes_can_be_subset(annotated_tree):
+    mt.tl.compute_fitness(annotated_tree)
+    subset = list(annotated_tree.internal_nodes[:5])
+    mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": "fitness", "subset": subset},
+                    ax=_ax())
 
 
-# -- annotated trees --------------------------------------------------------
-
-def test_plots_inferred_clones(annotated_tree):
-    """The tutorial's end state: colour leaves by the inferred MiTo clone."""
-    ax = _ax()
-    mt.pl.plot_tree(annotated_tree, ax=ax, features=["MiTo clone"])
-    assert _n_artists(ax) > 0
+# -- usability: the errors have to teach -----------------------------------
 
 
-def test_plots_ground_truth_against_inferred(annotated_tree):
-    ax = _ax()
-    mt.pl.plot_tree(annotated_tree, ax=ax, features=["GBC", "MiTo clone"])
-    assert _n_artists(ax) > 0
+@pytest.mark.parametrize("old,new", [
+    ("features", "annot"),
+    ("characters", "annot"),
+    ("cov_leaves", "leaves"),
+    ("feature_internal_nodes", "internal_nodes"),
+    ("colorstrip_width", "colorstrips"),
+    ("show_internal", "internal_nodes"),
+])
+def test_renamed_arguments_point_at_their_replacement(annotated_tree, old, new):
+    with pytest.raises(TypeError, match=new):
+        mt.pl.plot_tree(annotated_tree, ax=_ax(), **{old: "MiTo_clone"})
 
 
-# -- combinations and edge cases --------------------------------------------
-
-@pytest.mark.parametrize("orient", [90, "right"])
-def test_everything_at_once(tree, orient):
-    ax = _ax()
-    mt.pl.plot_tree(
-        tree, ax=ax, orient=orient,
-        features=["GBC", "nUMIs"],
-        characters=list(tree.character_matrix.columns[:2]),
-        show_internal=True, add_root=True,
-        extend_branches=True, angled_branches=False,
-        colorstrip_width=2.0, colorstrip_spacing=0.3,
-        branch_kwargs={"linewidth": 0.8},
-    )
-    assert _n_artists(ax) > 0
+def test_a_typo_in_a_spec_suggests_the_intended_key(annotated_tree):
+    with pytest.raises(ValueError, match="did you mean"):
+        mt.pl.plot_tree(annotated_tree, leaves={"featrue": "MiTo_clone"}, ax=_ax())
 
 
-def test_small_tree():
-    """A small tree must still render."""
-    from conftest import build_afm
-    a = build_afm(n_cells=35, n_vars=12, n_clones=2, clone_specific_frac=0.6, seed=50)
-    mt.pp.annotate_vars(a)
-    filtered = mt.pp.filter_afm(a, filtering="baseline",
-                                compute_enrichment=False, ncores=1)
-    small_tree = mt.tl.build_tree(filtered, precomputed=True, solver="UPMGA")
-    ax = _ax()
-    mt.pl.plot_tree(small_tree, ax=ax)
-    assert _n_artists(ax) > 0
-
-
-@pytest.mark.parametrize("solver", ["NJ", "UPMGA", "spectral", "greedy"])
-def test_plots_trees_from_every_solver(afm_filtered, solver):
-    t = mt.tl.build_tree(afm_filtered, precomputed=True, solver=solver)
-    ax = _ax()
-    mt.pl.plot_tree(t, ax=ax)
-    assert _n_artists(ax) > 0
+def test_an_unknown_argument_is_reported_as_unknown(annotated_tree):
+    with pytest.raises(TypeError, match="Unknown"):
+        mt.pl.plot_tree(annotated_tree, ax=_ax(), nonsense=1)

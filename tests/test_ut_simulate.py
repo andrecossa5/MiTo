@@ -42,22 +42,25 @@ def test_noisy_variants_ignore_the_tree():
 
 def test_has_the_layers_the_pipeline_needs():
     afm = mt.ut.simulate_afm(n_cells=100, n_clones=5)
-    for layer in ("AD", "DP", "site_coverage", "qual"):
+    for layer in ("AD", "DP", "genotype"):
         assert layer in afm.layers
         assert afm.layers[layer].shape == afm.shape
+    # the same contract mito.io.make_afm produces: one coverage layer, dense
+    from scipy.sparse import issparse
+    assert not issparse(afm.layers["DP"])
+    assert "site_coverage" not in afm.layers and "qual" not in afm.layers
 
 
 def test_has_the_obs_columns_the_cell_filters_need():
     afm = mt.ut.simulate_afm(n_cells=100, n_clones=5)
     for column in ("mean_site_coverage", "median_target_site_coverage",
-                   "median_untarget_site_coverage", "frac_target_site_covered"):
+                   "frac_target_site_covered"):
         assert column in afm.obs.columns
 
 
 def test_has_the_uns_slots_the_pipeline_needs():
     afm = mt.ut.simulate_afm(n_cells=100, n_clones=5)
-    for key in ("scLT_system", "pp_method", "per_position_coverage",
-                "per_position_quality", "simulation"):
+    for key in ("scLT_system", "pp_method", "simulation"):
         assert key in afm.uns
 
 
@@ -77,34 +80,38 @@ def test_positions_fall_inside_maester_target_sites():
 
 # -- genotypes are exact presence/absence -----------------------------------
 
+def test_base_quality_is_a_variant_property():
+    afm = mt.ut.simulate_afm(n_cells=100, n_clones=5)
+    assert "quality" in afm.var.columns
+    assert (afm.var["quality"] > 0).all()
+
+
 def test_genotype_layer_is_binary():
     afm = mt.ut.simulate_afm(n_cells=300, n_clones=10, n_root_clones=7)
     assert set(np.unique(afm.layers["genotype"].toarray())) <= {0, 1}
 
 
 def test_counts_are_consistent():
-    """site_coverage is the denominator; DP mirrors maegatk and is masked to the
-    cells that actually carry an alternative read."""
     afm = mt.ut.simulate_afm(n_cells=300, n_clones=10)
     AD = afm.layers["AD"].toarray()
-    DP = afm.layers["DP"].toarray()
-    SC = afm.layers["site_coverage"].toarray()
-    assert (SC >= 1).all()
-    assert (AD <= SC).all()
-    assert np.allclose(afm.X.toarray(), AD / SC, atol=1e-6)
+    DP = np.asarray(afm.layers["DP"])
+    assert (DP >= 1).all()
+    assert (AD <= DP).all()
+    assert np.allclose(afm.X.toarray(), AD / DP, atol=1e-6)
 
 
-def test_DP_is_site_coverage_masked_to_cells_with_an_alt_read():
-    """Regression: DP and site_coverage must NOT be interchangeable. Code that uses
-    DP as a binomial denominator silently drops every negative cell, which passes
-    unnoticed if the simulator makes DP a full-coverage matrix."""
+def test_coverage_is_defined_for_every_cell():
+    """
+    DP is the coverage of the SITE, not a per-variant depth masked to the cells with an
+    alternative read: a cell covered 100x with no alt read is evidence of absence, and
+    the genotyping needs that denominator. A simulator that zeroed DP there would hide
+    exactly the bug this contract exists to prevent.
+    """
     afm = mt.ut.simulate_afm(n_cells=300, n_clones=10)
     AD = afm.layers["AD"].toarray()
-    DP = afm.layers["DP"].toarray()
-    SC = afm.layers["site_coverage"].toarray()
-    assert ((DP == 0) == (AD == 0)).all()
-    assert (DP[AD > 0] == SC[AD > 0]).all()
-    assert (DP == 0).mean() > 0.1          # most of the matrix really is empty
+    DP = np.asarray(afm.layers["DP"])
+    assert (DP > 0).all()
+    assert ((DP > 0) & (AD == 0)).mean() > 0.1
 
 
 def test_positive_cells_carry_more_alternative_reads_than_negative_ones():
@@ -177,7 +184,7 @@ def test_overdispersion_is_component_specific():
                              overdispersion_background=1.2, random_seed=0)
     G = afm.layers["genotype"].toarray().astype(bool)
     AD = afm.layers["AD"].toarray()
-    COV = afm.layers["site_coverage"].toarray().astype(float)
+    COV = np.asarray(afm.layers["DP"]).astype(float)
 
     def phi(ad, cov):
         p = ad.sum()/max(cov.sum(), 1e-9)
@@ -234,7 +241,7 @@ def test_noise_at_the_same_af_is_indistinguishable_by_counts():
 
 def test_coverage_follows_the_requested_distribution():
     afm = mt.ut.simulate_afm(n_cells=400, n_clones=6, mean_coverage=50, sd_coverage=5)
-    SC = afm.layers["site_coverage"].toarray()
+    SC = np.asarray(afm.layers["DP"])
     assert SC.mean() == pytest.approx(50, abs=1)
     assert SC.std() == pytest.approx(5, abs=1)
 
@@ -242,11 +249,11 @@ def test_coverage_follows_the_requested_distribution():
 def test_coverage_cvs_make_the_depth_heterogeneous_and_skewed():
     """Real target-site coverage varies between cells and between sites, and is
     right-skewed; the CVs switch the depth model from normal to gamma-Poisson."""
-    flat = mt.ut.simulate_afm(n_cells=300, n_clones=8, mean_coverage=200,
-                              random_seed=0).layers["site_coverage"].toarray()
-    var = mt.ut.simulate_afm(n_cells=300, n_clones=8, mean_coverage=200,
-                             coverage_cell_cv=0.6, coverage_site_cv=0.8,
-                             random_seed=0).layers["site_coverage"].toarray()
+    flat = np.asarray(mt.ut.simulate_afm(n_cells=300, n_clones=8, mean_coverage=200,
+                                         random_seed=0).layers["DP"])
+    var = np.asarray(mt.ut.simulate_afm(n_cells=300, n_clones=8, mean_coverage=200,
+                                        coverage_cell_cv=0.6, coverage_site_cv=0.8,
+                                        random_seed=0).layers["DP"])
     assert var.std()/var.mean() > 4 * (flat.std()/flat.mean())
     assert np.median(var) < var.mean()                       # right-skewed
     assert var.mean(axis=1).std()/var.mean() > 0.3           # per-cell spread
@@ -448,7 +455,7 @@ def test_too_many_clones_for_the_target_sites():
 def _carrier_stats(afm):
     """Per-variant dispersion, median coverage and dropout, over true carriers."""
     AD = afm.layers["AD"].toarray()
-    COV = afm.layers["site_coverage"].toarray().astype(float)
+    COV = np.asarray(afm.layers["DP"]).astype(float)
     G = afm.layers["genotype"].toarray().astype(bool)
     phi, cov, drop = [], [], []
     for j in range(afm.shape[1]):
@@ -522,7 +529,7 @@ def test_molecule_draw_leaves_the_background_near_binomial():
     """Sequencing error is read-level; it has no molecules and must stay binomial."""
     afm = mt.ut.simulate_afm(**MOL)
     AD = afm.layers["AD"].toarray()
-    COV = afm.layers["site_coverage"].toarray().astype(float)
+    COV = np.asarray(afm.layers["DP"]).astype(float)
     G = afm.layers["genotype"].toarray().astype(bool)
     ad, cv = AD[~G], COV[~G]
     p = ad.sum() / cv.sum()

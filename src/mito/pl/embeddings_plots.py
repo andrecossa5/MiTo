@@ -5,9 +5,19 @@ Custom plotting function for embeddings.
 from typing import Any
 
 import matplotlib
+import matplotlib.pyplot as plt
 import plotting_utils as plu
 import scanpy as sc
 from anndata import AnnData
+
+##
+
+
+def _is_continuous(x):
+    """A numeric, non-categorical column is drawn with a continuous colormap."""
+    import pandas as pd
+    return not isinstance(x.dtype, pd.CategoricalDtype) and pd.api.types.is_numeric_dtype(x)
+
 
 ##
 
@@ -74,15 +84,26 @@ def draw_embedding(
         Axes object.
     """
 
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4.5, 4.5))
+
     if kwargs is None:
         kwargs = {}
-    if isinstance(categorical_cmap, str) and feature in afm.obs.columns:
-        _cmap = plu.create_palette(afm.obs, feature, categorical_cmap)
-    elif isinstance(categorical_cmap, dict) and feature in afm.obs.columns:
-        assert all(x in categorical_cmap for x in afm.obs[feature].unique())
-        _cmap = categorical_cmap
-    else:
-        _cmap = None
+
+    # Colors of a categorical feature, as a {category: color} mapping. A list of colors
+    # (the default palette) or the name of a seaborn palette are both turned into one:
+    # the legend needs the mapping, not the palette it came from.
+    _cmap = None
+    if feature is not None and feature in afm.obs.columns and not _is_continuous(afm.obs[feature]):
+        if isinstance(categorical_cmap, dict):
+            missing = set(afm.obs[feature].astype(str).unique()) - set(categorical_cmap)
+            if missing:
+                raise ValueError(f'No color for {sorted(missing)} in categorical_cmap.')
+            _cmap = categorical_cmap
+        elif isinstance(categorical_cmap, str):
+            _cmap = plu.create_palette(afm.obs, feature, palette=categorical_cmap)
+        else:
+            _cmap = plu.create_palette(afm.obs, feature, col_list=list(categorical_cmap))
 
     ax = sc.pl.embedding(
         afm,
@@ -99,11 +120,11 @@ def draw_embedding(
         **kwargs
     )
 
-    if legend:
+    if legend and _cmap is not None:
         plu.add_legend(
             ax=ax,
             label=feature,
-            colors=categorical_cmap,
+            colors=_cmap,
             loc=loc,
             bbox_to_anchor=bbox_to_anchor,
             artists_size=artists_size,

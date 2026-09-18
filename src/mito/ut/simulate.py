@@ -454,7 +454,7 @@ def simulate_afm(
     AnnData
         The simulated Allele Frequency Matrix, of shape ``(n_cells, n_clones)``.
         ``X`` holds allele frequencies, 1 where a cell carries a variant and 0
-        elsewhere, alongside the ``AD`` / ``DP`` / ``site_coverage`` / ``qual``
+        elsewhere, alongside the ``AD`` / ``DP``
         layers. Ground truth clone labels are in ``.obs['clone']``. ``.var`` records
         which clone each variant arose in and the clade carrying it, and
         ``.uns['simulation']`` holds the tree and every parameter.
@@ -758,12 +758,9 @@ def simulate_afm(
         # mis-mapping do, instead of being one global floor.
         p_background = af_negative_frac * p_positive
 
-    # NB: site_coverage is the real denominator -- every cell has coverage at a
-    # target site whether or not the variant is seen there. DP mirrors what
-    # maegatk reports: the same depth, but masked to the cells that actually carry
-    # an alternative read, and therefore 0 for the majority of the matrix. Code
-    # that uses DP as a binomial denominator silently drops every negative cell,
-    # so the two must not be interchangeable here as they are in real data.
+    # NB: DP is the coverage of the SITE, defined for every cell whether or not an
+    # alternative read is seen there -- the denominator the genotyping needs, and what
+    # `mt.io.make_afm` assembles from the pre-processing coverage table.
     site_coverage = _depth()
     # NB: overdispersion is heteroplasmy drift, which is a property of a real
     # mitochondrial variant. An artefact (mis-mapping, RNA editing) has no
@@ -800,7 +797,7 @@ def simulate_afm(
             _draw_alt(site_coverage, p_background, overdispersion_background),
         )
     AF = (AD / site_coverage).astype(np.float32)
-    DP = np.where(AD > 0, site_coverage, 0)
+    DP = site_coverage.astype(np.int16)
 
     # -- assembly -----------------------------------------------------------
     bases = np.array(['A', 'C', 'G', 'T'])
@@ -813,7 +810,6 @@ def simulate_afm(
             'clone': pd.Categorical(labels),
             'mean_site_coverage': site_coverage.mean(axis=1),
             'median_target_site_coverage': np.median(site_coverage, axis=1),
-            'median_untarget_site_coverage': np.median(site_coverage, axis=1) / 3,
             'frac_target_site_covered': (site_coverage > 0).mean(axis=1),
             'nUMIs': DP.sum(axis=1),
         },
@@ -841,9 +837,7 @@ def simulate_afm(
         var=var,
         layers={
             'AD': csr_matrix(AD.astype(np.int16)),
-            'DP': csr_matrix(DP.astype(np.int16)),
-            'site_coverage': csr_matrix(site_coverage.astype(np.int16)),
-            'qual': csr_matrix(np.full((n_cells, n_vars), 35, dtype=np.float32)),
+            'DP': DP,
             'genotype': csr_matrix(genotypes.astype(np.int8)),
         },
         uns={
@@ -898,15 +892,7 @@ def simulate_afm(
         },
     )
 
-    unique_positions = np.unique(positions)
-    afm.uns['per_position_coverage'] = pd.DataFrame(
-        np.clip(np.rint(rng.normal(mean_coverage, sd_coverage,
-                                   size=(n_cells, unique_positions.size))), 1, None),
-        index=afm.obs_names, columns=unique_positions,
-    )
-    afm.uns['per_position_quality'] = pd.DataFrame(
-        35.0, index=afm.obs_names, columns=unique_positions
-    )
+    afm.var['quality'] = 35.0
 
     return afm
 

@@ -1,244 +1,177 @@
 """
-mito.pp.call_genotypes and the genotyping primitives.
+mito.pp.call_genotypes, filter_low_signal_variants, impute_dropouts
 
-Tested at the primitive level rather than through filter_afm, so thresholds can
-be swept without the downstream cell filters masking their effect.
+The genotyper tests a cell's alternative reads against the variant's own error rate.
+Two properties matter most and are regression-tested here: a cell with no alternative
+read is never called (the failure mode of the mixture genotyper it replaced), and the
+background is estimated from non-carriers only (so a clone cannot inflate the background
+of its own marker).
 """
 
 import numpy as np
 import pytest
-from conftest import build_afm
 
 import mito as mt
-from mito.pp.distances import genotype_MiTo, genotype_mixtures
 
-BIN_METHODS = ["vanilla", "MiTo"]
-
-
-# -- call_genotypes contract ------------------------------------------------
-
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_adds_binary_layer(afm, bin_method):
-    mt.pp.call_genotypes(afm, bin_method=bin_method)
-    assert "bin" in afm.layers
-    assert afm.layers["bin"].shape == afm.shape
+# -- calls ------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_output_is_strictly_binary(afm, bin_method):
-    mt.pp.call_genotypes(afm, bin_method=bin_method)
-    values = np.unique(afm.layers["bin"].toarray())
-    assert set(values).issubset({0, 1})
+def test_writes_the_genotyping_slots(afm):
+    mt.pp.call_genotypes(afm)
+    assert "bin" in afm.layers and afm.layers["bin"].shape == afm.shape
+    assert "imputed" in afm.layers
+    for column in ("error_rate", "n_carriers", "n_imputed", "prevalence"):
+        assert column in afm.var.columns
+    assert afm.uns["genotyping"]["method"] == "binomial"
 
 
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_records_provenance(afm, bin_method):
-    mt.pp.call_genotypes(afm, bin_method=bin_method)
-    assert afm.uns["genotyping"]["bin_method"] == bin_method
-    assert "binarization_kwargs" in afm.uns["genotyping"]
-
-
-def test_unknown_method_raises(afm):
-    with pytest.raises(ValueError, match="not a valid genotype calling method"):
-        mt.pp.call_genotypes(afm, bin_method="MiTo_smooth")
-
-
-@pytest.mark.parametrize("bad", ["", "smooth", "Vanilla", None])
-def test_various_invalid_methods_raise(afm, bad):
-    with pytest.raises(ValueError):
-        mt.pp.call_genotypes(afm, bin_method=bad)
-
-
-def test_mito_requires_site_coverage(afm):
-    """MiTo genotyping needs the site_coverage layer, not just DP."""
-    del afm.layers["site_coverage"]
-    with pytest.raises(ValueError, match="site_coverage"):
-        mt.pp.call_genotypes(afm, bin_method="MiTo")
-
-
-def test_vanilla_works_without_site_coverage(afm):
-    del afm.layers["site_coverage"]
-    mt.pp.call_genotypes(afm, bin_method="vanilla")
-    assert "bin" in afm.layers
-
-
-# -- vanilla thresholds -----------------------------------------------------
-
-@pytest.mark.parametrize("t_vanilla", [0.0, 0.01, 0.05, 0.1, 0.5, 0.9])
-def test_vanilla_af_threshold(afm_factory, t_vanilla):
-    a = afm_factory(seed=81)
-    mt.pp.call_genotypes(a, bin_method="vanilla", t_vanilla=t_vanilla, min_AD=1)
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
-
-
-def test_vanilla_af_threshold_is_monotone(afm_factory):
-    """A higher AF threshold cannot call more mutations."""
-    counts = []
-    for t in [0.0, 0.05, 0.2, 0.5, 0.9]:
-        a = afm_factory(seed=82)
-        mt.pp.call_genotypes(a, bin_method="vanilla", t_vanilla=t, min_AD=1)
-        counts.append(int(a.layers["bin"].sum()))
-    assert counts == sorted(counts, reverse=True)
-
-
-@pytest.mark.parametrize("min_AD", [1, 2, 5, 10, 100])
-def test_vanilla_min_AD(afm_factory, min_AD):
-    a = afm_factory(seed=83)
-    mt.pp.call_genotypes(a, bin_method="vanilla", min_AD=min_AD)
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
-
-
-def test_vanilla_min_AD_is_monotone(afm_factory):
-    counts = []
-    for m in [1, 2, 5, 20]:
-        a = afm_factory(seed=84)
-        mt.pp.call_genotypes(a, bin_method="vanilla", min_AD=m)
-        counts.append(int(a.layers["bin"].sum()))
-    assert counts == sorted(counts, reverse=True)
-
-
-def test_vanilla_impossible_threshold_calls_nothing(afm_factory):
-    a = afm_factory(seed=85)
-    mt.pp.call_genotypes(a, bin_method="vanilla", min_AD=10**6)
-    assert int(a.layers["bin"].sum()) == 0
-
-
-# -- MiTo thresholds --------------------------------------------------------
-
-@pytest.mark.parametrize("t_prob", [0.5, 0.6, 0.7, 0.9, 0.99])
-def test_mito_posterior_threshold(afm_factory, t_prob):
-    a = afm_factory(seed=86)
-    mt.pp.call_genotypes(a, bin_method="MiTo", t_prob=t_prob)
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
-
-
-@pytest.mark.parametrize("min_cell_prevalence", [0.0, 0.05, 0.1, 0.5, 1.0])
-def test_mito_min_cell_prevalence(afm_factory, min_cell_prevalence):
-    """Controls the switch between probabilistic and hard-threshold calling."""
-    a = afm_factory(seed=87)
-    mt.pp.call_genotypes(a, bin_method="MiTo", min_cell_prevalence=min_cell_prevalence)
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
-
-
-def test_mito_prevalence_extremes_differ(afm_factory):
-    """Prevalence 0 forces the mixture path, 1 forces the vanilla path."""
-    a0 = afm_factory(seed=88)
-    mt.pp.call_genotypes(a0, bin_method="MiTo", min_cell_prevalence=0.0)
-    a1 = afm_factory(seed=88)
-    mt.pp.call_genotypes(a1, bin_method="MiTo", min_cell_prevalence=1.0)
-    assert a0.layers["bin"].shape == a1.layers["bin"].shape
-
-
-@pytest.mark.parametrize("min_AD", [1, 2, 5])
-def test_mito_min_AD(afm_factory, min_AD):
-    a = afm_factory(seed=89)
-    mt.pp.call_genotypes(a, bin_method="MiTo", min_AD=min_AD)
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
-
-
-# -- method comparison ------------------------------------------------------
-
-def test_methods_disagree_somewhere(afm_factory):
-    """vanilla and MiTo must not be trivially identical on structured data."""
-    a = afm_factory(seed=90)
-    b = afm_factory(seed=90)
-    mt.pp.call_genotypes(a, bin_method="vanilla", min_AD=2)
-    mt.pp.call_genotypes(b, bin_method="MiTo", min_AD=2)
-    assert not np.array_equal(a.layers["bin"].toarray(), b.layers["bin"].toarray())
-
-
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_deterministic(afm_factory, bin_method):
-    a = afm_factory(seed=91)
-    b = afm_factory(seed=91)
-    mt.pp.call_genotypes(a, bin_method=bin_method)
-    mt.pp.call_genotypes(b, bin_method=bin_method)
-    assert np.array_equal(a.layers["bin"].toarray(), b.layers["bin"].toarray())
-
-
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_recalling_is_idempotent(afm_factory, bin_method):
-    a = afm_factory(seed=92)
-    mt.pp.call_genotypes(a, bin_method=bin_method)
-    first = a.layers["bin"].toarray().copy()
-    mt.pp.call_genotypes(a, bin_method=bin_method)
-    assert np.array_equal(first, a.layers["bin"].toarray())
-
-
-# -- primitives -------------------------------------------------------------
-
-def test_genotype_MiTo_shape_and_values():
-    rng = np.random.default_rng(5)
-    DP = rng.integers(10, 100, size=(50, 10))
-    AD = (DP * rng.random((50, 10))).astype(int)
-    X = genotype_MiTo(AD, DP)
-    assert X.shape == AD.shape
-    assert set(np.unique(X)).issubset({0, 1})
-
-
-def test_genotype_mixtures_shape_and_values():
-    rng = np.random.default_rng(6)
-    DP = rng.integers(10, 100, size=(40, 6))
-    AD = (DP * rng.random((40, 6))).astype(int)
-    X = genotype_mixtures(AD, DP)
-    assert X.shape == AD.shape
-    assert set(np.unique(X)).issubset({0, 1})
-
-
-def test_genotype_MiTo_all_zero_input():
-    """No alternative counts anywhere means no positive genotypes."""
-    DP = np.full((20, 4), 50)
-    AD = np.zeros((20, 4), dtype=int)
-    X = genotype_MiTo(AD, DP)
-    assert X.sum() == 0
-
-
-def test_genotype_MiTo_fully_fixed_variant_calls_nothing():
+def test_a_cell_with_no_alternative_read_is_never_called(afm):
     """
-    A variant at 100% VAF in every cell is degenerate for a two-component binomial
-    mixture -- and biologically homoplasmic, so uninformative for lineage tracing.
-    The probabilistic path therefore calls nothing.
+    Regression: the binomial-mixture genotyper called cells with AD = 0 from the prior
+    alone (61% of the calls on one of our datasets). Absence of reads is absence of
+    evidence.
     """
-    DP = np.full((20, 4), 50)
-    AD = np.full((20, 4), 50)
-    assert genotype_MiTo(AD, DP, min_AD=1).sum() == 0
+    mt.pp.call_genotypes(afm)
+    AD = afm.layers["AD"].toarray()
+    B = afm.layers["bin"].toarray()
+    assert not ((AD == 0) & (B > 0)).any()
 
 
-def test_genotype_MiTo_falls_back_to_hard_threshold():
-    """Below min_cell_prevalence the vanilla path is used, which does call them."""
-    DP = np.full((20, 4), 50)
-    AD = np.full((20, 4), 50)
-    X = genotype_MiTo(AD, DP, min_AD=1, min_cell_prevalence=1.1)
-    assert X.sum() == X.size
+def test_recovers_the_planted_genotypes(afm):
+    mt.pp.call_genotypes(afm)
+    truth = afm.layers["genotype"].toarray() > 0
+    called = afm.layers["bin"].toarray() > 0
+    planted = truth.any(axis=0)
+    recall = called[:, planted][truth[:, planted]].mean()
+    precision = truth[:, planted][called[:, planted]].mean()
+    assert recall > 0.9 and precision > 0.9
 
 
-def test_genotype_MiTo_bimodal_variant_is_called():
-    """A genuinely clonal variant -- high VAF in half the cells -- must be called."""
-    rng = np.random.default_rng(11)
-    DP = np.full((60, 3), 80)
-    AD = np.zeros((60, 3), dtype=int)
-    AD[:30, :] = rng.binomial(80, 0.8, size=(30, 3))
-    X = genotype_MiTo(AD, DP, min_AD=1)
-    assert X[:30, :].sum() > X[30:, :].sum()
+def test_error_rate_is_estimated_from_non_carriers(afm):
+    """
+    The planted markers sit at AF 0.15 in a quarter of the cells, on a background of
+    0.002. A background taken over all cells would be inflated towards the carriers'.
+    """
+    mt.pp.call_genotypes(afm)
+    planted = afm.layers["genotype"].toarray().any(axis=0)
+    assert afm.var.loc[planted, "error_rate"].max() < 0.02
 
 
-# -- edge-sized inputs ------------------------------------------------------
-
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_small_afm(afm_small, bin_method):
-    mt.pp.call_genotypes(afm_small, bin_method=bin_method)
-    assert afm_small.layers["bin"].shape == afm_small.shape
+def test_a_stricter_alpha_calls_no_more_cells(afm):
+    strict = mt.pp.call_genotypes(afm, alpha=1e-6, copy=True)
+    loose = mt.pp.call_genotypes(afm, alpha=1e-2, copy=True)
+    assert strict.layers["bin"].sum() <= loose.layers["bin"].sum()
 
 
-@pytest.mark.parametrize("bin_method", BIN_METHODS)
-def test_single_variant(bin_method):
-    a = build_afm(n_cells=25, n_vars=1, n_clones=2, seed=93)
-    mt.pp.call_genotypes(a, bin_method=bin_method)
-    assert a.layers["bin"].shape == (25, 1)
+def test_convergence_is_reported(afm):
+    mt.pp.call_genotypes(afm)
+    assert afm.uns["genotyping"]["converged"] is True
+    assert afm.uns["genotyping"]["n_iter"] >= 1
 
 
-@pytest.mark.parametrize("coverage", [5, 20, 200])
-def test_across_coverage_levels(coverage):
-    a = build_afm(coverage=coverage, seed=94)
-    mt.pp.call_genotypes(a, bin_method="MiTo")
-    assert set(np.unique(a.layers["bin"].toarray())).issubset({0, 1})
+def test_truncated_background_is_flagged(afm, caplog):
+    """Stopping the iteration early is legitimate but must not be silent."""
+    with caplog.at_level("WARNING"):
+        mt.pp.call_genotypes(afm, max_iter=1)
+    assert afm.uns["genotyping"]["converged"] is False
+    assert "converge" in caplog.text
+
+
+def test_needs_read_counts(afm):
+    del afm.layers["AD"]
+    with pytest.raises(ValueError, match="AD"):
+        mt.pp.call_genotypes(afm)
+
+
+def test_copy_semantics(afm):
+    out = mt.pp.call_genotypes(afm, copy=True)
+    assert out is not afm
+    assert "bin" in out.layers and "bin" not in afm.layers
+
+
+# -- signal over background -------------------------------------------------
+
+
+def test_snr_is_the_median_af_of_read_bearing_cells_over_the_error_rate(afm):
+    mt.pp.call_genotypes(afm)
+    AD = afm.layers["AD"].toarray()
+    X = afm.X.toarray()
+    mt.pp.filter_low_signal_variants(afm, min_snr=0)
+
+    with np.errstate(all="ignore"):
+        expected = np.nanmedian(np.where(AD >= 1, X, np.nan), axis=0) / afm.var["error_rate"]
+    assert np.allclose(afm.var["snr"], expected, rtol=1e-6)
+
+
+def test_planted_markers_stand_above_their_background(afm):
+    mt.pp.call_genotypes(afm)
+    planted = afm.layers["genotype"].toarray().any(axis=0)
+    mt.pp.filter_low_signal_variants(afm, min_snr=0)
+    assert afm.var.loc[planted, "snr"].min() > 10
+
+
+def test_a_broad_heteroplasmic_variant_is_dropped(afm):
+    """
+    A variant present at a similar AF in every cell has a random-looking subset called
+    and no signal over its own background: it must not survive.
+    """
+    rng = np.random.default_rng(0)
+    AD = afm.layers["AD"].toarray()
+    DP = np.asarray(afm.layers["DP"])
+    AD[:, -1] = rng.binomial(DP[:, -1], 0.02)          # everywhere, weakly
+    afm.layers["AD"] = type(afm.layers["AD"])(AD)
+    afm.X = type(afm.X)((AD / DP).astype(np.float32))
+
+    mt.pp.call_genotypes(afm)
+    name = afm.var_names[-1]
+    mt.pp.filter_low_signal_variants(afm, min_snr=10)
+    assert name not in afm.var_names
+
+
+def test_requires_genotypes(afm):
+    with pytest.raises(ValueError, match="call_genotypes"):
+        mt.pp.filter_low_signal_variants(afm)
+
+
+# -- imputation -------------------------------------------------------------
+
+
+def test_imputation_only_adds_calls(afm):
+    mt.pp.call_genotypes(afm)
+    before = afm.layers["bin"].toarray() > 0
+    mt.pp.impute_dropouts(afm, k=10, thr=0.5)
+    after = afm.layers["bin"].toarray() > 0
+    assert (after >= before).all()
+    assert after.sum() >= before.sum()
+
+
+def test_imputed_calls_are_flagged_and_counted(afm):
+    mt.pp.call_genotypes(afm)
+    mt.pp.impute_dropouts(afm, k=10, thr=0.5)
+    imputed = afm.layers["imputed"].toarray() > 0
+    called = afm.layers["bin"].toarray() > 0
+    assert (imputed <= called).all(), "an imputed call must be a call"
+    assert afm.var["n_imputed"].sum() == imputed.sum()
+    assert afm.uns["imputation"]["n_imputed"] == int(imputed.sum())
+
+
+def test_min_support_protects_cells_with_no_evidence(afm):
+    """
+    Without it, a cell with no call at all is handed a genotype by its neighbourhood
+    alone, which is how imputation starts inventing clones.
+    """
+    AD = afm.layers["AD"].toarray()
+    AD[0] = 0                                   # a cell with no alternative read anywhere
+    afm.layers["AD"] = type(afm.layers["AD"])(AD)
+    afm.X = type(afm.X)((AD / np.asarray(afm.layers["DP"])).astype(np.float32))
+
+    mt.pp.call_genotypes(afm)
+    assert not (afm.layers["bin"].toarray()[0] > 0).any()
+
+    mt.pp.impute_dropouts(afm, k=10, thr=0.5, min_support=1)
+    assert not (afm.layers["bin"].toarray()[0] > 0).any(), "no call, no imputation"
+
+
+def test_imputation_requires_genotypes(afm):
+    with pytest.raises(ValueError, match="call_genotypes"):
+        mt.pp.impute_dropouts(afm)

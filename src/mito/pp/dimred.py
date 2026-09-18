@@ -3,7 +3,6 @@ Dimensionality reduction utils to reduce a (pre-filtered) AFMs.
 """
 
 import logging
-from typing import Any
 
 import numpy as np
 import sklearn.preprocessing as pp
@@ -13,12 +12,14 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import PAIRWISE_BOOLEAN_FUNCTIONS, PAIRWISE_DISTANCE_FUNCTIONS
 from umap.umap_ import find_ab_params, simplicial_set_embedding
 
+from mito.ut.provenance import record
+
 from .distances import compute_distances
-from .kNN import kNN_graph
+from .kNN import _kNN_graph
 
 # UMAP only uses `metric` for the spectral initialisation of a disconnected
 # graph, where it forwards the name to sklearn.pairwise_distances. MiTo's own
-# metrics (weighted_jaccard, weighted_hamming) are not known there, so they are
+# metrics (weighted_jaccard) are not known there, so they are
 # mapped to a safe default -- the connectivity graph is precomputed either way.
 _UMAP_SAFE_METRICS = (
     set(PAIRWISE_DISTANCE_FUNCTIONS) | set(PAIRWISE_BOOLEAN_FUNCTIONS)
@@ -30,18 +31,17 @@ _UMAP_SAFE_METRICS = (
 
 def find_diffusion_matrix(D):
     """
-    Function to find the diffusion matrix P.
+    Symmetrised diffusion operator of a distance matrix, and the scaling that maps its
+    eigenvectors back to diffusion coordinates.
     """
     alpha = D.flatten().std()
-    K = np.exp(-D**2 / alpha**2) # alpha is the variance of the distance matrix, here
+    K = np.exp(-D**2 / alpha**2)
     r = np.sum(K, axis=0)
-    Di = np.diag(1/r)
-    P = np.matmul(Di, K)
-    D_right = np.diag((r)**0.5)
+    P = np.matmul(np.diag(1/r), K)
     D_left = np.diag((r)**-0.5)
-    P_prime = np.matmul(D_right, np.matmul(P,D_left))
+    P_prime = np.matmul(np.diag((r)**0.5), np.matmul(P, D_left))
 
-    return P_prime, P, Di, K, D_left
+    return P_prime, D_left
 
 
 ##
@@ -83,11 +83,14 @@ def _umap_from_X_conn(X, conn, ncomps=2, metric='cosine', metric_kwargs=None, se
     """
     if metric_kwargs is None:
         metric_kwargs = {}
+    # NB: `parallel=False` (umap's default, passed explicitly here) is what makes the
+    # embedding reproducible: the layout optimisation is numba-compiled, and with
+    # parallel=True its updates race, so two runs of the same seed differ.
     a, b = find_ab_params(1.0, 0.5)
     X_umap, _ = simplicial_set_embedding(
         X, conn, ncomps, 1.0, a, b, 1.0, 5, 200, 'spectral',
         random_state=np.random.RandomState(seed), metric=metric, metric_kwds=metric_kwargs,
-        densmap=None, densmap_kwds=None, output_dens=None
+        densmap=None, densmap_kwds=None, output_dens=None, parallel=False
     )
     return X_umap
 
@@ -110,19 +113,18 @@ def _get_X(afm, layer):
 ##
 
 
-def _get_D(afm, distance_key, **kwargs):
+def _get_D(afm, distance_key, metric, ncores):
+    """
+    Distances in .obsp[distance_key], computed with `metric` if they are not there yet.
+    """
 
-    if 'distance_calculations' in afm.uns:
-        if distance_key in afm.uns['distance_calculations']:
-            if afm.uns['distance_calculations'][distance_key]['metric'] == kwargs['metric']:
-                logging.info(f'Use precomputed {distance_key}')
-                D = afm.obsp[distance_key].toarray()
-                return D
+    computed = afm.uns.get('distances', {}).get(distance_key, {}).get('metric')
+    if distance_key in afm.obsp and computed == metric:
+        logging.info(f'Use precomputed {distance_key}')
+    else:
+        compute_distances(afm, distance_key=distance_key, metric=metric, ncores=ncores)
 
-    compute_distances(afm, distance_key=distance_key, **kwargs)
-    D = afm.obsp[distance_key].toarray()
-
-    return D
+    return afm.obsp[distance_key].toarray()
 
 
 ##
@@ -130,17 +132,16 @@ def _get_D(afm, distance_key, **kwargs):
 
 def reduce_dimensions(
     afm: AnnData,
+    method: str = 'UMAP',
+    n_comps: int = 2,
+    k: int = 10,
     layer: str = 'bin',
     distance_key: str = 'distances',
-    seed: int = 1234,
-    method: str = 'UMAP',
-    k: int = 10,
-    n_comps: int = 2,
-    ncores: int = 8,
     metric: str = 'weighted_jaccard',
-    bin_method: str = 'MiTo',
-    binarization_kwargs: dict[str,Any] = None
-    ):
+    seed: int = 1234,
+    ncores: int = 8,
+    copy: bool = False
+    ) -> AnnData | None:
     """
     Dimensionality reduction for an Allele Frequency Matrix.
 
@@ -161,16 +162,27 @@ def reduce_dimensions(
     n_comps : int, optional
         Number of dimensions of the output embedding. Default is 2.
     metric : str, optional
-        Dissimilarity metric to use. Default is "weightde_jaccard".
-    bin_method : str, optional
-        Genotyping method. Default is "MiTo".
-    binarization_kwargs : dict, optional
-        Keyword arguments for binarization. Default is {}.
+        Dissimilarity metric, if distances have to be computed. Default is "weighted_jaccard".
+    ncores : int, optional
+        Cores for the distance computation. Default is 8.
+    copy : bool, optional
+        Return a modified copy instead of updating `afm` in place. Default is False.
+
+    Returns
+    -------
+    AnnData | None
+        Updated AFM if `copy` is True, otherwise None. The embedding is added to
+        .obsm["X_pca" | "X_umap" | "X_diffmap"], with its parameters in
+        .uns["mito"]["reduce_dimensions"].
+
+    Notes
+    -----
+    Embeddings are reproducible: PCA, the UMAP layout and the diffusion map are all
+    seeded by `seed`, and the UMAP optimisation runs single-threaded (see
+    `_umap_from_X_conn`).
     """
 
-    if binarization_kwargs is None:
-        binarization_kwargs = {}
-    kwargs = {'metric': metric, 'bin_method': bin_method, 'ncores': ncores, 'binarization_kwargs': binarization_kwargs}
+    afm = afm.copy() if copy else afm
 
     if method == 'PCA':
         X = _get_X(afm, layer)
@@ -178,8 +190,8 @@ def reduce_dimensions(
 
     elif method == 'UMAP':
         X = _get_X(afm, layer)
-        D = _get_D(afm, distance_key, **kwargs)
-        _, _, conn = kNN_graph(D=D, k=k, from_distances=True)
+        D = _get_D(afm, distance_key, metric, ncores)
+        _, _, conn = _kNN_graph(D=D, k=k, from_distances=True)
         umap_metric = metric if metric in _UMAP_SAFE_METRICS else 'euclidean'
         if umap_metric != metric:
             logging.info(
@@ -189,13 +201,17 @@ def reduce_dimensions(
         afm.obsm['X_umap'] = _umap_from_X_conn(X, conn, ncomps=n_comps, metric=umap_metric, seed=seed)
 
     elif method == 'diffmap':
-        D = _get_D(afm, distance_key, **kwargs)
-        P_prime, _,_,_, D_left = find_diffusion_matrix(D)
+        D = _get_D(afm, distance_key, metric, ncores)
+        P_prime, D_left = find_diffusion_matrix(D)
         afm.obsm['X_diffmap'] = find_diffusion_map(P_prime, D_left, n_eign=n_comps)
 
     else:
         raise ValueError(f'Method {method} not recognized. Please use "PCA", "UMAP" or "diffmap".')
 
-    return
+    record(afm, 'reduce_dimensions', {
+        'method':method, 'n_comps':n_comps, 'k':k, 'layer':layer, 'metric':metric, 'seed':seed
+    })
+
+    return afm if copy else None
 
 

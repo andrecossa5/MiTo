@@ -1,39 +1,19 @@
-""""
+"""
 Miscellaneous utilities.
 """
 
+import inspect
 import logging
 import os
-import pickle
 import sys
 import time
 from importlib.resources import files
-from shutil import rmtree
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
 
 ##
 
-
-_cell_filters = ['filter1', 'filter2']
-_var_filters = [
-    'baseline',
-    'CV',
-    'miller2022',
-    'weng2024',
-    'MQuad',
-    'MiTo',
-    'GT_enriched'
-    # DEPRECATED
-    # 'ludwig2019',
-    # 'velten2021',
-    # 'seurat',
-    # 'MQuad_optimized',
-    # 'density',
-    # 'GT_stringent'
-]
 
 # Assets ship inside the package, so they resolve identically from a source
 # checkout, a wheel install and a zipped egg.
@@ -99,22 +79,6 @@ class Timer:
 
         return formatted_time
 
-
-##
-
-
-def make_folder(path, name, overwrite=True):
-    """
-    A function to create a new {name} folder at the {path} path.
-    """
-    os.chdir(path)
-    if not os.path.exists(name) or overwrite:
-        rmtree(os.path.join(path, name), ignore_errors=True)
-        os.makedirs(name)
-    else:
-        pass
-
-
 ##
 
 
@@ -168,177 +132,58 @@ def flatten_dict(d):
             result[key] = value
     return result
 
-
 ##
 
 
-def format_tuning(path_tuning):
+def extract_kwargs(args, path_tuning=None, job_id=None):
     """
-    Format tuning dataframe.
+    Parameters for the three pipeline entry points, from CLI arguments and, optionally,
+    from one row of a tuning table.
+
+    Only the arguments that `mito.pp.filter_cells`, `mito.pp.filter_afm` and
+    `mito.tl.annotate_clones` actually accept are returned, so a stale or misspelled
+    option fails here instead of deep in the call. A tuning row overrides the CLI.
+
+    Parameters
+    ----------
+    args : argparse.Namespace or dict
+        Parsed CLI arguments.
+    path_tuning : str, optional
+        Folder with `all_options_final.csv`, whose `job_id` column selects one
+        parameter combination. Default is None (use `args` only).
+    job_id : str, optional
+        Row of the tuning table to use. Default is None.
+
+    Returns
+    -------
+    dict
+        {"filter_cells": {...}, "filter_afm": {...}, "annotate_clones": {...},
+         "build_tree": {...}}, each holding only that function's parameters.
     """
 
-    assert os.path.exists(path_tuning)
-    options = pd.read_csv(os.path.join(path_tuning, 'all_options_final.csv'))
-    metrics = pd.read_csv(os.path.join(path_tuning, 'all_metrics_final.csv'))
-    df = pd.merge(
-        options.pivot(index=['sample', 'job_id'], values='value', columns='option').reset_index(),
-        metrics.pivot(index=['sample', 'job_id'], values='value', columns='metric').reset_index(),
-        on=['sample', 'job_id']
-    )
-    options = options['option'].unique().tolist()
-    metrics = metrics['metric'].unique().tolist()
+    from mito.pp import filter_afm, filter_cells
+    from mito.tl import annotate_clones, build_tree
 
-    return df, metrics, options
+    d = vars(args).copy() if not isinstance(args, dict) else dict(args)
+    path_tuning = path_tuning if path_tuning is not None else d.get('path_tuning')
+    job_id = job_id if job_id is not None else d.get('job_id')
 
-
-##
-
-
-def extract_kwargs(args, only_tree=False):
-    """
-    Extract preprocessing parameters from CLI and tuning information.
-    """
-
-    path_tuning = args.path_tuning if hasattr(args, 'path_tuning') else None
-
-    if path_tuning is not None and args.job_id is not None:
-
+    if path_tuning is not None and job_id is not None:
         path_options = os.path.join(path_tuning, 'all_options_final.csv')
-        if os.path.exists(path_options):
+        if not os.path.exists(path_options):
+            raise ValueError(f'{path_options} does not exist!')
+        options = pd.read_csv(path_options).query('job_id == @job_id')
+        if options.empty:
+            raise ValueError(f'job_id {job_id} is not in {path_options}')
+        d.update(options.iloc[0].to_dict())
 
-            df_options = pd.read_csv(path_options).loc[lambda x: x['job_id'] == args.job_id]
-            d = dict(zip(df_options['option'],df_options['value'], strict=False))
+    out = {}
+    for name, fun in [('filter_cells', filter_cells), ('filter_afm', filter_afm),
+                      ('annotate_clones', annotate_clones), ('build_tree', build_tree)]:
+        accepted = set(inspect.signature(fun).parameters) - {'afm', 'tree', 'copy'}
+        out[name] = { k:v for k, v in d.items() if k in accepted and v is not None }
 
-            if not only_tree:
-
-                cell_filter = d['cell_filter']
-                min_cell_number = int(d['min_cell_number'])
-                lineage_column = d['lineage_column']
-                filtering = d['filtering']
-                bin_method = d['bin_method']
-                metric = d['metric']
-                min_n_var = int(d['min_n_var'])
-                filter_dbs = d['filter_dbs']
-                filter_moran = d['filter_moran']
-                kwargs = {
-                    'min_cell_number' : min_cell_number,
-                    'lineage_column' : lineage_column,
-                    'filtering' : filtering,
-                    'bin_method' : bin_method,
-                    'min_n_var' : min_n_var,
-                    'ncores' : args.ncores,
-                    'metric' : metric,
-                    'spatial_metrics' : args.spatial_metrics,
-                    'filter_dbs' : filter_dbs,
-                    'filter_moran' : filter_moran
-                }
-                filtering_kwargs = {
-                    'min_cov' : int(d['min_cov']),
-                    'min_var_quality': int(d['min_var_quality']),
-                    'min_frac_negative' : float(d['min_frac_negative']),
-                    'min_n_positive' : int(d['min_n_positive']),
-                    'af_confident_detection' : float(d['af_confident_detection']),
-                    'min_n_confidently_detected' : int(d['min_n_confidently_detected']),
-                    'min_mean_AD_in_positives' : float(d['min_mean_AD_in_positives']),
-                    'min_mean_DP_in_positives' : float(d['min_mean_DP_in_positives'])
-                }
-                filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
-                binarization_kwargs = {
-                    't_prob' : float(d['t_prob']),
-                    't_vanilla' : float(d['t_vanilla']),
-                    'min_AD' : int(d['min_AD']),
-                    'min_cell_prevalence' : float(d['min_cell_prevalence']),
-                    'k' : int(d['k']),
-                    'gamma' :  float(d['gamma']),
-                    'resample' : False
-                }
-                tree_kwargs = {'solver':d['solver'], 'metric':d['metric']}
-
-            else:
-
-                cell_filter = None
-                kwargs = None
-                filtering_kwargs = None
-                binarization_kwargs = None
-                tree_kwargs = {'solver':d['solver'], 'metric':d['metric']}
-
-        else:
-            raise ValueError(f'{path_options} does not exists!')
-
-    else:
-
-        if not only_tree:
-
-            cell_filter = args.cell_filter
-            kwargs = {
-                'min_cell_number' : args.min_cell_number,
-                'lineage_column' : args.lineage_column,
-                'filtering' : args.filtering if args.filtering in _var_filters else None,
-                'bin_method' : args.bin_method,
-                'min_n_var' : args.min_n_var,
-                'filter_dbs' : True if args.filter_dbs == 'true' else False,
-                'ncores' : args.ncores,
-                'metric' : args.metric,
-                'spatial_metrics' : True if args.spatial_metrics == 'true' else False,
-                'filter_moran' : True if args.filter_moran == 'true' else False,
-            }
-            filtering_kwargs = {
-                'min_cov' : args.min_cov,
-                'min_var_quality': args.min_var_quality,
-                'min_frac_negative' : args.min_frac_negative,
-                'min_n_positive' : args.min_n_positive,
-                'af_confident_detection' : args.af_confident_detection,
-                'min_n_confidently_detected' : args.min_n_confidently_detected,
-                'min_mean_AD_in_positives' : args.min_mean_AD_in_positives,
-                'min_mean_DP_in_positives' : args.min_mean_DP_in_positives
-            }
-            filtering_kwargs = filtering_kwargs if kwargs['filtering'] == 'MiTo' else {}
-            binarization_kwargs = {
-                't_prob' : args.t_prob,
-                't_vanilla' : args.t_vanilla,
-                'min_AD' : args.min_AD,
-                'min_cell_prevalence' : args.min_cell_prevalence,
-                'k' : args.k,
-                'gamma' : args.gamma,
-                'resample' : False
-            }
-            tree_kwargs = {'solver':args.solver, 'metric':args.metric}
-
-        else:
-
-            cell_filter = None
-            kwargs = None
-            filtering_kwargs = None
-            binarization_kwargs = None
-            tree_kwargs = {'solver':args.solver, 'metric':args.metric}
-
-    return cell_filter, kwargs, filtering_kwargs, binarization_kwargs, tree_kwargs
-
-
-##
-
-
-def rank_items(df, groupings, metrics, weights, metric_annot):
-
-    df_agg = df.groupby(groupings, dropna=False)[metrics].mean().reset_index()
-
-    for metric_type in metric_annot:
-        colnames = []
-        for metric in metric_annot[metric_type]:
-            colnames.append(f'{metric}_rescaled')
-            if metric in ['n_dbSNP', 'n_REDIdb']:
-                df_agg[metric] = -df_agg[metric]
-            df_agg[f'{metric}_rescaled'] = (df_agg[metric] - df_agg[metric].min()) / \
-                                           (df_agg[metric].max() - df_agg[metric].min())
-
-        x = df_agg[colnames].mean(axis=1)
-        df_agg[f'{metric_type} score'] = (x - x.min()) / (x.max() - x.min())
-
-    x = np.sum(df_agg[ [ f'{k} score' for k in metric_annot ] ] * np.array([ weights[k] for k in metric_annot ]), axis=1)
-    df_agg['Overall score'] = (x - x.min()) / (x.max() - x.min())
-    df_agg = df_agg.sort_values('Overall score', ascending=False)
-
-    return df_agg
+    return out
 
 
 ##
@@ -382,102 +227,3 @@ def load_edits_REDIdb():
 ##
 
 
-def subsample_afm(afm, n_clones=3, ncells=100, freqs=np.array([.3,.3,.4])):
-
-    assert 1-np.array(freqs).sum() <= .05
-    assert len(freqs) == n_clones
-
-    clones_sorted = afm.obs['GBC'].value_counts().index
-    clones = clones_sorted[:n_clones].to_list()
-
-    cells = []
-    for _clone, f in zip(clones, freqs, strict=False):
-        afm_clone = afm[afm.obs.query('GBC==@clone').index,:].copy()
-        afm_clone = afm_clone[(afm_clone.layers['bin']>0).sum(axis=1).flatten()>2,
-                              (afm_clone.layers['bin']>0).sum(axis=0).flatten()>=2]
-        n_cells_clone = min(round(ncells*f), afm_clone.shape[0])
-        cells.extend(
-            np.random.choice(afm_clone.obs_names, n_cells_clone, replace=False).tolist()
-        )
-
-    afm_subsample = afm[cells].copy()
-
-    return afm_subsample
-
-
-##
-
-
-def select_jobs(df, sample, n_cells, n_GBC_groups, frac_unassigned):
-    """
-    Select jobs, and choose one for clonal inference benchmarking
-    """
-    df_selected = (
-        df.loc[
-            (df['sample'] == sample) & \
-            (df['n_cells'] >= n_cells) & \
-            (df['n_GBC_groups'] >= n_GBC_groups) & \
-            (df['frac_unassigned'] <= frac_unassigned)
-        ]
-    )
-    df_selected = (
-        df_selected[[
-            'job_id', 'pp_method', 'bin_method', 'af_confident_detection', 'min_cell_number', 'metric',
-            'ARI', 'corr', 'NMI', 'AUPRC', 'n_cells', 'unassigned', 'n_vars', 'n_GBC_groups', 'n MiTo clone',
-        ]]
-    )
-    df_final = df_selected.sort_values('ARI', ascending=False).head(5)
-
-    return df_selected, df_final
-
-
-##
-
-
-def extract_bench_df(path):
-
-    L = []
-    for folder,_,filenames in os.walk(path):
-        for file in filenames:
-            if file.endswith('pickle'):
-                with open(os.path.join(folder, file), 'rb') as f:
-                    d = pickle.load(f)
-                d['n_inferred'] = d['labels'].loc[lambda x: ~x.isna()].unique().size
-                del d['labels']
-                L.append(d)
-    df_bench = pd.DataFrame(L)
-
-    return df_bench
-
-
-def perturb_AD_counts(a, perc_sites=.75, theta=1, add=True):
-    """
-    Perturb AD and .X layers of afm.
-    """
-    afm = a.copy()
-    AD_new = afm.layers['AD'].copy()
-
-    n_vars = AD_new.shape[1]
-    n_sites = int(np.round(n_vars * perc_sites))
-    idx = np.random.choice(np.arange(n_vars), n_sites)
-
-    for i in idx:
-        ad = afm.layers['AD'][:,i].toarray().flatten()
-        dp = afm.layers['site_coverage'][:,i].toarray().flatten()
-        p_fit = np.sum(ad) / np.sum(dp)
-        p_noise = theta * p_fit
-        if add:
-            new_ad = ad + (dp * p_noise)
-        else:
-            new_ad = ad - (dp * p_noise)
-
-        AD_new[:,i] = new_ad
-
-    corr = np.corrcoef(afm.layers['AD'].toarray().flatten(), AD_new.toarray().flatten())[0,1]
-    afm.layers['AD'] = csr_matrix(AD_new)
-    afm.X = csr_matrix(AD_new / (afm.layers['DP'].toarray() + .000001))
-
-    return afm, corr
-
-
-##

@@ -1,7 +1,0 @@
-dataset,alpha_cell,genotypes,qc_kept,final_vars,GT_final,calls,cells_pct,labels,ARI,homog,compl,big_recovered
-MDA_PT,0.001,graph EM + imputation (current),74,65,57,2801,67.0,75,0.63,0.71,0.712,5/10
-MDA_PT,0.001,binomial,74,72,64,1936,47.1,48,0.87,0.865,0.89,6/10
-MDA_PT,0.001,binomial + imputation,74,72,64,2008,47.9,48,0.859,0.855,0.884,6/10
-MDA_PT,0.01,graph EM + imputation (current),71,60,49,2612,65.0,69,0.638,0.711,0.716,4/10
-MDA_PT,0.01,binomial,71,58,47,2299,50.0,78,0.657,0.766,0.712,3/10
-MDA_PT,0.01,binomial + imputation,71,60,49,2644,58.1,66,0.693,0.744,0.748,4/10

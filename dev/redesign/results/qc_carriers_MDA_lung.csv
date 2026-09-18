@@ -1,6 +1,0 @@
-dataset,carriers_def,calls,median_carriers_GT,median_carriers_nonGT,kept,GT_kept,GT_total,nonGT_kept,shipped_vars_kept,shipped_total,secs
-MDA_lung,guard flat g>0.7 (current),2238,2.0,0.0,15,15,35,0,14,56,1
-MDA_lung,guard flat g>0.5,2400,2.0,0.0,18,17,35,1,16,56,1
-MDA_lung,AD>=1,7152,22.0,9.0,37,29,35,8,27,56,12
-MDA_lung,AD>=2,4569,16.0,4.0,37,30,35,7,27,56,11
-MDA_lung,old flat g>0.7 (unguarded),11736,17.0,9.0,37,29,35,8,28,56,12

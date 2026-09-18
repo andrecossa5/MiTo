@@ -1,5 +1,0 @@
-dataset,carriers,calls,kept,GT_kept,GT_total,nonGT_kept,median_carriers_GT,median_carriers_nonGT
-MDA_PT,guard flat (current),1646,36,32,94,4,2.0,0.0
-MDA_PT,AD>0,10306,70,60,94,10,25.0,13.0
-MDA_PT,binomial a=0.01,6541,71,60,94,11,23.0,13.0
-MDA_PT,binomial a=0.001,3226,74,66,94,8,8.0,4.0

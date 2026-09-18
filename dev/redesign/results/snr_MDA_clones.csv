@@ -1,8 +1,0 @@
-pipeline,cells_pct,labels,ARI,NMI,rescued,dataset,clones_rec_min10,of_min10,clones_rec_min5,of_min5,shared_cells_vs_shipped,ARI_shared (this/shipped)
-guarded (current default),72.8,6,0.93,0.897,,MDA_clones,4,6,4,6,253.0,0.963/0.951
-QC 1e-4 + binom 1e-3,62.7,10,0.806,0.81,,MDA_clones,4,6,4,6,217.0,0.799/0.935
-QC 1e-4 + binom 1e-3 + tau,58.7,9,0.834,0.83,,MDA_clones,4,6,4,6,209.0,0.832/0.946
-QC 1e-4 + binom 1e-3 + SNR>=10,65.1,8,0.862,0.862,,MDA_clones,4,6,4,6,225.0,0.856/0.929
-QC 1e-4 + binom 1e-3 + SNR>=10 + tau,57.9,6,0.908,0.904,,MDA_clones,4,6,4,6,208.0,0.903/0.946
-QC 1e-4 + binom 1e-3 + SNR>=10 + tau + pooled rescue,59.7,6,0.9,0.892,7.0,MDA_clones,4,6,4,6,214.0,0.894/0.935
-SHIPPED,75.5,9,0.945,0.908,,MDA_clones,5,6,5,6,,

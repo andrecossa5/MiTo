@@ -1,8 +1,0 @@
-cells_pct,labels,ARI,NMI,homog,compl,big_recovered,pipeline,caller,n_vars,GT_kept,n_chars,common_cells,ARI_common,SHIPPED_ARI_common
-76.5,11,0.953,0.885,0.893,0.877,4/5,SHIPPED (mfu=0.1),MiToTreeAnnotator,56,29,,,,
-81.4,6,0.945,0.899,0.861,0.941,4/5,QC2 a=0.05 guard no split,evidence_cut,13,13,13.0,1115.0,0.962,0.955
-81.4,6,0.945,0.899,0.861,0.941,4/5,QC2 a=0.05 guard no split,evidence_cut + tau,13,13,13.0,1115.0,0.962,0.955
-80.7,5,0.946,0.889,0.838,0.948,4/5,QC2 a=0.05 guard no split,MiToTreeAnnotator,13,13,13.0,1110.0,0.958,0.955
-81.4,6,0.945,0.899,0.861,0.941,4/5,QC2 a=0.05 guard split,evidence_cut,13,13,13.0,1115.0,0.962,0.955
-81.4,6,0.945,0.899,0.861,0.941,4/5,QC2 a=0.05 guard split,evidence_cut + tau,13,13,13.0,1115.0,0.962,0.955
-80.7,5,0.946,0.889,0.838,0.948,4/5,QC2 a=0.05 guard split,MiToTreeAnnotator,13,13,13.0,1110.0,0.958,0.955

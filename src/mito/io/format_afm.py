@@ -486,6 +486,66 @@ def make_afm(
 ##
 
 
+def migrate_afm(afm: AnnData, copy: bool = False) -> AnnData | None:
+    """
+    Bring an AFM written by MiTo < 0.3 up to the current contract.
+
+    Before 0.3 an AFM carried two coverage layers: "site_coverage", the coverage of the
+    variant's site, and "DP", the same values *masked* to the cells with an alternative
+    read - so DP was 0 for the majority of the matrix. The pipeline now expects a single
+    "DP" layer holding the site's coverage for every cell, and base quality as a .var
+    column, so an old object read from disk has to be converted: used as it is, every
+    negative cell would have a zero denominator and the genotyping would see no evidence
+    of absence anywhere.
+
+    Parameters
+    ----------
+    afm : AnnData
+        AFM read from a file written by an earlier version.
+    copy : bool, optional
+        Return a converted copy instead of updating `afm` in place. Default is False.
+
+    Returns
+    -------
+    AnnData | None
+        The converted AFM if `copy` is True, otherwise None.
+    """
+
+    afm = afm.copy() if copy else afm
+
+    if 'site_coverage' not in afm.layers:
+        logging.info('AFM already follows the current contract: nothing to migrate.')
+        return afm if copy else None
+
+    logging.info('Migrate AFM: site_coverage -> DP (dense), qual -> var["quality"]')
+    AD = afm.layers['AD'].toarray() if hasattr(afm.layers['AD'], 'toarray') else np.asarray(afm.layers['AD'])
+    site = afm.layers['site_coverage']
+    site = site.toarray() if hasattr(site, 'toarray') else np.asarray(site)
+    DP = np.maximum(site, AD)
+    afm.layers['DP'] = DP.astype(_coverage_dtype(DP))
+    del afm.layers['site_coverage']
+
+    if 'qual' in afm.layers:
+        qual = afm.layers['qual']
+        qual = qual.toarray() if hasattr(qual, 'toarray') else np.asarray(qual)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            afm.var['quality'] = np.nanmean(np.where(qual>0, qual, np.nan), axis=0)
+        del afm.layers['qual']
+
+    # Per-position tables are cells x 16569 and nothing reads them any more
+    for key in ('per_position_coverage', 'per_position_quality', 'raw_basecalls_metrics'):
+        afm.uns.pop(key, None)
+
+    # AF is recomputed, since its denominator has just changed for the negative cells
+    afm.X = csr_matrix((AD/np.maximum(DP, 1)).astype(np.float32))
+
+    return afm if copy else None
+
+
+##
+
+
 def read_coverage(afm: AnnData, path_coverage: str, sample: str = None) -> pd.DataFrame:
     """
     Read the per-position coverage table of a sample, for the cells of `afm`.

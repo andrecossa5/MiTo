@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0] - 2026-09-18
+## [0.3.0] - 2026-09-21
 ### Changed
 - **MT-only scope.** MiTo now covers MAESTER, mtscATAC and ReDeeM data
   (`pp_method`: `maegatk`, `mgatk`, `redeem-v`); the Cas9, scWGS and EPI-clone
@@ -37,6 +37,9 @@ All notable changes to this project will be documented in this file.
   `impute_dropouts`, `filter_incompatible_variants`.
 - `mt.tl.evidence_cut`, `clone_support`, `rescue_unassigned`, `compute_fitness`,
   `compute_expansions`; `mt.ut.dataset_metrics`.
+- `mt.io.migrate_afm`, which converts an AFM written by MiTo < 0.3 to the current
+  contract. Genotyping refuses to run on an unconverted object rather than use a
+  masked coverage layer as its denominator.
 
 ### Removed
 - Feature-selection strategies superseded by the clonality QC: `MQuad`,
@@ -45,6 +48,12 @@ All notable changes to this project will be documented in this file.
 - The binomial-mixture genotyper (it called cells with zero alternative reads),
   `mt.tl._classification`, `mt.ut.de_utils`, `mt.ut.stats_utils` and unused
   helpers; dependencies `mquad`, `bbmix`, `lightgbm`, `shap`, `gseapy`.
+
+### Maintenance
+- CI actions and pre-commit hooks updated (`download-artifact`,
+  `action-gh-release`, `pyproject-fmt`, `ruff-pre-commit`).
+- Tutorials re-executed against the new API; the suite is 347 tests and needs no
+  external data.
 
 ### Fixed
 - One character without a positive allele frequency made *every* cell-cell

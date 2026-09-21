@@ -28,6 +28,14 @@ def _counts(afm):
     site whose coverage was computed on a different read set can never give AD > DP.
     """
 
+    if 'site_coverage' in afm.layers:
+        # Written by MiTo < 0.3, where DP was masked to the cells with an alternative
+        # read: using it as the denominator would hide every negative cell.
+        raise ValueError(
+            'This AFM was written by MiTo < 0.3 (it still has a "site_coverage" layer). '
+            'Convert it first: mito.io.migrate_afm(afm).'
+        )
+
     for layer in ('AD', 'DP'):
         if layer not in afm.layers:
             raise ValueError(

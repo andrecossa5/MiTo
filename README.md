@@ -12,11 +12,12 @@
 [![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/latest/index.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**MiTo** infer clonal ancestries in single-cell data from natural mtDNA variation. 
+**MiTo** infers clonal ancestries in single-cell data from natural mtDNA variation.
 
-The framework provides the infrastructure to convert MAESTER, scmtATAC-seq and RedeeM pre-processing outputs
-into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and
-infer mitochondrial phylogenies and clones for dowstream multi-omic analysis.
+The framework converts MAESTER, scmtATAC-seq and ReDeeM pre-processing output into Allele
+Frequency Matrices ([AnnData](https://anndata.readthedocs.io/) objects), selects the mtDNA
+variants that mark lineages, genotypes individual cells, and infers mitochondrial
+phylogenies and clones for downstream multi-omic analysis.
 
 ## Installation
 
@@ -62,13 +63,15 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 
 | Module | Purpose |
 | --- | --- |
-| `io` | Build AFMs from pre-processing outputs, read/write Newick tree objects |
-| `pp` | Cell and variant filtering, genotying, distances, kNN graphs, embeddings |
-| `tl` | Tree building, clonal inference, clustering, fate bias |
+| `io` | Build AFMs from pre-processing output, read/write Newick trees |
+| `pp` | Cell and variant filtering, genotyping, distances, kNN graphs, embeddings |
+| `tl` | Tree building, clonal annotation, fate bias, bootstrapping |
 | `pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
-| `ut` | Metrics, helpers |
+| `ut` | Metrics, MT annotations, simulation, helpers |
 
-**Supported platforms:** scRNA-seq (MAESTER), scmtATAC-seq and 10x MultiOme (RedeeM).
+**Supported assays** (`scLT_system`, `pp_method`): MAESTER (`maegatk`, `mgatk`),
+scmtATAC-seq (`mgatk`) and ReDeeM (`redeem-v`). Pre-processing is done by
+[nf-MiTo](https://github.com/andrecossa5/nf-MiTo).
 
 Full reference: [MiTo docs](https://mito.readthedocs.io/en/latest/index.html).
 

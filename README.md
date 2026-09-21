@@ -54,8 +54,9 @@ annotator.clonal_inference()
 mt.pl.plot_tree(tree, features=['MiTo clone'])
 ```
 
-See [getting-started tutorial](https://mito.readthedocs.io/en/latest/getting_started_tutorial.html) for 
-the full vignette.
+See the [getting started tutorial](https://mito.readthedocs.io/en/latest/getting_started.html)
+for the full vignette, and the [ground truth benchmark](https://mito.readthedocs.io/en/latest/benchmark.html)
+for a worked example on real MAESTER data.
 
 ## API
 

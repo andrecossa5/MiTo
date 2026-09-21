@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 from scipy.stats import fisher_exact
-from statsmodels.sandbox.stats.multicomp import multipletests
+from statsmodels.stats.multitest import multipletests
 
 from mito.ut.positions import mask_mt_sites
 from mito.ut.utils import load_common_dbSNP, load_edits_REDIdb

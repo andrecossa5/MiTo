@@ -56,6 +56,9 @@ All notable changes to this project will be documented in this file.
   external data.
 
 ### Fixed
+- `multipletests` is imported from `statsmodels.stats.multitest`; the
+  `statsmodels.sandbox` path it used was removed in statsmodels 0.15, which had
+  been breaking every CI run since 31 Aug 2026 on unchanged code.
 - One character without a positive allele frequency made *every* cell-cell
   distance NaN; weights are now taken over called cells, with a fallback.
 - The four-gamete filter resolved conflicts by count alone, deleting prevalent

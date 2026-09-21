@@ -11,7 +11,7 @@ import pandas as pd
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
-from statsmodels.sandbox.stats.multicomp import multipletests
+from statsmodels.stats.multitest import multipletests
 
 
 ##

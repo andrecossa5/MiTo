@@ -9,24 +9,26 @@ Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md`; user
 
 ## Release check (0.5.0, package defaults only, from the readers)
 
-`python benchmarks/release_check.py mda|pl1000|sims`. Values are ARI / ARI_all, small-clone pass off (on).
+`python benchmarks/release_check.py mda|pl1000|sims`. Values are ARI / ARI_all.
 
-| Dataset | 0.5.0 | 0.3.0 | Reference |
-|---|---|---|---|
-| MDA_clones | .896 / .758 | .929 / .647 (70% assigned) | paper .967 |
-| MDA_lung | .958 / .903 | .960 / .896 | paper .964 |
-| MDA_PT | .841 / .453 (.845 / .453) | .830 / .370 | paper .847 |
-| 24 MAESTER sims | mean .787 | .755 | — |
-| pL1000 ReDeeM (3,686 cells) | .827 / .644 (.825 / .646), recall 49% (56%) | .785 / .593 | MitoDrift .679 / .632 (τ .125), .800 / .635 (τ .25) |
-| pL1000 mtscATAC (3,811 cells, f = 1.66) | .838 / .626 (.841 / .630), recall 34% (41%) | .34 / .27 | — |
+| Dataset | 0.5.0 | + `min_support=0.5` | 0.3.0 | Time: filter_afm / tree / 100 support replicates |
+|---|---|---|---|---|
+| MDA_clones | .895 / .758 | .938 / .756 | .929 / .647 | 1.0 / 0.0 / 0.3 s |
+| MDA_lung | .960 / .905 | .961 / .905 | .960 / .896 | 3.1 / 0.0 / 2.7 s |
+| MDA_PT | .842 / .456 | .856 / .456 | .830 / .370 | 6.1 / 0.1 / 3.8 s |
+| 24 MAESTER sims | mean .792 / .565 | .797 / .565 | .755 | 0.4 / — / 1.0 s |
+| pL1000 ReDeeM | .840 / .660, recall 49% | .859 / .646, precision .80 | .785 / .593 | 8.6 / 0.1 / 12.9 s |
+| pL1000 mtscATAC (f = 1.66, both strands) | .841 / .629, recall 34% | .871 / .600, precision .80 | .34 / .27 | 7.6 / 0.1 / 8.0 s |
 
+- **Comparisons:** MitoDrift on pL1000 scores .679 / .632 (τ .125) and .800 / .635 (τ .25). The paper reports .967 / .964 / .847 on MDA.
 - **Same cells and barcodes, ReDeeM vs mtscATAC** (`final_compare.py`): .818/.648 vs .846/.644.
-  - The two partitions agree at ARI .94 on the cells both assign.
-  - ReDeeM recovers 49 clones that mtscATAC misses (mostly small); mtscATAC recovers 8 that ReDeeM misses.
-- **Getting-started and MAESTER benchmark tutorials** re-executed on 0.5.0. MDA_clones in the tutorial (legacy AFM, `migrate_afm`):
-  - 337 cells (was 276), 95.8% assigned;
-  - ARI .903 (was .929), 10 clones for 8 ground truth;
-  - distance AUPRC .910 (was .335).
+- **Clonality filter** (`clonality_speed.py`):
+  - 10–26× faster: 1,000 candidates × 3,300 cells, 87 s → 3.3 s; 9,700 cells, 70 s / 4.6 GB → 6.8 s / 1.3 GB.
+  - Fixes a self-confirmation bug (float32 Gram downdate).
+  - Kept variants vs the 0.5.0 code: Jaccard .95–.97. Against the bug-fixed old code, .965–.995, which is Monte Carlo level.
+  - Bit-identical across re-runs.
+- **Clade support** (`support_eval.py`), transfer support from count resampling, tree clade precision at support ≥ .5: ReDeeM .49 → .81 (recall .65 → .59), MDA_lung .21 → .69, mtscATAC .45 → .81.
+- **UPGMA** is now SciPy (32.5 s → 0.18 s at 2,400 cells). It breaks ties between identical cells differently from Cassiopeia, so trees are not identical to before (ReDeeM: 72% of clades shared); the metrics above are equal or better.
 
 ## Resume in 3 commands
 
@@ -68,6 +70,8 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `mgatk_pairs.py` | mgatk as both-strand molecules (= the 0.5.0 reader) | `mgatk_pairs.csv` |
 | `final_compare.py` | ReDeeM vs mtscATAC vs MitoDrift, same cells and LARRY barcodes, per-clone recovery | `final_compare*.csv` |
 | `release_check.py mda \| pl1000 \| sims` | 0.5.0 defaults end to end, from the readers | `release_check_*.csv` |
+| `clonality_speed.py real <afm>... \| scaling` | old vs incremental clonality filter: time, peak memory, agreement | `clonality_speed_*.csv` |
+| `support_eval.py pl1000 \| mda` | count-resampling clade support: tree-level precision/recall, support as a clone filter | `support_eval_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)

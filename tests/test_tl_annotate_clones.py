@@ -44,7 +44,7 @@ def test_writes_the_labels_on_both_the_afm_and_the_tree(annotated):
 def test_the_clone_table_says_where_each_clone_came_from(annotated):
     afm, tree = annotated
     clones = afm.uns["mito"]["annotate_clones"]["clones"]
-    assert list(clones.columns) == ["n_cells", "node", "markers"]
+    assert list(clones.columns) == ["n_cells", "node", "support", "markers"]
     assert clones["n_cells"].sum() == (afm.obs["MiTo_clone"].astype(str) != "unassigned").sum()
     assert set(clones["node"]) <= set(tree.nodes)
     assert (clones["markers"].str.len() > 0).all(), "a clone with no marker is not a clone"

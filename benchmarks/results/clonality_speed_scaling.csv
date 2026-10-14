@@ -1,0 +1,5 @@
+dataset,n_cells,n_vars,old_secs,old_peak_mb,old_kept,new_secs,new_peak_mb,new_kept,kept_jaccard,p_spearman,speedup
+sim_2500,2413,73,5.2,905.0,65.0,0.7,716,65,1.0,,7.4
+sim_5000,4868,81,18.3,1709.0,65.0,2.3,1156,65,1.0,,8.0
+sim_10000,9728,81,69.9,4644.0,65.0,6.8,1334,65,1.0,,10.3
+sim_20000,19455,81,,,,24.2,2922,65,,,

@@ -57,7 +57,7 @@ The package follows the scverse layout, so it composes with ``scanpy`` and
    * - ``mt.pp``
      - Cell and variant filtering, genotype calling, distances, kNN graphs, embeddings
    * - ``mt.tl``
-     - Tree building, clonal inference, clustering, fate bias, bootstrapping
+     - Tree building, clade support, clonal inference, clustering, fate bias
    * - ``mt.pl``
      - Trees, heatmaps, embeddings, coverage and variant-spectrum plots
    * - ``mt.ut``
@@ -77,6 +77,7 @@ At a glance
    mt.pp.filter_afm(afm)
 
    tree = mt.tl.build_tree(afm, solver='UPMGA')
+   mt.tl.clade_support(tree, afm)
    mt.tl.annotate_clones(tree, afm)
 
    mt.pl.plot_tree(tree, annot='MiTo_clone')

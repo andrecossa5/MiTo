@@ -246,10 +246,12 @@ def _reference_bases(positions, random=False, rng=None):
 
 
 def _write_allelic_tables(folder, prefix="", with_quality=True, n_cells=120, n_sites=40,
-                          n_clones=4, seed=0, ref_allele=False, compress=True):
+                          n_clones=4, seed=0, ref_allele=False, compress=True, mates="overlap"):
     """
     maegatk / mgatk output: one table per base, plus coverage. With `with_quality=False`
-    the tables have 4 columns, as mgatk writes them for 10x data.
+    the tables have 4 columns, as mgatk writes them for 10x data. `mates="overlap"` splits
+    every count evenly over the two strands (molecules read by both mates); "single"
+    puts each read on a random strand (no overlapping mates).
     """
     folder.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
@@ -270,7 +272,8 @@ def _write_allelic_tables(folder, prefix="", with_quality=True, n_cells=120, n_s
             ref_ct = int(cov[i, j]) - ad
             for base, count in ((ref_of[p], ref_ct), (alt_of[p], ad)):
                 if count > 0:
-                    fw, rev = count // 2, count - count // 2
+                    fw = count // 2 if mates == "overlap" else int(rng.binomial(count, 0.5))
+                    rev = count - fw
                     row = ([p, c, fw, 35.0, rev, 35.0] if with_quality else [p, c, fw, rev])
                     rows[base].append(row)
             cov_rows.append((p, c, int(cov[i, j])))
@@ -331,6 +334,15 @@ def mgatk_tables(tmp_path):
     folder = tmp_path / "mgatk"
     meta = _write_allelic_tables(folder / "final", prefix="sampleX.", with_quality=False,
                                  ref_allele=True)
+    return folder, meta
+
+
+@pytest.fixture
+def mgatk_single_end_tables(tmp_path):
+    """mgatk tables of a library whose molecules are read by one mate only."""
+    folder = tmp_path / "mgatk_se"
+    meta = _write_allelic_tables(folder / "final", prefix="sampleX.", with_quality=False,
+                                 ref_allele=True, mates="single")
     return folder, meta
 
 

@@ -6,29 +6,43 @@ import logging
 
 import numpy as np
 from anndata import AnnData
+from scipy.sparse import csr_matrix
 
-from ._graph import cosine_distances, knn_adjacency
+from ._graph import LeaveOneOutKNN, adjacency_from_neighbours
 
 ##
 
 
-def _stratified_sets(strata, carriers, n_perm, rng):
+class _StratifiedNull:
     """
-    Random cell sets with the same number of cells per stratum as `carriers`, so that
-    cell quality (coverage) cannot masquerade as lineage structure in the null.
+    Random cell sets with the same number of cells per stratum as a variant's carriers,
+    so that cell quality (coverage) cannot masquerade as lineage structure in the null.
+
+    One random permutation of each stratum per null draw is made once; the first c cells
+    of a permutation are a uniform random c-subset, so every variant's null is read off
+    the same bank. Each variant's test stays exact, and the p-values depend on the seed
+    only, not on the order the variants are tested in.
     """
 
-    n = strata.size
-    R = np.zeros((n_perm, n))
-    for s in np.unique(strata):
-        pool = np.flatnonzero(strata==s)
-        c = int(carriers[pool].sum())
-        if c == 0:
-            continue
-        for p in range(n_perm):
-            R[p, rng.choice(pool, c, replace=False)] = 1.0
+    def __init__(self, strata, n_perm, rng):
+        self.n_perm = n_perm
+        self.n = strata.size
+        self.pools = {}
+        for s in np.unique(strata):
+            pool = np.flatnonzero(strata==s)
+            perm = np.argsort(rng.random((n_perm, pool.size)), axis=1)
+            self.pools[s] = (pool, pool[perm], strata==s)
 
-    return R
+    def sets(self, carriers):
+        """Sparse (n_perm, n) indicator matrix of the null sets."""
+        cols = []
+        for pool, bank, in_stratum in self.pools.values():
+            c = int(carriers[in_stratum].sum())
+            if c:
+                cols.append(bank[:,:c])
+        cols = np.concatenate(cols, 1)
+        rows = np.repeat(np.arange(self.n_perm), cols.shape[1])
+        return csr_matrix((np.ones(rows.size), (rows, cols.ravel())), shape=(self.n_perm, self.n))
 
 
 ##
@@ -68,6 +82,11 @@ def filter_non_clonal_variants(
 
     `alpha` sets the smallest clone that can be kept: a variant carried by very few cells
     cannot reach a small p-value in a permutation test, whatever its quality.
+
+    The leave-one-out graphs are updated incrementally (`LeaveOneOutKNN`: only the cells
+    carrying the held-out variant change), and the null sets are read off one bank of
+    stratified permutations, so the cost per variant grows with its carriers, not with
+    the square of the number of cells.
 
     Parameters
     ----------
@@ -111,8 +130,8 @@ def filter_non_clonal_variants(
         strata = np.zeros(n, int)
 
     total_calls = B.sum(1).astype(float)
-    G = X @ X.T
-    sq = (X**2).sum(1)
+    knn = LeaveOneOutKNN(X, k, seed=seed)
+    null = _StratifiedNull(strata, n_perm, rng)
     p_join = np.ones(m)
     p_excl = np.ones(m)
 
@@ -121,13 +140,13 @@ def filter_non_clonal_variants(
         if x.sum()<2:
             continue
         other = total_calls-x                        # calls of the OTHER variants
-        A = knn_adjacency(cosine_distances(X, G, sq, j), k)
-        R = _stratified_sets(strata, B[:,j], n_perm, rng)
+        A = adjacency_from_neighbours(knn.neighbours(j), n)
+        R = null.sets(B[:,j])
         jc_obs = x @ (A @ x)
-        jc_null = np.einsum('pi,pi->p', R @ A, R)
+        jc_null = np.asarray((R @ A).multiply(R).sum(1)).ravel()
         p_join[j] = (1+(jc_null>=jc_obs).sum()) / (1+n_perm)
         ex_obs = (x @ other) / x.sum()
-        ex_null = (R @ other) / R.sum(1)
+        ex_null = (R @ other) / x.sum()
         p_excl[j] = (1+(ex_null<=ex_obs).sum()) / (1+n_perm)
 
     p_clonal = 2*np.minimum(p_join, p_excl)

@@ -16,17 +16,36 @@ mtscATAC.
 - **`max_candidates=1000`** in `filter_afm` (`mt.pp.cap_candidates`): at most this
   many candidates, the most over-dispersed, with a warning.
 - **mtscATAC as molecule counts.** `make_afm` converts mgatk read counts for
-  mtscATAC (`molecules=None` -> on): alternative molecules are those read by both
-  mates, min(forward, reverse), and coverage is reads / f, with the reads per
-  molecule f estimated from the strand counts and stored in
-  `.uns["reads_per_molecule"]` (1.66 on pL1000, 1.73 from ReDeeM molecules of the
-  same cells).
+  mtscATAC (`molecules=None` -> on), from the strand counts alone: the reads per
+  molecule f and the fraction of molecules read by both mates o = f - 1 are
+  estimated from the strand variance (1.66 on pL1000, 1.73 from ReDeeM molecules of
+  the same cells); coverage = reads / f; alternative molecules = min(forward,
+  reverse) when o >= 0.5, rint(reads / f) otherwise (single-end reads, long
+  fragments). Stored in `.uns["molecules"]`; libraries with PCR duplicates left in
+  are detected and reported.
+- **Clade support from count resampling** (`mt.tl.clade_support`): each replicate
+  draws every cell's alternative molecules again, re-calls genotypes and rebuilds the
+  UPGMA tree; support is the transfer bootstrap expectation (Lemoine et al., 2018;
+  `method="exact"` for Felsenstein's). 100 replicates: 0.3 s (340 cells) to 13 s
+  (2,400 cells). Written on the tree nodes; `annotate_clones` reports each clone's
+  support and `annotate_clones(min_support=...)` leaves weakly supported clones
+  unassigned. On pL1000 ReDeeM, clade precision of the tree .49 -> .81 at support
+  >= .5 (recall .65 -> .59).
 - **Small-clone pass** (`mt.tl.small_clone_pass`, `annotate_clones(small_clones=True)`,
   off by default): a character carried by 2-4 cells that are exactly a clade becomes
   a clone.
 - `make_afm(multi_allelic_sites=True)`: keep every alternative allele of a site.
 
 ### Changed
+- **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
+  leave-one-out kNN graphs are updated incrementally (only the held-out variant's
+  carriers change; exact), and the null sets come from one bank of stratified
+  permutations (p-values independent of variant order). 1,000 candidates x 3,300
+  cells: 87 s -> 3.3 s; 9,700 cells: 70 s / 4.6 GB -> 6.8 s / 1.3 GB.
+- **`build_tree(solver="UPMGA")` uses scipy's average linkage** (cassiopeia for the
+  other solvers): 32.5 s -> 0.18 s for 2,400 cells.
+- The clones table of `annotate_clones` gives each clone's clade as the common
+  ancestor of its cells (the cut could stop at a sub-clade of a clone), and its support.
 - **Reader**: one alternative allele per site by default, the dominant one;
   `migrate_afm` applies the same rule to AFMs written by MiTo < 0.3
   (`multi_allelic_sites=True` keeps every allele).
@@ -38,7 +57,16 @@ mtscATAC.
 - The signal-over-background ratio is annotated (`.var["snr"]`, used to rank
   conflicting characters) but no longer filtered on.
 
+### Fixed
+- Clonality filter and imputation: the held-out variant leaked into its own graph.
+  The Gram matrix was computed in float32 and down-dated in float64; for cells whose
+  only variant was the held-out one, the residue (~1e-6) made them each other's
+  nearest neighbours, so sole-marker variants could confirm themselves.
+- `weighted_jaccard`: no 0/0 warning for cells without calls.
+
 ### Removed
+- `mt.tl.bootstrap_MiTo` and `mt.tl.bootstrap_bin` (character resampling): replaced
+  by `mt.tl.clade_support`.
 - The read-threshold candidate stage: `mt.pp.filter_candidate_variants` and the
   `filter_afm` parameters `cand_min_site_cov`, `cand_min_frac_negative`,
   `cand_min_n_positive`, `cand_af_confident`, `cand_min_n_confident`,

@@ -44,9 +44,10 @@ afm = mt.io.make_afm('path/to/maegatk_output', scLT_system='MAESTER', pp_method=
 mt.pp.filter_cells(afm, cell_filter='filter2')     # 'filter1' (default) for ReDeeM / mtscATAC
 mt.pp.filter_afm(afm)
 
-# Phylogeny and clones
+# Phylogeny, clade support (count resampling) and clones
 tree = mt.tl.build_tree(afm, solver='UPMGA')
-mt.tl.annotate_clones(tree, afm)
+mt.tl.clade_support(tree, afm)                    # optional: support of every clade
+mt.tl.annotate_clones(tree, afm)                  # min_support=0.5 for higher precision
 
 # Visualization
 mt.pl.plot_tree(tree, annot='MiTo_clone')
@@ -77,7 +78,7 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 | --- | --- |
 | `io` | Build AFMs from pre-processing output, read/write Newick trees |
 | `pp` | Cell and variant filtering, genotyping, distances, kNN graphs, embeddings |
-| `tl` | Tree building, clonal annotation, fate bias, bootstrapping |
+| `tl` | Tree building, clade support, clonal annotation, fate bias |
 | `pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
 | `ut` | Metrics, MT annotations, simulation, helpers |
 

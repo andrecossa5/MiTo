@@ -31,7 +31,7 @@ EXPORTS = {
         "build_tree", "coarse_grained_tree", "AFM_to_seqs",
         "annotate_clones", "evidence_cut", "clone_support", "rescue_unassigned", "small_clone_pass",
         "compute_clonal_fate_bias", "compute_scPlasticity", "compute_fitness",
-        "compute_expansions", "bootstrap_MiTo", "bootstrap_bin", "leiden_clustering",
+        "compute_expansions", "clade_support", "leiden_clustering",
     ],
     "pl": [
         "plot_tree", "draw_embedding", "heatmap_distances", "heatmap_variants",

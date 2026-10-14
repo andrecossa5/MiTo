@@ -41,7 +41,8 @@ def weighted_jaccard(M, w):
     b = np.expand_dims(total, axis=1) - a
     c = np.expand_dims(total, axis=0) - a
     denom = a + b + c
-    S = np.where(denom != 0, a / denom, 0.0)
+    S = np.zeros_like(a)
+    np.divide(a, denom, out=S, where=denom!=0)       # cells with no call: similarity 0
     D = 1.0 - S
 
     return D

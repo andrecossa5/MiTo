@@ -9,7 +9,7 @@ from anndata import AnnData
 from scipy import stats
 from scipy.sparse import csr_matrix
 
-from ._graph import cosine_distances
+from ._graph import LeaveOneOutKNN
 
 ##
 
@@ -266,17 +266,12 @@ def impute_dropouts(
     was_imputed = _dense(afm.layers['imputed'])>0
     n, m = X.shape
 
-    G = X @ X.T
-    sq = (X**2).sum(1)
+    knn = LeaveOneOutKNN(X, k)
     Bf = (B>0).astype(float)
     support = Bf.sum(1)
     P = np.zeros((n,m))
     for j in range(m):
-        D = cosine_distances(X, G, sq, j)
-        np.fill_diagonal(D, np.inf)
-        kk = min(k, n-1)
-        idx = np.argpartition(D, kk, axis=1)[:,:kk]
-        dist = np.take_along_axis(D, idx, 1)
+        idx, dist = knn.neighbours(j, return_dist=True)
         sig = np.maximum(dist.max(1, keepdims=True), 1e-9)
         w = np.exp(-(dist/sig)**2)
         w = w/np.maximum(w.sum(1, keepdims=True), 1e-12)

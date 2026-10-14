@@ -237,8 +237,8 @@ def test_mtscatac_counts_molecules_read_by_both_mates(mgatk_tables):
     folder, _ = mgatk_tables
     reads = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk", molecules=False)
     mols = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk")
-    assert "reads_per_molecule" in mols.uns and "reads_per_molecule" not in reads.uns
-    assert 1 <= mols.uns["reads_per_molecule"] <= 2
+    assert "molecules" in mols.uns and "molecules" not in reads.uns
+    assert 1 <= mols.uns["molecules"]["reads_per_molecule"] <= 2
     common = reads.var_names.intersection(mols.var_names)
     assert (mols[:, common].layers["AD"].toarray() <= reads[:, common].layers["AD"].toarray()).all()
     assert (mols.layers["DP"] <= reads[:, mols.var_names].layers["DP"]).all()
@@ -247,7 +247,7 @@ def test_mtscatac_counts_molecules_read_by_both_mates(mgatk_tables):
 def test_maester_counts_are_left_as_they_are(maegatk_tables):
     folder, _ = maegatk_tables
     afm = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
-    assert "reads_per_molecule" not in afm.uns
+    assert "molecules" not in afm.uns
 
 
 # -- AFMs written by MiTo < 0.3 ---------------------------------------------
@@ -278,3 +278,20 @@ def test_migrate_afm_can_keep_every_allele():
     afm = _legacy_afm()
     mt.io.migrate_afm(afm, multi_allelic_sites=True)
     assert afm.shape[1] == 3
+
+
+def test_without_overlapping_mates_alternative_reads_are_scaled_not_dropped(mgatk_single_end_tables):
+    folder, _ = mgatk_single_end_tables
+    reads = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk", molecules=False)
+    mols = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk")
+    info = mols.uns["molecules"]
+    assert info["alt_rule"] == "reads_over_f"
+    assert info["frac_both_mates"] < 0.5
+    # strand confirmation would have kept almost nothing; scaling keeps the evidence
+    assert mols.layers["AD"].sum() >= 0.5 * reads.layers["AD"].sum() / info["reads_per_molecule"]
+
+
+def test_with_overlapping_mates_alternative_molecules_need_both_strands(mgatk_tables):
+    folder, _ = mgatk_tables
+    mols = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk")
+    assert mols.uns["molecules"]["alt_rule"] == "both_strands"

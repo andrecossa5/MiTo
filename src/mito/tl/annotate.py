@@ -116,6 +116,23 @@ def rescue_unassigned(
 ##
 
 
+def _clade_of(tree, cells):
+    """The clone's clade: the most recent common ancestor of its cells."""
+    cells = list(cells)
+    return cells[0] if len(cells) == 1 else tree.find_lca(*cells)
+
+
+def _node_support(tree, node, key='support'):
+    """Clade support written by `mito.tl.clade_support`, NaN if there is none."""
+    try:
+        return float(tree.get_attribute(node, key))
+    except Exception:  # noqa: BLE001
+        return np.nan
+
+
+##
+
+
 def small_clone_pass(
     tree: CassiopeiaTree,
     B: np.array,
@@ -167,6 +184,7 @@ def annotate_clones(
     tau: float = 0.25,
     small_clones: bool = False,
     small_clones_max_cells: int = 4,
+    min_support: float = None,
     rescue: bool = False,
     key_added: str = 'MiTo_clone',
     copy: bool = False
@@ -174,7 +192,7 @@ def annotate_clones(
     """
     Infer discrete clone labels from a MT-SNVs phylogeny.
 
-    Two steps, and an optional third:
+    Two steps, and optional ones:
 
     1. **evidence cut** (`mito.tl.evidence_cut`): the tree is cut where, and only where,
        the characters pay for the split - a clade is subdivided only if at least
@@ -186,6 +204,8 @@ def annotate_clones(
        `small_clones_max_cells` cells that are exactly a clade of the tree makes them a
        clone, below the cut's `min_cells`. It gains recall of the smallest clones, at some
        cost in precision, where single markers are reliable (molecule counts).
+    4. **clade support** (`min_support`), optional: clones whose clade is not recovered
+       under count resampling (`mito.tl.clade_support`) are left unassigned.
 
     This replaces the grid search over similarity percentile, mutation enrichment and
     merging thresholds of the published annotator, which needed per-dataset overrides to
@@ -206,6 +226,12 @@ def annotate_clones(
         Run the small-clone pass after the abstention. Default is False.
     small_clones_max_cells : int, optional
         Largest clone the small-clone pass creates. Default is 4.
+    min_support : float, optional
+        Leave unassigned the cells of clones whose clade support is below this value
+        (`mito.tl.clade_support`, which must have been run on the tree). A precision
+        knob: on our benchmarks 0.5 raised ARI on the assigned cells (pL1000 ReDeeM .84 ->
+        .88, MDA_PT .84 -> .87) at the cost of the cells of weakly supported clones.
+        Default is None (no filter; the support of each clone is reported either way).
     rescue : bool, optional
         Try to assign left-over cells from pooled reads over clone markers
         (`mito.tl.rescue_unassigned`). Default is False.
@@ -220,7 +246,8 @@ def annotate_clones(
         Annotated AFM if `copy` is True, otherwise None. Adds afm.obs[`key_added`] and
         afm.obs["clone_support"], the same two columns in tree.cell_meta, and
         .uns["mito"]["annotate_clones"], whose "clones" table gives each clone's size, the
-        tree node it was cut at, and its marker characters.
+        clade (node: the common ancestor of its cells), the clade's support (if
+        `mito.tl.clade_support` was run) and its marker characters.
     """
 
     afm = afm.copy() if copy else afm
@@ -248,6 +275,18 @@ def annotate_clones(
         labels, n_small = small_clone_pass(tree, B, cells, labels, max_cells=small_clones_max_cells)
         logging.info(f'Small-clone pass: {n_small} clones of 2-{small_clones_max_cells} cells')
 
+    if min_support is not None:
+        # A clone's support is its clade's: the cut can stop at a node holding only part
+        # of a clone (a ladder of outlier cells follows its big child), so the clade is the
+        # common ancestor of all its cells
+        groups = labels[labels!='unassigned'].groupby(labels[labels!='unassigned']).groups
+        sup = {L:_node_support(tree, _clade_of(tree, idx)) for L, idx in groups.items()}
+        if len(sup) and all(np.isnan(v) for v in sup.values()):
+            raise ValueError('min_support needs clade support on the tree: run mito.tl.clade_support first.')
+        weak = [L for L, v in sup.items() if not v >= min_support]
+        labels = labels.mask(labels.isin(weak), 'unassigned')
+        logging.info(f'Clade support >= {min_support}: {len(sup)-len(weak)}/{len(sup)} clones kept')
+
     if rescue:
         labels = rescue_unassigned(labels, afm)
 
@@ -257,15 +296,18 @@ def annotate_clones(
     node_of = {f'MT-{i}':node for i, node in enumerate(sizes.index, start=1)}
     labels = labels.map({v:k for k, v in node_of.items()}).fillna('unassigned')
 
-    # One row per clone: size, the tree node it was cut at, and its marker characters
+    # One row per clone: size, its clade (common ancestor of its cells) and that clade's
+    # support, and its marker characters
     ok = (labels!='unassigned').values
+    clade = {L:_clade_of(tree, labels.index[labels==L]) for L in node_of}
     rows = []
     for L in sorted(pd.unique(labels[ok]), key=lambda x: int(x.split('-')[1])):
         inL = (labels==L).values
         prev_in = B[inL].mean(0)
         prev_out = B[ok & ~inL].mean(0) if (ok & ~inL).any() else np.zeros(B.shape[1])
         rows.append(dict(
-            clone=str(L), n_cells=int(inL.sum()), node=str(node_of[L]),
+            clone=str(L), n_cells=int(inL.sum()), node=str(clade[L]),
+            support=_node_support(tree, clade[L]),
             markers=';'.join(afm.var_names[(prev_in>=0.5) & (prev_out<=0.1)])
         ))
     clones = pd.DataFrame(rows).set_index('clone') if rows else pd.DataFrame()
@@ -279,7 +321,8 @@ def annotate_clones(
             'alpha':alpha, 'min_in':min_in, 'ratio':ratio, 'self_min_in':self_min_in,
             'min_cells':min_cells, 'min_supported':min_supported, 'one_sided':one_sided,
             'tau':tau, 'small_clones':small_clones,
-            'small_clones_max_cells':small_clones_max_cells, 'rescue':rescue
+            'small_clones_max_cells':small_clones_max_cells, 'min_support':min_support,
+            'rescue':rescue
         },
         'n_small_clones' : int(n_small),
         'clones' : clones,

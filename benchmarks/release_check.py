@@ -2,7 +2,8 @@
 MiTo 0.5.0 release check: package defaults only, from the readers, on every benchmark.
 
     make_afm -> filter_cells (defaults) -> filter_afm (defaults) -> UPGMA ->
-    annotate_clones (defaults; and small_clones=True)
+    clade_support (100 count replicates) -> annotate_clones (defaults; small_clones=True;
+    min_support=0.5)
 
     MDA_clones / lung / PT   MAESTER, GBC truth (current reader, filter2 cells)
     pL1000 ReDeeM            redeemV (edge_trim 9 default), LARRY truth
@@ -40,20 +41,26 @@ def run(afm, truth, strata, **meta):
     t0 = time.time()
     afm = afm.copy()
     mt.pp.filter_afm(afm)
+    t_filter = time.time() - t0
     tree = mt.tl.build_tree(afm, solver='UPMGA')
+    t_tree = time.time() - t0 - t_filter
+    sup = mt.tl.clade_support(tree, afm, n_boot=100)
+    t_support = time.time() - t0 - t_filter - t_tree
     rows = []
-    for d2 in (False, True):
-        mt.tl.annotate_clones(tree, afm, small_clones=d2)
+    for d2, ms in ((False, None), (True, None), (False, 0.5)):
+        mt.tl.annotate_clones(tree, afm, small_clones=d2, min_support=ms)
         lab = afm.obs['MiTo_clone'].astype(str)
-        row = dict(**meta, D2=d2, version=mt.__version__, n_chars=afm.shape[1],
-                   cells_kept=afm.shape[0], secs=round(time.time() - t0),
+        row = dict(**meta, D2=d2, min_support=ms, version=mt.__version__, n_chars=afm.shape[1],
+                   cells_kept=afm.shape[0], secs_filter=round(t_filter, 1), secs_tree=round(t_tree, 1),
+                   secs_support=round(t_support, 1), median_support=round(float(sup.median()), 3),
                    **me.partition_scores(lab, truth))
         sets = [set(lab.index[lab == L]) for L in lab.unique() if L != me.UNASSIGNED]
         if strata is not None and sets:
             pr = me.clade_pr(truth, sets, strata=strata).iloc[0]
             row.update({k: pr[k] for k in pr.index if k.startswith(('recall', 'precision'))})
         rows.append(row)
-        print({k: row.get(k) for k in ('dataset', 'seed', 'D2', 'n_chars', 'cells_kept', 'yield_',
+        print({k: row.get(k) for k in ('dataset', 'seed', 'D2', 'min_support', 'secs_filter', 'secs_support',
+                                         'n_chars', 'cells_kept', 'yield_',
                                          'ARI', 'ARI_all', 'recall')}, flush=True)
     return rows
 
@@ -82,9 +89,11 @@ def main():
             afm = sc.read(cache)
         else:
             afm = ds._to_gex(mt.io.make_afm(ds.PL1000, scLT_system='mtscATAC', pp_method='mgatk'), truth)
+            afm.write(cache)
         mt.pp.filter_cells(afm)
         rows += run(afm, truth, strata, dataset='pL1000_mtscATAC', cells_in=afm.shape[0],
-                    reads_per_molecule=afm.uns['reads_per_molecule'])
+                    reads_per_molecule=afm.uns['molecules']['reads_per_molecule'],
+                    alt_rule=afm.uns['molecules']['alt_rule'])
         pd.DataFrame(rows).to_csv(out, index=False)
     else:
         for nk, topo, seed in ds.SIM_GRID:

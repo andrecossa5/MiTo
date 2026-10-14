@@ -1,0 +1,4 @@
+dataset,n_cells,n_vars,old_secs,old_peak_mb,old_kept,new_secs,new_peak_mb,new_kept,kept_jaccard,p_spearman,speedup
+PT,2754,497,35.5,1043,112,3.3,1270,110,0.965,0.913,10.8
+ReDeeM,3317,1000,86.6,1164,654,3.3,930,627,0.953,0.857,26.2
+mtscATAC,3697,684,81.3,1279,415,3.4,958,411,0.971,0.927,23.9

@@ -6,11 +6,14 @@ import logging
 from typing import Any
 
 import cassiopeia as cs
+import networkx as nx
 import numpy as np
 import pandas as pd
 from anndata import AnnData
 from cassiopeia.data import CassiopeiaTree
+from scipy.cluster.hierarchy import linkage
 from scipy.sparse import csr_matrix
+from scipy.spatial.distance import squareform
 
 from mito.pp.distances import compute_distances
 
@@ -103,6 +106,37 @@ def AFM_to_seqs(afm: AnnData) -> dict[str,str]:
 ##
 
 
+def upgma_linkage(D: np.ndarray) -> np.ndarray:
+    """UPGMA (average linkage) of a square distance matrix, as a scipy linkage matrix."""
+
+    D = np.asarray(D, dtype=float)
+    D = (D + D.T) / 2
+    np.fill_diagonal(D, 0.)
+
+    return linkage(squareform(D, checks=False), method='average')
+
+
+def linkage_to_graph(Z: np.ndarray, names) -> nx.DiGraph:
+    """
+    Rooted binary tree of a linkage matrix, with the leaves named `names`, internal nodes
+    "node<i>" and the root "root", as cassiopeia's solvers name them.
+    """
+
+    n = len(names)
+    label = list(names) + [f'node{i}' for i in range(n, 2*n-1)]
+    label[-1] = 'root'
+    G = nx.DiGraph()
+    for i, (a, b, _, _) in enumerate(Z):
+        parent = label[n+i]
+        G.add_edge(parent, label[int(a)])
+        G.add_edge(parent, label[int(b)])
+
+    return G
+
+
+##
+
+
 def build_tree(
     afm: AnnData,
     distance_key: str = 'distances',
@@ -126,7 +160,10 @@ def build_tree(
     metric : str, optional
         Distance metric, if distances need to be computed. Default is "weighted_jaccard".
     solver : str, optional
-        Lineage solver to use. Default is "UPMGA".
+        Lineage solver to use. Default is "UPMGA": average linkage on the distances,
+        computed with scipy (the same tree as cassiopeia's UPGMASolver up to the order of
+        tied merges, in a fraction of the time). "NJ", "spectral", "greedy" and the other
+        cassiopeia solvers are run through cassiopeia.
     ncores : int, optional
         Number of cores to use for computation. Default is 1.
     min_n_positive_cells : int, optional
@@ -164,12 +201,16 @@ def build_tree(
     metric = afm.uns['distances'][distance_key]['metric']
     logging.info(f'Build tree: metric={metric}, solver={solver}')
     np.random.seed(1234)
-    tree = cs.data.CassiopeiaTree(character_matrix=M, dissimilarity_map=D, cell_meta=afm.obs)
-    _solver = solver_d[solver]
-    kwargs = _solver_kwargs[solver]
-    kwargs.update(solver_kwargs)
-    solver = _solver(**kwargs)
-    solver.solve(tree)
+    if solver == 'UPMGA' and not solver_kwargs:
+        G = linkage_to_graph(upgma_linkage(D.loc[M.index, M.index].values), list(M.index))
+        tree = cs.data.CassiopeiaTree(tree=G, character_matrix=M, dissimilarity_map=D, cell_meta=afm.obs)
+    else:
+        tree = cs.data.CassiopeiaTree(character_matrix=M, dissimilarity_map=D, cell_meta=afm.obs)
+        _solver = solver_d[solver]
+        kwargs = dict(_solver_kwargs[solver])
+        kwargs.update(solver_kwargs)
+        solver = _solver(**kwargs)
+        solver.solve(tree)
 
     # Add layers to CassiopeiaTree
     tree.layers['raw'] = M_raw

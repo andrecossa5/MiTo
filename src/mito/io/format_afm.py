@@ -273,10 +273,20 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
 
     `molecules` (default: for mtscATAC) converts read counts to molecules. mtscATAC reads
     are not UMI-collapsed: a molecule covered by both mates of a short fragment is counted
-    twice, and sequencing errors are single reads. Alternative molecules are those seen by
-    both mates, min(forward, reverse), and coverage is reads / f, with f the reads per
-    molecule estimated from the strand counts (`_reads_per_molecule`), stored in
-    .uns["reads_per_molecule"].
+    twice, and sequencing errors are single reads. From the strand counts alone:
+
+    1. f, the reads per molecule, and o = f - 1, the fraction of molecules read by both
+       mates, are estimated (`_reads_per_molecule`; PCR duplicates must have been removed
+       upstream, as mgatk does by default);
+    2. coverage = reads / f;
+    3. alternative molecules = min(forward, reverse) if most molecules are read by both
+       mates (o >= 0.5): an alternative base seen on one read only is, most of the time,
+       a sequencing error (on pL1000, 70% of the background against 11% of the real
+       molecules), and a real one is kept with probability ~o. With fewer overlapping
+       mates (single-end reads, long fragments) strand confirmation would discard most
+       real molecules, so alternative molecules = rint(alternative reads / f).
+
+    f, o and the rule used are stored in .uns["molecules"].
     """
 
     if molecules is None:
@@ -339,10 +349,18 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
     logging.info(f'Alternative basecalls: {long.shape[0]}')
     if not multi_allelic_sites:
         long = _dominant_alt(long)
+    rule = None
     if molecules:
-        long['AD'] = np.minimum(long['count_fw'], long['count_rev'])
+        rule = 'both_strands' if f - 1 >= 0.5 else 'reads_over_f'
+        if rule == 'both_strands':
+            long['AD'] = np.minimum(long['count_fw'], long['count_rev'])
+        else:
+            long['AD'] = np.rint(long['AD'] / f).astype(int)
         long = long.query('AD>0').copy()
-        logging.info(f'Alternative molecules read by both mates: {long.shape[0]} (cell, variant) pairs')
+        logging.info(
+            f'Alternative molecules ({rule}, {f - 1:.0%} of molecules read by both mates): '
+            f'{long.shape[0]} (cell, variant) pairs'
+        )
 
     # Coverage, for every cell and site
     logging.info('Retrieve cell-site total coverage')
@@ -370,7 +388,7 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
 
     afm = _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=quality)
     if molecules:
-        afm.uns['reads_per_molecule'] = f
+        afm.uns['molecules'] = {'reads_per_molecule':f, 'frac_both_mates':f - 1, 'alt_rule':rule}
 
     return afm
 
@@ -579,10 +597,11 @@ def make_afm(
         By default only the dominant one is kept: sequencing error alone puts all three
         alleles at nearly every site of a large dataset. Default is False.
     molecules : bool, optional
-        maegatk / mgatk tables only: convert read counts to molecules (alternative
-        molecules read by both mates; coverage divided by the reads per molecule, estimated
-        from the strand counts). None (default) decides from the assay: on for mtscATAC,
-        whose reads are not UMI-collapsed, off for MAESTER (UMI consensus counts).
+        maegatk / mgatk tables only: convert read counts to molecules, from the strand
+        counts (reads per molecule, then alternative molecules read by both mates, or
+        alternative reads / reads per molecule when few fragments have overlapping mates).
+        None (default) decides from the assay: on for mtscATAC, whose reads are not
+        UMI-collapsed, off for MAESTER (UMI consensus counts).
     **kwargs
         Reader-specific options (RedeemV: `edge_trim`, default 9; `treshold`, default
         "Sensitive").

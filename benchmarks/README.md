@@ -46,6 +46,8 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `mgatk_mechanism.py` | why dedup works: min2 reads, continuous scaling, beta-binomial | `mgatk_mechanism.csv` |
 | `filter2_port.py [--entries]` | redeemR Filter-2 in Python on raw redeemV; validation vs the deposited matrix | `filter2_port_*.csv` |
 | `redeem_e2e.py` | MiTo on ReDeeM: deposited Filter-2, port (χ²/Tarone, all vs labelled cells), current reader | `redeem_e2e.csv` |
+| `redeem_small.py` | ReDeeM small clones: genotyping (binom 1e-3/1e-2/any molecule) x clonality on/off x tau x min_cells x D2, Filter-2 port on all cells | `redeem_small.csv` |
+| `redeem_compare.py` | MitoDrift vs MiTo 0.3.0 vs proposed MiTo, same LARRY cells and metrics | `redeem_compare.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)
@@ -109,6 +111,17 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 - The current reader is better on ARI_all on all three datasets: clones .647→.746, lung .896→.904, PT .370→.394.
 - ARI on assigned cells drops on clones (.929→.877) and PT (.830→.759), for +18 and +8 points of yield.
 
+## Results (2026-10-14): ReDeeM small clones and the three-way comparison
+
+- **Partition vs clade scoring.** MitoDrift's 75% recall counts every confident tree node. Scored as a partition (as MiTo is), MitoDrift gets 53.5% at tau .125 (smallest clones 44%, precision .80, ARI_all .632) and 62.5% at tau .25 (54%, .89, .635).
+- **Single-molecule binary calls are a dead end.** Binomial 1e-2 or AD>=1 drops ARI to ~0.50 and breaks the large clones.
+- **The clonality filter is redundant after Filter-2 and costs small clones.** Turning it off raises tree recall 68%→77% (smallest 64%→79%). Large clones split more, so it stays on by default.
+- **D2 on ReDeeM:** +6–10 pts recall, +13–20 pts on the smallest clones, ~-0.06 precision, ARI_all neutral. min_cells=3 is worse than D2.
+- **Proposed MiTo** (Filter-2 front end, MiTo candidate thresholds opened, clonality on, tau .25, D2) on MitoDrift's exact input: ARI .866, ARI_all **.662** (MitoDrift .632/.635), precision .75, recall 51% (77/61/39% by stratum), yield 63%, 13 s.
+- **On all ~4k cells:** ARI_all .612, recall 57%.
+- **MiTo 0.3.0 defaults from raw redeemV:** ARI_all .593, recall 51%, precision .71.
+- **Remaining gap:** yield and small-clone precision. MiTo's tree has no clade confidence (tree precision .45 vs .77), so this is the bootstrap clade-support question.
+
 ## Decisions taken
 
 - Plan:
@@ -128,7 +141,8 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
    - calls only for the annotation.
 
    Compare with `read_scale` alone. Not run yet.
-2. **D2: undecided.** Proposed test first: let single molecules count at clean sites on ReDeeM (point 2 above), and report small private-marker cherries.
+2. **D2:** undecided; it helps on ReDeeM (see above). Also open: whether to add clade confidence (bootstrap support).
+   Earlier note: Proposed test first: let single molecules count at clean sites on ReDeeM (point 2 above), and report small private-marker cherries.
 
 ## Next (Phase 2, after the open questions)
 

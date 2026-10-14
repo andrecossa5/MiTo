@@ -7,9 +7,10 @@ result (redeemV coverage >= 10, 3,721 cells), so the two assays compare directly
     od_raw+scaled      ... calls on duplicate-scaled counts (AD/f, DP/f, continuous tail)
     od_scaled+scaled   over-dispersion test on rounded AD/f, DP/f too; then as above
 
-f = 2 (any f in 1.5-4 worked for genotyping, mgatk_dup.py).
+f = 2 by default (any f in 1.5-4 worked for genotyping, mgatk_dup.py); `--f 1.66` is the
+value estimated from the strand counts (mgatk_dupfactor.py).
 
-Usage: python mgatk_unified.py      -> results/mgatk_unified.csv
+Usage: python mgatk_unified.py [--f F]     -> results/mgatk_unified[_fF].csv
 """
 
 import logging
@@ -35,7 +36,8 @@ from mgatk_e2e import OPEN  # noqa: E402
 from mgatk_mechanism import cont_sf, generic_caller  # noqa: E402
 
 RESULTS = os.path.join(os.path.dirname(__file__), 'results')
-F = 2.0
+F = float(sys.argv[sys.argv.index('--f') + 1]) if '--f' in sys.argv else 2.0
+OUT = os.path.join(RESULTS, 'mgatk_unified.csv' if F == 2.0 else f'mgatk_unified_f{F}.csv')
 scaled_caller = generic_caller(lambda A, N, p: cont_sf(A / F, N / F, p))
 
 
@@ -62,13 +64,24 @@ def main():
     meta = dict(dataset='pL1000_mgatk_redeem_cells')
 
     rows = []
+    if F != 2.0:                     # the thresholds / od_raw rows do not depend on f
+        ab.CONFIGS = {'od_raw+scaled': ({'candidates': 'overdispersion'}, {'call_genotypes': scaled_caller})}
+        rows += ab.run(afm, truth, strata, f=F, **meta)
+        pd.DataFrame(rows).to_csv(OUT, index=False)
+        pre = scaled_test_afm(afm)
+        ab.CONFIGS = {'od_scaled+scaled': ({'candidates': 'thresholds', 'min_snr': 0, **OPEN},
+                                           {'call_genotypes': scaled_caller})}
+        rows += ab.run(pre, truth, strata, f=F, **meta)
+        pd.DataFrame(rows).to_csv(OUT, index=False)
+        print('ALL DONE', flush=True)
+        return
     ab.CONFIGS = {
         'thresholds': ({'candidates': 'thresholds'}, {}),
         'od_raw': ({'candidates': 'overdispersion'}, {}),
         'od_raw+scaled': ({'candidates': 'overdispersion'}, {'call_genotypes': scaled_caller}),
     }
     rows += ab.run(afm, truth, strata, **meta)
-    pd.DataFrame(rows).to_csv(os.path.join(RESULTS, 'mgatk_unified.csv'), index=False)
+    pd.DataFrame(rows).to_csv(OUT, index=False)
 
     # Test on scaled counts, then the downstream with candidate thresholds open
     pre = scaled_test_afm(afm)
@@ -77,7 +90,7 @@ def main():
                              {'call_genotypes': scaled_caller}),
     }
     rows += ab.run(pre, truth, strata, **meta)
-    pd.DataFrame(rows).to_csv(os.path.join(RESULTS, 'mgatk_unified.csv'), index=False)
+    pd.DataFrame(rows).to_csv(OUT, index=False)
     print('ALL DONE', flush=True)
 
 

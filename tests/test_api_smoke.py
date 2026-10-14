@@ -20,7 +20,8 @@ EXPORTS = {
     "io": ["make_afm", "read_coverage", "read_newick", "write_newick"],
     "pp": [
         "filter_cells", "filter_afm",
-        "annotate_vars", "filter_low_quality_variants", "filter_candidate_variants",
+        "annotate_vars", "filter_low_quality_variants", "filter_overdispersed_variants",
+        "cap_candidates",
         "filter_known_artefacts", "call_genotypes", "filter_non_clonal_variants",
         "filter_low_signal_variants", "impute_dropouts", "filter_incompatible_variants",
         "compute_distances", "kNN_graph", "reduce_dimensions",
@@ -28,7 +29,7 @@ EXPORTS = {
     ],
     "tl": [
         "build_tree", "coarse_grained_tree", "AFM_to_seqs",
-        "annotate_clones", "evidence_cut", "clone_support", "rescue_unassigned",
+        "annotate_clones", "evidence_cut", "clone_support", "rescue_unassigned", "small_clone_pass",
         "compute_clonal_fate_bias", "compute_scPlasticity", "compute_fitness",
         "compute_expansions", "bootstrap_MiTo", "bootstrap_bin", "leiden_clustering",
     ],

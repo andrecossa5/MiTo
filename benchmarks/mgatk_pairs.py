@@ -70,7 +70,7 @@ def main():
     cells = rv.obs_names[rv.obs['mean_site_coverage'].values >= 10]
     d = ms.load()
     strata = me.size_strata(truth)
-    ab.CONFIGS = {'unified': ({'candidates': 'overdispersion'}, {})}
+    ab.CONFIGS = {'unified': ({}, {})}
     rows = []
     for name, alt, f in (('pairs', 'pairs', F_EST), ('pairs_f2', 'pairs', 2.0), ('reads_f1.66', 'reads', F_EST)):
         afm = molecule_afm(d, cells, alt, f)

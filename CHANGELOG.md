@@ -2,29 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.5.0] - 2026-10-14
+One pipeline for the three MT-scLT assays: every AFM holds molecule counts, and
+`filter_afm` runs the same stages with the same defaults on MAESTER, ReDeeM and
+mtscATAC.
+
 ### Added
 - **Over-dispersion candidate stage** (`mt.pp.filter_overdispersed_variants`), the
-  variant-level part of redeemR Filter-2 (MitoDrift's input): carriers >= 2, no
-  homoplasmy, chi-square test of the per-cell counts against one binomial (q <= .05),
-  blacklisted regions and RSRS50 ancestral variants removed, median depth >= 5. Default
-  candidate stage of `filter_afm` for MAESTER and ReDeeM (`candidates=`); mtscATAC
-  keeps the read-level thresholds.
-- **`max_candidates=1000`** in `filter_afm` (`mt.pp.cap_candidates`): the most
-  over-dispersed candidates are kept, with a warning.
+  variant-level part of redeemR Filter-2 (MitoDrift's input): >= 2 carriers, no
+  homoplasmy, chi-square test of the per-cell counts against one binomial at the
+  site's depth (Storey q <= .05), blacklisted regions and RSRS50 ancestral variants
+  removed, median depth >= 5. Markers of two-cell clones stay testable.
+- **`max_candidates=1000`** in `filter_afm` (`mt.pp.cap_candidates`): at most this
+  many candidates, the most over-dispersed, with a warning.
+- **mtscATAC as molecule counts.** `make_afm` converts mgatk read counts for
+  mtscATAC (`molecules=None` -> on): alternative molecules are those read by both
+  mates, min(forward, reverse), and coverage is reads / f, with the reads per
+  molecule f estimated from the strand counts and stored in
+  `.uns["reads_per_molecule"]` (1.66 on pL1000, 1.73 from ReDeeM molecules of the
+  same cells).
 - **Small-clone pass** (`mt.tl.small_clone_pass`, `annotate_clones(small_clones=True)`,
   off by default): a character carried by 2-4 cells that are exactly a clade becomes
   a clone.
+- `make_afm(multi_allelic_sites=True)`: keep every alternative allele of a site.
+
 ### Changed
-- **Reader**: one alternative allele per site, the dominant one;
-  `make_afm(multi_allelic_sites=True)` keeps every allele (as redeemR). The quality
-  filter no longer drops sites with several alleles.
-- RedeemV reader: `edge_trim=9` by default (redeemR Filter-2; was 4).
+- **Reader**: one alternative allele per site by default, the dominant one;
+  `migrate_afm` applies the same rule to AFMs written by MiTo < 0.3
+  (`multi_allelic_sites=True` keeps every allele).
+- RedeemV reader: `edge_trim=9` by default (redeemR; was 4).
 - `filter_cells(mean_cov_all=10)` (was 20): redeemR's qualified cells. MAESTER's
   `filter2` is unaffected.
-- `filter_afm(filter_artefacts=None)`: dbSNP / REDIdb filter on for MAESTER only.
-- `filter_afm(min_snr=None)`: the signal-to-background filter runs after the
-  threshold candidate stage only (`.var['snr']` is still written).
+- `filter_afm(filter_artefacts=None)`: dbSNP / REDIdb filter on for MAESTER (RNA)
+  only.
+- The signal-over-background ratio is annotated (`.var["snr"]`, used to rank
+  conflicting characters) but no longer filtered on.
+
+### Removed
+- The read-threshold candidate stage: `mt.pp.filter_candidate_variants` and the
+  `filter_afm` parameters `cand_min_site_cov`, `cand_min_frac_negative`,
+  `cand_min_n_positive`, `cand_af_confident`, `cand_min_n_confident`,
+  `cand_min_AD_in_positives`, `cand_min_DP_in_positives`, and `min_snr`.
+- The multi-allelic site drop of `filter_low_quality_variants` and of the AFM
+  builder (the reader decides, `multi_allelic_sites`).
+- Unused helpers `mt.ut.ji`, `mt.ut.flatten_dict`, `mt.ut.update_params`.
 
 ## [0.3.0] - 2026-09-21
 ### Changed

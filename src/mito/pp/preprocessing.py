@@ -19,7 +19,6 @@ from .genotyping import call_genotypes, filter_low_signal_variants, impute_dropo
 from .variant_filters import (
     annotate_vars,
     cap_candidates,
-    filter_candidate_variants,
     filter_known_artefacts,
     filter_low_quality_variants,
     filter_overdispersed_variants,
@@ -126,24 +125,15 @@ def filter_afm(
     lineage_column: str = None,
     min_cell_number: int = 0,
     # 1. candidate MT-SNVs
-    candidates: str = None,
     max_candidates: int = 1000,
     cand_min_cell_coverage: float = 10,
     cand_q_max: float = 0.05,
-    cand_min_site_cov: int = 5,
     cand_min_quality: int = 30,
-    cand_min_frac_negative: float = 0.5,
-    cand_min_n_positive: int = 5,
-    cand_af_confident: float = 0.01,
-    cand_min_n_confident: int = 2,
-    cand_min_AD_in_positives: float = 1.25,
-    cand_min_DP_in_positives: float = 10,
     cand_only_genes: bool = None,
     filter_artefacts: bool = None,
     # 2-4. genotyping and variant QC
     qc_alpha: float = 0.05,
     geno_alpha: float = 1e-3,
-    min_snr: float = None,
     # 5. dropout imputation
     impute: bool = False,
     # 6. characters
@@ -160,20 +150,19 @@ def filter_afm(
 
     The pipeline runs, in this order:
 
-    1. **candidate MT-SNVs**: which variants are worth testing at all. Either an
-       over-dispersion test of the per-cell counts (`mito.pp.filter_overdispersed_variants`,
-       redeemR Filter-2) or read-level thresholds (`mito.pp.filter_candidate_variants`);
-       then `mito.pp.filter_low_quality_variants`, `mito.pp.filter_known_artefacts`, and at
-       most `max_candidates` variants (`mito.pp.cap_candidates`).
+    1. **candidate MT-SNVs**: variants whose per-cell molecule counts are over-dispersed
+       relative to sequencing noise (`mito.pp.filter_overdispersed_variants`, redeemR
+       Filter-2), the same test for every assay; then `mito.pp.filter_low_quality_variants`,
+       `mito.pp.filter_known_artefacts`, and at most `max_candidates` variants
+       (`mito.pp.cap_candidates`).
     2. **provisional genotypes** (`mito.pp.call_genotypes` at `geno_alpha`/10): stricter
        calls, so that the graph the QC runs on is not built out of noise.
     3. **clonality filter** (`mito.pp.filter_non_clonal_variants`): keeps the variants whose
        carriers are clustered on the cell kNN graph, or mutually exclusive with the other
        variants' carriers. Replaces the Moran's I filter of the published pipeline.
-    4. **final genotypes** (`mito.pp.call_genotypes` at `geno_alpha`) and, after the
-       "thresholds" candidate stage only, the signal-to-background filter
-       (`mito.pp.filter_low_signal_variants`): the over-dispersion test already removes
-       what it would.
+    4. **final genotypes** (`mito.pp.call_genotypes` at `geno_alpha`), and each variant's
+       signal over background (.var["snr"], `mito.pp.filter_low_signal_variants`), which
+       the compatibility filter uses to rank conflicting characters.
     5. **dropout imputation** (`mito.pp.impute_dropouts`), optional.
     6. **characters**: prevalence cap, at least two calls, and four-gamete compatibility
        (`mito.pp.filter_incompatible_variants`); then cell-cell distances.
@@ -193,22 +182,16 @@ def filter_afm(
         categories is computed and stored in .var. Default is None.
     min_cell_number : int, optional
         Minimum number of cells per category of `lineage_column`. Default is 0.
-    candidates : str, optional
-        Candidate stage: "overdispersion" or "thresholds". None (default) decides from the
-        assay: "overdispersion" for molecule counts (MAESTER, ReDeeM), "thresholds" for
-        read counts (mtscATAC), whose PCR duplicates make any count look over-dispersed.
     max_candidates : int, optional
         Keep at most this many candidates, the most over-dispersed ones, with a warning.
         Time and memory of the clonality filter grow with it. None disables the cap.
         Default is 1000.
     cand_min_cell_coverage : float, optional
-        "overdispersion" only: mean MT coverage of the cells the test is computed on.
-        Default is 10.
+        Mean MT coverage of the cells the over-dispersion test is computed on. Default is 10.
     cand_q_max : float, optional
-        "overdispersion" only: maximum q-value of the test. Default is 0.05.
-    cand_min_site_cov, cand_min_quality, cand_min_frac_negative, cand_min_n_positive, cand_af_confident, cand_min_n_confident, cand_min_AD_in_positives, cand_min_DP_in_positives
-        "thresholds" only (`cand_min_quality` also applies to "overdispersion"): candidate
-        MT-SNVs thresholds. See `mito.pp.filter_candidate_variants`.
+        Maximum q-value of the over-dispersion test. Default is 0.05.
+    cand_min_quality : int, optional
+        Minimum mean base quality, where the AFM has one. Default is 30.
     cand_only_genes : bool, optional
         Restrict to MT-SNVs inside MT-gene bodies. None (default) decides from the AFM:
         on for targeted assays, which only enrich that region, off for assays covering
@@ -218,15 +201,16 @@ def filter_afm(
         assay: on for MAESTER, which sequences RNA, off for DNA assays (mtscATAC, ReDeeM),
         where RNA edits do not exist and the over-dispersion stage's homoplasmy and
         carrier-fraction rules already remove common germline variants.
+
+    mtscATAC AFMs must hold molecule counts, as `mito.io.make_afm` builds them (alternative
+    molecules read by both mates, coverage in molecules): on raw read counts, overlapping
+    mates make every site look over-dispersed.
     qc_alpha : float, optional
         Significance of the clonality filter. This sets the smallest clone that can be
         kept: markers of very small clones cannot reach small permutation p-values.
         Default is 0.05.
     geno_alpha : float, optional
         Significance of the per-cell genotyping test. Default is 1e-3.
-    min_snr : float, optional
-        Minimum signal-to-background ratio of a variant. None (default) decides from the
-        candidate stage: 10 after "thresholds", skipped after "overdispersion". 0 skips it.
     impute : bool, optional
         Impute genotype dropouts from each cell's neighbourhood. Dataset-dependent: it
         buys coverage at some cost in precision. Default is False.
@@ -276,27 +260,18 @@ def filter_afm(
         cand_only_genes = 'median_target_site_coverage' in afm.obs.columns
         logging.info(f'Restrict to MT-gene bodies: {cand_only_genes}')
 
-    if candidates is None:
-        candidates = 'thresholds' if afm.uns.get('scLT_system') == 'mtscATAC' else 'overdispersion'
-        logging.info(f'Candidate stage: {candidates}')
-    if candidates not in ('overdispersion', 'thresholds'):
-        raise ValueError(f'candidates must be "overdispersion" or "thresholds". Provided: {candidates}')
     if filter_artefacts is None:
         filter_artefacts = afm.uns.get('scLT_system') == 'MAESTER'
-    if min_snr is None:
-        min_snr = 10.0 if candidates == 'thresholds' else 0
 
-    if candidates == 'overdispersion':
-        # Tested first, on every variant: the q-values are over the whole genome, and the
-        # test brings its own coverage requirement (median depth at the site)
-        n0 = afm.shape[1]
-        filter_overdispersed_variants(afm, min_cell_coverage=cand_min_cell_coverage, q_max=cand_q_max)
-        _record('over-dispersion filter', n0)
+    # Tested first, on every variant: the q-values are over the whole genome, and the
+    # test brings its own coverage requirement (median depth at the site)
+    n0 = afm.shape[1]
+    filter_overdispersed_variants(afm, min_cell_coverage=cand_min_cell_coverage, q_max=cand_q_max)
+    _record('over-dispersion filter', n0)
 
     n0 = afm.shape[1]
     filter_low_quality_variants(
-        afm, min_site_cov=cand_min_site_cov if candidates == 'thresholds' else 0,
-        min_var_quality=cand_min_quality, only_genes=cand_only_genes
+        afm, min_site_cov=0, min_var_quality=cand_min_quality, only_genes=cand_only_genes
     )
     _record('quality filter', n0)
     if afm.shape[1] == 0 or afm.shape[0] == 0:
@@ -304,24 +279,9 @@ def filter_afm(
         # otherwise fail on an empty object rather than say what went missing.
         raise ValueError(
             f'Nothing left after the quality filter ({afm.shape[0]} cells, {afm.shape[1]} '
-            f'MT-SNVs): relax the cand_min_site_cov / cand_min_quality thresholds, or '
-            f'check that the input AFM has any alternative allele at all.'
+            f'MT-SNVs): relax cand_q_max / cand_min_quality, or check that the input AFM '
+            f'has any alternative allele at all.'
         )
-
-    if candidates == 'thresholds':
-        n0 = afm.shape[1]
-        filter_candidate_variants(
-            afm,
-            min_cov=cand_min_site_cov,
-            min_var_quality=cand_min_quality,
-            min_frac_negative=cand_min_frac_negative,
-            min_n_positive=cand_min_n_positive,
-            af_confident_detection=cand_af_confident,
-            min_n_confidently_detected=cand_min_n_confident,
-            min_mean_AD_in_positives=cand_min_AD_in_positives,
-            min_mean_DP_in_positives=cand_min_DP_in_positives,
-        )
-        _record('candidate filter', n0)
 
     if filter_artefacts:
         n0 = afm.shape[1]
@@ -335,8 +295,8 @@ def filter_afm(
 
     if afm.shape[1] == 0:
         raise ValueError(
-            'No candidate MT-SNV survived the read-level filters. Relax the cand_* '
-            'thresholds, or check that the input AFM has enough signal.'
+            'No candidate MT-SNV survived the candidate filters. Relax cand_q_max, or '
+            'check that the input AFM has enough signal.'
         )
 
     # 2-3. Provisional genotypes, then the clonality filter. The QC runs on stricter
@@ -353,12 +313,11 @@ def filter_afm(
             f'tree. Raise qc_alpha, or relax the candidate filters.'
         )
 
-    # 4. Final genotypes, and signal over background
+    # 4. Final genotypes, and signal over background: annotated, not filtered on (the
+    # over-dispersion test already removed what a threshold would); the compatibility
+    # filter ranks conflicting characters by it
     call_genotypes(afm, alpha=geno_alpha)
-    n0 = afm.shape[1]
-    filter_low_signal_variants(afm, min_snr=min_snr)    # min_snr=0 only annotates .var['snr']
-    if min_snr:
-        _record('signal-to-background filter', n0)
+    filter_low_signal_variants(afm, min_snr=0)
 
     # 5. Dropout imputation
     if impute:
@@ -416,18 +375,12 @@ def filter_afm(
     record(afm, 'filter_afm', {
         'params' : {
             'candidates' : {
-                'method':candidates, 'max_candidates':max_candidates,
-                'min_cell_coverage':cand_min_cell_coverage, 'q_max':cand_q_max,
-                'min_site_cov':cand_min_site_cov, 'min_quality':cand_min_quality,
-                'min_frac_negative':cand_min_frac_negative, 'min_n_positive':cand_min_n_positive,
-                'af_confident':cand_af_confident, 'min_n_confident':cand_min_n_confident,
-                'min_AD_in_positives':cand_min_AD_in_positives,
-                'min_DP_in_positives':cand_min_DP_in_positives,
+                'max_candidates':max_candidates, 'min_cell_coverage':cand_min_cell_coverage,
+                'q_max':cand_q_max, 'min_quality':cand_min_quality,
                 'only_genes':cand_only_genes, 'filter_artefacts':filter_artefacts
             },
             'genotyping' : {'alpha':geno_alpha, 'alpha_qc':geno_alpha/10},
             'clonality' : {'alpha':qc_alpha, 'seed':seed},
-            'signal' : {'min_snr':min_snr},
             'imputation' : {'enabled':impute},
             'characters' : {'max_prevalence':max_prevalence, 'min_calls':2, 'min_n_var':min_n_var},
         },

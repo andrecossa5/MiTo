@@ -1,5 +1,5 @@
 """
-Read-level MT-SNVs filters: annotation, quality, candidate selection, known artefacts.
+MT-SNVs filters: annotation, quality, over-dispersion candidates, known artefacts.
 """
 
 import logging
@@ -173,91 +173,6 @@ def filter_low_quality_variants(
 ##
 
 
-def filter_candidate_variants(
-    afm: AnnData,
-    min_cov: float = 5,
-    min_var_quality: float = 30,
-    min_frac_negative: float = 0.5,
-    min_n_positive: int = 5,
-    af_confident_detection: float = .01,
-    min_n_confidently_detected: int = 2,
-    min_mean_AD_in_positives: float = 1.25,
-    min_mean_DP_in_positives: float = 10,
-    copy: bool = False
-    ) -> AnnData | None:
-    """
-    Select candidate MT-SNVs from their read-level statistics.
-
-    Filters variants with:
-
-    * at least `min_cov` mean site coverage (across cells)
-    * at least `min_var_quality` mean base call quality (across cells)
-    * at least n cells * `min_frac_negative` negative cells
-    * at least `min_n_positive` cells with AF > 0
-    * at least `min_n_confidently_detected` cells with AF >= `af_confident_detection`
-    * at least `min_mean_AD_in_positives` mean AD in positive cells
-    * at least `min_mean_DP_in_positives` mean DP in positive cells
-
-    These thresholds only have to make a variant *worth testing*: whether its carriers
-    are a clone is decided downstream, by genotyping and by the clonality filter. They
-    are deliberately looser than the published MiTo defaults (mean DP in positives 25,
-    negative fraction 0.2, confident AF 0.02), which discarded real markers of small
-    clones before any test could see them.
-
-    Parameters
-    ----------
-    afm : AnnData
-        Allele Frequency Matrix.
-    min_cov : float, optional
-        Minimum mean site coverage. Default is 5.
-    min_var_quality : float, optional
-        Minimum mean base call quality. Default is 30.
-    min_frac_negative : float, optional
-        Minimum fraction of negative cells. Default is 0.5.
-    min_n_positive : int, optional
-        Minimum number of cells with AF > 0. Default is 5.
-    af_confident_detection : float, optional
-        AF threshold for a confident detection. Default is 0.01.
-    min_n_confidently_detected : int, optional
-        Cells required at that AF. Default is 2.
-    min_mean_AD_in_positives : float, optional
-        Minimum mean AD in positive cells. Default is 1.25.
-    min_mean_DP_in_positives : float, optional
-        Minimum mean DP in positive cells. Default is 10.
-    copy : bool, optional
-        Return a modified copy instead of updating `afm` in place. Default is False.
-
-    Returns
-    -------
-    AnnData | None
-        Updated AFM if `copy` is True, otherwise None.
-    """
-
-    afm = afm.copy() if copy else afm
-    annotate_vars(afm, overwrite=True)
-    # Kept local: these two counts only serve the thresholds below
-    n_negative = afm.shape[0] - (afm.X>0).sum(axis=0).A1
-    n_confident = (afm.X>=af_confident_detection).sum(axis=0).A1
-
-    test = (
-        (afm.var['mean_cov']>=min_cov) & \
-        (n_negative>=min_frac_negative*afm.shape[0]) & \
-        (afm.var['n_cells']>=min_n_positive) & \
-        (n_confident>=min_n_confidently_detected) & \
-        (afm.var['mean_AD_in_positives']>=min_mean_AD_in_positives) & \
-        (afm.var['mean_DP_in_positives']>=min_mean_DP_in_positives)
-    )
-    if 'quality' in afm.var.columns:
-        test &= afm.var['quality']>=min_var_quality
-
-    afm._inplace_subset_var(test.values)
-
-    return afm if copy else None
-
-
-##
-
-
 # rCRS regions of recurrent artefacts: the 303-315 and 513-525 homopolymers, the 3107N
 # reference gap, and the 16182-16193 homopolymer (redeemR blacklist).
 BLACKLIST_REGIONS = ((302, 315), (513, 525), (3105, 3109), (16182, 16187))
@@ -373,9 +288,8 @@ def filter_overdispersed_variants(
     * median depth >= `min_median_depth`, and carried by at most `max_carrier_frac` of
       the covered cells
 
-    Unlike `mito.pp.filter_candidate_variants`, no floor on the number of carriers above
-    two, nor on alt counts per carrier: markers of two-cell clones, seen once in each,
-    stay testable. Statistics are stored in .var (`od_stat`, `od_q`).
+    No floor on the number of carriers above two, nor on alt counts per carrier: markers
+    of two-cell clones, seen once in each, stay testable. Statistics are stored in .var (`od_stat`, `od_q`).
 
     Parameters
     ----------

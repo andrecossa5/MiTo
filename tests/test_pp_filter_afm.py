@@ -42,7 +42,7 @@ def test_internal_qc_statistics_are_not_persisted(afm_filtered):
 def test_provenance_is_one_record(afm_filtered):
     record = afm_filtered.uns["mito"]["filter_afm"]
     assert set(record) == {"params", "flow", "converged", "n_cells_in", "n_cells_out", "seconds"}
-    assert set(record["params"]) == {"candidates", "genotyping", "clonality", "signal",
+    assert set(record["params"]) == {"candidates", "genotyping", "clonality",
                                      "imputation", "characters"}
     assert record["converged"] is True
     assert record["n_cells_out"] == afm_filtered.shape[0]
@@ -152,7 +152,7 @@ def test_is_keyword_only_after_the_afm(afm):
 def test_no_candidate_variant_is_explained():
     a = build_afm(markers_per_clone=0, error_rate=0.0, seed=11)
     mt.pp.filter_cells(a, cell_filter="filter2")
-    with pytest.raises(ValueError, match="cand_min_site_cov|cand_"):
+    with pytest.raises(ValueError, match="cand_q_max"):
         mt.pp.filter_afm(a, ncores=1)
 
 

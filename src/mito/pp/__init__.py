@@ -9,7 +9,6 @@ from .variant_filters import (
     annotate_vars,
     cap_candidates,
     compute_lineage_biases,
-    filter_candidate_variants,
     filter_known_artefacts,
     filter_low_quality_variants,
     filter_overdispersed_variants,
@@ -21,7 +20,7 @@ __all__ = [
     # main entry points
     "filter_cells", "filter_afm",
     # single stages
-    "annotate_vars", "filter_low_quality_variants", "filter_candidate_variants",
+    "annotate_vars", "filter_low_quality_variants",
     "filter_overdispersed_variants", "cap_candidates",
     "filter_known_artefacts", "call_genotypes", "filter_non_clonal_variants",
     "filter_low_signal_variants", "impute_dropouts", "filter_incompatible_variants",

@@ -1,16 +1,37 @@
-# MiTo finalization benchmarks — status and how to resume
+# MiTo benchmarks — status and how to resume
 
-Last updated: 2026-10-14. Branch `scverse`, on top of `c441938` (0.3.0).
-Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md` (Phases 0–3); user notes in `PLAN.md` (repo root, untracked).
+Last updated: 2026-10-14. Branch `scverse`. **MiTo 0.5.0** is implemented (one pipeline for MAESTER, ReDeeM and mtscATAC). Its release check is `release_check.py`; results are below.
+Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md`; user notes in `PLAN.md` (repo root, untracked).
 
-**Where we are:** Phase 0 (data + harness) and Phase 1 (analyses) are done. Phase 2 (package changes) has **not** started. It waits on the open questions at the bottom.
+**API note:** the scripts before `release_check.py` were written against the development API. That API still had the read-threshold candidate stage (`candidates=`, `cand_min_*`, `min_snr`), which 0.5.0 removes.
+- They reproduce at commit `373cbb3` (`git checkout 373cbb3 -- src` in a scratch worktree).
+- `release_check.py`, `final_compare.py` and `mgatk_pairs.py` run on 0.5.0.
 
----
+## Release check (0.5.0, package defaults only, from the readers)
+
+`python benchmarks/release_check.py mda|pl1000|sims`. Values are ARI / ARI_all, small-clone pass off (on).
+
+| Dataset | 0.5.0 | 0.3.0 | Reference |
+|---|---|---|---|
+| MDA_clones | .896 / .758 | .929 / .647 (70% assigned) | paper .967 |
+| MDA_lung | .958 / .903 | .960 / .896 | paper .964 |
+| MDA_PT | .841 / .453 (.845 / .453) | .830 / .370 | paper .847 |
+| 24 MAESTER sims | mean .787 | .755 | — |
+| pL1000 ReDeeM (3,686 cells) | .827 / .644 (.825 / .646), recall 49% (56%) | .785 / .593 | MitoDrift .679 / .632 (τ .125), .800 / .635 (τ .25) |
+| pL1000 mtscATAC (3,811 cells, f = 1.66) | .838 / .626 (.841 / .630), recall 34% (41%) | .34 / .27 | — |
+
+- **Same cells and barcodes, ReDeeM vs mtscATAC** (`final_compare.py`): .818/.648 vs .846/.644.
+  - The two partitions agree at ARI .94 on the cells both assign.
+  - ReDeeM recovers 49 clones that mtscATAC misses (mostly small); mtscATAC recovers 8 that ReDeeM misses.
+- **Getting-started and MAESTER benchmark tutorials** re-executed on 0.5.0. MDA_clones in the tutorial (legacy AFM, `migrate_afm`):
+  - 337 cells (was 276), 95.8% assigned;
+  - ARI .903 (was .929), 10 clones for 8 ground truth;
+  - distance AUPRC .910 (was .335).
 
 ## Resume in 3 commands
 
 ```bash
-conda activate mito-docs                       # mito 0.3.0 editable; numpy 2.4.6, pandas 3.0.5, scanpy 1.12.3,
+conda activate mito-docs                       # mito 0.5.0 editable; numpy 2.4.6, pandas 3.0.5, scanpy 1.12.3,
 pip install pyreadr                            # sklearn 1.9.0, scipy 1.18.0, statsmodels 0.14.6, ete3 3.1.3
 python benchmarks/fetch_pl1000.py              # -> data_test/bench/pL1000 (5.6 GB, md5-checked, skips intact files)
 python benchmarks/run.py mitodrift             # gate: must print recall .7539 / precision .7728 / ARI_gt1pct .9184
@@ -22,14 +43,6 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - MDA re-read with the current reader: `data_test/bench/mda_current_reader/`.
   - All are rebuilt on demand if missing.
 - **MAESTER inputs** come from `data_test/source_data/data/general/AFMs/` (MiTo paper source data).
-
-## Working tree (uncommitted)
-
-- `src/mito/io/format_afm.py`:
-  - dominant-alt-allele reader (`_dominant_alt`);
-  - memory-safe redeemV reader (6 of 14 columns, typed, float `Depth`).
-
-  **Decision:** keep dominant-allele as the default, and add `multi_allelic_sites=True` as an option that keeps every allele per site, like redeemR. Not implemented yet.
 
 ## Scripts
 
@@ -50,6 +63,11 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `redeem_compare.py` | MitoDrift vs MiTo 0.3.0 vs proposed MiTo, same LARRY cells and metrics | `redeem_compare.csv` |
 | `overdispersion.py redeem \| redeem_qcells \| maester \| sims` | generic Filter-2-style candidate stage (χ² or Tarone, blacklist/RSRS50, median depth, cap 1000) on any AFM vs MiTo 0.3.0 candidate filter | `overdispersion_*.csv` |
 | `ablation.py mda \| redeem \| sims` | package `filter_afm` with one downstream stage off at a time (artefacts, provisional calls, clonality, SNR, four-gamete, all), vs 0.3.0 thresholds; D2 off/on | `ablation_*.csv` |
+| `mgatk_unified.py [--f F]` | mgatk through the unified pipeline with a duplication factor (thresholds / raw / scaled) | `mgatk_unified*.csv` |
+| `mgatk_dupfactor.py` | reads per molecule from strand variance (1.66), checked against ReDeeM molecules (1.73) | `mgatk_dupfactor.csv` |
+| `mgatk_pairs.py` | mgatk as both-strand molecules (= the 0.5.0 reader) | `mgatk_pairs.csv` |
+| `final_compare.py` | ReDeeM vs mtscATAC vs MitoDrift, same cells and LARRY barcodes, per-clone recovery | `final_compare*.csv` |
+| `release_check.py mda \| pl1000 \| sims` | 0.5.0 defaults end to end, from the readers | `release_check_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)
@@ -174,33 +192,9 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - `multi_allelic_sites` option, redeemV `edge_trim=9`, `filter_cells(mean_cov_all=10)` (implemented).
 - Next: mtscATAC.
 
-## Open questions (user) — answer before Phase 2
+## Open (after 0.5.0)
 
-1. **mtscATAC:** a lighter alternative to `read_scale`? Proposed test:
-   - site-level overdispersion filter on reads/f;
-   - weighted cosine on AF for distances;
-   - calls only for the annotation.
-
-   Compare with `read_scale` alone. Not run yet.
-2. **D2:** undecided; it helps on ReDeeM (see above). Also open: whether to add clade confidence (bootstrap support).
-   Earlier note: Proposed test first: let single molecules count at clean sites on ReDeeM (point 2 above), and report small private-marker cherries.
-
-## Next (Phase 2, after the open questions)
-
-- **io:**
-  - ~~`multi_allelic_sites` option~~ (done);
-  - per-strand AD layers for read-level input;
-  - DP = A+C+G+T fallback;
-  - ~~redeemV `edge_trim=9` default~~ (done);
-  - `barcode_map=`;
-  - `read_counts_table`.
-- **pp:**
-  - ~~Filter-2 front end~~ (done: `candidates='overdispersion'`);
-  - `read_scale` in `call_genotypes`;
-  - per-`scLT_system` presets in `filter_afm(preset=)`;
-  - `max_candidates=1000`;
-  - drop the redundant multi-allelic drop in `filter_low_quality_variants`.
-- **Scalability:**
-  - incremental leave-one-out kNN (only carrier rows/cols change), per-variant seeds, float32, threads;
-  - shared with `impute_dropouts`.
-- **Tests** for all of the above; then the Phase 3 re-baseline, docs and release 0.4.0.
+- **Clade confidence** (bootstrap support on the tree): the remaining gap to MitoDrift is tree precision (.46 vs .90) and small-clone recall.
+- **mtscATAC cell coverage:** 36% of barcoded cells carry no called variant (ReDeeM 22%). The user's lighter alternative is still untested: weighted cosine distances on allele frequencies, with calls used for annotation only.
+- **Scalability:** incremental leave-one-out kNN for the clonality filter (plan, Phase 2).
+- Push / release: not done (user's call).

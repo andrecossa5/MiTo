@@ -9,8 +9,8 @@ LARRY cells), so the numbers stay comparable with the earlier tables.
     ReDeeM     make_afm(redeem-v, edge_trim=9) -> filter_afm defaults (over-dispersion,
                no dbSNP/REDIdb, no SNR) -> UPGMA -> annotate_clones
     mgatk      both-strand molecules: AD = min(fw, rev), DP = rint(reads / 1.66), f from
-               strand variance (mgatk_dupfactor.py) -> filter_afm(candidates=
-               "overdispersion") -> UPGMA -> annotate_clones
+               strand variance (mgatk_dupfactor.py; = make_afm in 0.5.0) -> filter_afm
+               defaults -> UPGMA -> annotate_clones
     MitoDrift  the deposited tree (tau .125 / .25), restricted to the same cells
 
 Each with the small-clone pass off and on. Also per truth clone: recovered (J >= .5) by
@@ -93,7 +93,7 @@ def main():
         print(rows[-1], flush=True)
 
     m = molecule_afm(d, cells, 'pairs', 1.66)
-    lab, sets, a, secs = pipeline(m, candidates='overdispersion')
+    lab, sets, a, secs = pipeline(m)
     for d2 in (False, True):
         labels[('mgatk', d2)] = lab[d2]
         rows.append(score('mgatk', lab[d2], truth, strata, sets, D2=d2, n_chars=a.shape[1],

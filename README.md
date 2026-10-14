@@ -35,24 +35,35 @@ print(mt.__version__)
 ## Quick start
 
 ```python
-import scanpy as sc
 import mito as mt
 
-# Allele Frequency Matrix (cell x site AnnData with AD / DP layers)
-afm = sc.read('afm_unfiltered.h5ad')
+# Allele Frequency Matrix from pre-processing output (molecule counts, AD / DP layers)
+afm = mt.io.make_afm('path/to/maegatk_output', scLT_system='MAESTER', pp_method='maegatk')
 
-# Cell and variant filters, distances in mtDNA mutation space
-afm = mt.pp.filter_cells(afm, cell_filter='filter2')
-afm = mt.pp.filter_afm(afm, filtering='MiTo')
+# Cell and variant filters, single-cell genotypes, distances in mtDNA mutation space
+mt.pp.filter_cells(afm, cell_filter='filter2')     # 'filter1' (default) for ReDeeM / mtscATAC
+mt.pp.filter_afm(afm)
 
-# Phylogeny and clonal inference
-tree = mt.tl.build_tree(afm, precomputed=True, solver='UPMGA')
-annotator = mt.tl.MiToTreeAnnotator(tree)
-annotator.clonal_inference()
+# Phylogeny and clones
+tree = mt.tl.build_tree(afm, solver='UPMGA')
+mt.tl.annotate_clones(tree, afm)
 
-# Visualization
-mt.pl.plot_tree(tree, features=['MiTo clone'])
+# Visualization
+mt.pl.plot_tree(tree, annot='MiTo_clone')
 ```
+
+The same calls, with the same defaults, run on the three assays:
+
+| Assay | `make_afm(scLT_system=, pp_method=)` | What the reader does |
+| --- | --- | --- |
+| MAESTER | `'MAESTER'`, `'maegatk'` | UMI consensus counts, as they are |
+| ReDeeM | `'ReDeeM'`, `'redeem-v'` | consensus molecules, 9 bp trimmed from fragment ends |
+| mtscATAC | `'mtscATAC'`, `'mgatk'` | reads to molecules: alternative molecules read by both mates, coverage / reads per molecule (estimated from the strand counts) |
+
+`filter_afm` then selects variants whose per-cell counts are over-dispersed relative to
+sequencing noise (redeemR Filter-2, at most `max_candidates=1000`), keeps those whose
+carriers are clonal on the cell kNN graph, and genotypes each cell against each
+variant's own error rate.
 
 See the [getting started tutorial](https://mito.readthedocs.io/en/latest/getting_started.html)
 for the full vignette, and the [ground truth benchmark](https://mito.readthedocs.io/en/latest/benchmark.html)
@@ -70,9 +81,7 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 | `pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
 | `ut` | Metrics, MT annotations, simulation, helpers |
 
-**Supported assays** (`scLT_system`, `pp_method`): MAESTER (`maegatk`, `mgatk`),
-scmtATAC-seq (`mgatk`) and ReDeeM (`redeem-v`). Pre-processing is done by
-[nf-MiTo](https://github.com/andrecossa5/nf-MiTo).
+Pre-processing is done by [nf-MiTo](https://github.com/andrecossa5/nf-MiTo).
 
 Full reference: [MiTo docs](https://mito.readthedocs.io/en/latest/index.html).
 

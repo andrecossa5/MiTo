@@ -17,14 +17,11 @@ from .simulate import simulate_afm
 from .utils import (
     Timer,
     extract_kwargs,
-    flatten_dict,
-    ji,
     load_common_dbSNP,
     load_edits_REDIdb,
     load_mt_gene_annot,
     load_mut_spectrum_ref,
     rescale,
-    update_params,
 )
 
 ##
@@ -36,7 +33,7 @@ __all__ = [
     # positions
     "transitions", "transversions", "MAESTER_genes_positions", "mask_mt_sites",
     # general utilities
-    "Timer", "ji", "rescale", "flatten_dict", "update_params", "extract_kwargs",
+    "Timer", "rescale", "extract_kwargs",
     "load_mt_gene_annot", "load_mut_spectrum_ref", "load_common_dbSNP", "load_edits_REDIdb",
     # simulation
     "simulate_afm",

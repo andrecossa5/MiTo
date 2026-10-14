@@ -82,20 +82,6 @@ class Timer:
 ##
 
 
-def update_params(d_original, d_passed):
-    for k in d_passed:
-        if k in d_original:
-            pass
-        else:
-            print(f'{k}:{d_passed[k]} kwargs added...')
-        d_original[k] = d_passed[k]
-
-    return d_original
-
-
-##
-
-
 def rescale(x):
     """
     Max/min rescaling.
@@ -105,32 +91,6 @@ def rescale(x):
     else:
         return x
 
-
-##
-
-
-def ji(x, y):
-    """
-    Jaccard Index between two list-like objs.
-    """
-    x = set(x)
-    y = set(y)
-    ji = len(x&y) / len(x|y)
-
-    return ji
-
-
-##
-
-
-def flatten_dict(d):
-    result = {}
-    for key, value in d.items():
-        if isinstance(value, dict):
-            result.update(flatten_dict(value))
-        else:
-            result[key] = value
-    return result
 
 ##
 

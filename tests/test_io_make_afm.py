@@ -209,8 +209,72 @@ def test_every_reader_output_runs_the_pipeline(request, fixture, system, method,
     folder, _ = request.getfixturevalue(fixture)
     afm = mt.io.make_afm(folder, scLT_system=system, pp_method=method)
     mt.pp.filter_cells(afm, cell_filter=cell_filter, mean_cov_all=5)
-    mt.pp.filter_afm(afm, cand_min_n_positive=3, cand_min_DP_in_positives=5,
-                     qc_alpha=0.1, min_snr=2, ncores=1)
+    mt.pp.filter_afm(afm, qc_alpha=0.1, ncores=1)
     tree = mt.tl.build_tree(afm, solver="UPMGA")
     mt.tl.annotate_clones(tree, afm, min_cells=3)
     assert afm.obs["MiTo_clone"].nunique() >= 2
+
+
+# -- mtscATAC: reads to molecules -------------------------------------------
+
+@pytest.mark.parametrize("o", [0.3, 0.66, 0.9])
+def test_reads_per_molecule_is_recovered_from_the_strands(o):
+    from mito.io.format_afm import _reads_per_molecule
+    rng = np.random.default_rng(0)
+    n_cells, n_sites = 300, 60
+    s = rng.uniform(0.3, 0.7, n_sites)                    # forward fraction of single reads
+    molecules = rng.poisson(30, (n_cells, n_sites))
+    paired = rng.binomial(molecules, o)
+    single_fw = rng.binomial(molecules - paired, s)
+    fw = paired + single_fw
+    rev = paired + (molecules - paired - single_fw)
+    pos = np.tile(np.arange(n_sites), (n_cells, 1))
+    f = _reads_per_molecule(fw.ravel(), rev.ravel(), pos.ravel())
+    assert f == pytest.approx(1 + o, abs=0.05)
+
+
+def test_mtscatac_counts_molecules_read_by_both_mates(mgatk_tables):
+    folder, _ = mgatk_tables
+    reads = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk", molecules=False)
+    mols = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk")
+    assert "reads_per_molecule" in mols.uns and "reads_per_molecule" not in reads.uns
+    assert 1 <= mols.uns["reads_per_molecule"] <= 2
+    common = reads.var_names.intersection(mols.var_names)
+    assert (mols[:, common].layers["AD"].toarray() <= reads[:, common].layers["AD"].toarray()).all()
+    assert (mols.layers["DP"] <= reads[:, mols.var_names].layers["DP"]).all()
+
+
+def test_maester_counts_are_left_as_they_are(maegatk_tables):
+    folder, _ = maegatk_tables
+    afm = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
+    assert "reads_per_molecule" not in afm.uns
+
+
+# -- AFMs written by MiTo < 0.3 ---------------------------------------------
+
+def _legacy_afm():
+    from anndata import AnnData
+    from scipy.sparse import csr_matrix
+    AD = np.array([[3, 1, 0], [2, 0, 0], [0, 0, 4]])
+    site = np.array([[50, 50, 40], [60, 60, 30], [55, 55, 20]])
+    DP_masked = np.where(AD > 0, site, 0)
+    qual = np.where(AD > 0, 35.0, 0.0)
+    return AnnData(X=csr_matrix(AD / np.maximum(DP_masked, 1)),
+                   var=pd.DataFrame(index=["100_A>G", "100_A>T", "200_C>T"]),
+                   layers={"AD": csr_matrix(AD), "DP": csr_matrix(DP_masked),
+                           "site_coverage": csr_matrix(site), "qual": csr_matrix(qual)})
+
+
+def test_migrate_afm_restores_site_coverage_and_one_allele_per_site():
+    afm = _legacy_afm()
+    mt.io.migrate_afm(afm)
+    assert list(afm.var_names) == ["100_A>G", "200_C>T"]          # 100_A>T: fewer alt reads
+    assert {"site_coverage", "qual"}.isdisjoint(afm.layers)
+    assert (afm.layers["DP"] == np.array([[50, 40], [60, 30], [55, 20]])).all()
+    assert "quality" in afm.var.columns
+
+
+def test_migrate_afm_can_keep_every_allele():
+    afm = _legacy_afm()
+    mt.io.migrate_afm(afm, multi_allelic_sites=True)
+    assert afm.shape[1] == 3

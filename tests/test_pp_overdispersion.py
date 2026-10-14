@@ -72,13 +72,12 @@ def test_the_cap_does_nothing_below_the_limit(afm):
     assert afm.shape[1] == n
 
 
-def test_filter_afm_resolves_the_stage_from_the_assay():
-    a = build_afm()
-    mt.pp.filter_afm(a)
-    assert a.uns['mito']['filter_afm']['params']['candidates']['method'] == 'overdispersion'
-    b = build_afm(scLT_system='mtscATAC', pp_method='mgatk', targeted=False)
-    mt.pp.filter_afm(b)
-    assert b.uns['mito']['filter_afm']['params']['candidates']['method'] == 'thresholds'
+def test_filter_afm_starts_from_the_overdispersion_stage_for_every_assay():
+    for system, method, targeted in (("MAESTER", "maegatk", True), ("ReDeeM", "redeem-v", False),
+                                     ("mtscATAC", "mgatk", False)):
+        a = build_afm(scLT_system=system, pp_method=method, targeted=targeted)
+        mt.pp.filter_afm(a)
+        assert a.uns['mito']['filter_afm']['flow']['stage'].iloc[0] == 'over-dispersion filter'
 
 
 def test_filter_afm_caps_the_candidates():
@@ -89,20 +88,11 @@ def test_filter_afm_caps_the_candidates():
     assert a.shape[1] <= 4
 
 
-def test_filter_afm_rejects_an_unknown_stage(afm):
-    with pytest.raises(ValueError, match='candidates'):
-        mt.pp.filter_afm(afm, candidates='magic')
-
-
-
-def test_the_signal_filter_runs_after_the_thresholds_stage_only():
+def test_snr_is_annotated_but_not_filtered_on():
     a = build_afm()
     mt.pp.filter_afm(a)
-    b = build_afm()
-    mt.pp.filter_afm(b, candidates='thresholds')
+    assert 'snr' in a.var.columns
     assert 'signal-to-background filter' not in set(a.uns['mito']['filter_afm']['flow']['stage'])
-    assert 'signal-to-background filter' in set(b.uns['mito']['filter_afm']['flow']['stage'])
-    assert b.uns['mito']['filter_afm']['params']['signal']['min_snr'] == 10
 
 
 def test_known_artefacts_are_filtered_for_rna_assays_only():

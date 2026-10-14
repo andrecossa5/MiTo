@@ -5,8 +5,9 @@ The AFM is the single object every MiTo function consumes, and it holds the mini
 needed to genotype cells and filter MT-SNVs:
 
     afm.X                 allele frequencies, float32, sparse
-    afm.layers['AD']      alternative allele (consensus UMI) counts, int, sparse
-    afm.layers['DP']      coverage at the variant's site, int, DENSE
+    afm.layers['AD']      alternative allele molecules (consensus UMIs; for mtscATAC,
+                          molecules read by both mates), int, sparse
+    afm.layers['DP']      coverage at the variant's site, in molecules, int, DENSE
     afm.obs               cell metadata, plus per-cell coverage metrics
     afm.var               'pos', 'ref', 'alt' and, where available, 'quality'
     afm.uns               'scLT_system', 'pp_method'
@@ -209,9 +210,51 @@ def _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=None):
 ##
 
 
+def _reads_per_molecule(fw, rev, pos, min_reads=5):
+    """
+    Reads per molecule of a read-count assay (mtscATAC), from the strand counts alone.
+
+    A molecule is read by both mates (one forward and one reverse read, fraction `o`) or by
+    one (a single read, forward with the site's probability `s`). Paired reads leave
+    fw - s * R unchanged; single reads add binomial noise, so per site
+
+        kappa = sum (fw - s R)^2 / sum R s (1 - s) = (1 - o) / (1 + o)
+
+    over cells, and f = 1 + o = 2 / (1 + kappa). The median over well-covered,
+    strand-balanced sites is returned, within [1, 2]: PCR duplicates (same-strand copies)
+    would push kappa above 1, a sign that duplicates were not removed upstream.
+
+    fw, rev, pos: per (cell, site) forward reads, reverse reads (all bases) and position.
+    On pL1000 (Multiome), 1.66, against 1.73 from the ReDeeM molecules of the same cells.
+    """
+
+    df = pd.DataFrame({'fw':fw, 'R':fw + rev, 'pos':pos})
+    tot = df.groupby('pos')[['fw', 'R']].sum()
+    s = (tot['fw'] / tot['R'].clip(lower=1)).rename('s')
+    df = df.join(s, on='pos')
+    df['num'] = (df['fw'] - df['s'] * df['R'])**2
+    df['den'] = df['R'] * df['s'] * (1 - df['s'])
+    site = df.groupby('pos')[['num', 'den', 'R']].agg({'num':'sum', 'den':'sum', 'R':'mean'})
+    ok = (site['R'] >= min_reads) & s.reindex(site.index).between(0.2, 0.8) & (site['den'] > 0)
+    if not ok.any():
+        logging.warning('Too little coverage to estimate reads per molecule: assuming 1.')
+        return 1.0
+    kappa = float(np.median(site.loc[ok, 'num'] / site.loc[ok, 'den']))
+    f = 2 / (1 + kappa)
+    if f < 1:
+        logging.warning(
+            f'Strand counts are over-dispersed (kappa={kappa:.2f}): PCR duplicates were '
+            f'probably not removed upstream. Reads per molecule set to 1.'
+        )
+    return float(np.clip(f, 1.0, 2.0))
+
+
+##
+
+
 def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
                          scLT_system='MAESTER', pp_method='maegatk', ref='rCRS',
-                         multi_allelic_sites=False):
+                         multi_allelic_sites=False, molecules=None):
     """
     Read maegatk / mgatk per-base allelic tables.
 
@@ -227,7 +270,17 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
     * 6 columns - the same, with a mean base quality per strand (maegatk; mgatk with
       `-eb`).
     * more - extra consensus/group-size columns (mito_preprocessing-style), ignored.
+
+    `molecules` (default: for mtscATAC) converts read counts to molecules. mtscATAC reads
+    are not UMI-collapsed: a molecule covered by both mates of a short fragment is counted
+    twice, and sequencing errors are single reads. Alternative molecules are those seen by
+    both mates, min(forward, reverse), and coverage is reads / f, with f the reads per
+    molecule estimated from the strand counts (`_reads_per_molecule`), stored in
+    .uns["reads_per_molecule"].
     """
+
+    if molecules is None:
+        molecules = scLT_system == 'mtscATAC'
 
     path_ch_matrix = _resolve_dir(path_ch_matrix)
     ref_base = _read_reference(ref, path=path_ch_matrix)
@@ -261,7 +314,7 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', RuntimeWarning)   # basecalls with no quality
             df['qual'] = np.nanmean(np.where(qual>0, qual, np.nan), axis=1)
-        L.append(df[['pos', 'cell', 'counts', 'qual']].assign(base=base))
+        L.append(df[['pos', 'cell', 'counts', 'count_fw', 'count_rev', 'qual']].assign(base=base))
 
     if not has_quality:
         logging.info('No base qualities in the allelic tables: var["quality"] is not set.')
@@ -272,12 +325,24 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
         long['cell'] = long['cell'].map(lambda x: f'{x}_{sample}')
     long['ref'] = long['pos'].map(ref_base)
 
+    f = 1.0
+    if molecules:
+        strands = long.groupby(['pos', 'cell'], observed=True)[['count_fw', 'count_rev']].sum().reset_index()
+        f = _reads_per_molecule(strands['count_fw'].values, strands['count_rev'].values,
+                                strands['pos'].values)
+        logging.info(f'Reads per molecule, from the strand counts: {f:.2f}')
+        del strands
+
     # Alternative basecalls only, one alternative allele per (cell, site)
     logging.info('Filter variant allele basecalls')
     long = long.query('base!=ref').rename(columns={'counts':'AD', 'base':'alt'}).copy()
     logging.info(f'Alternative basecalls: {long.shape[0]}')
     if not multi_allelic_sites:
         long = _dominant_alt(long)
+    if molecules:
+        long['AD'] = np.minimum(long['count_fw'], long['count_rev'])
+        long = long.query('AD>0').copy()
+        logging.info(f'Alternative molecules read by both mates: {long.shape[0]} (cell, variant) pairs')
 
     # Coverage, for every cell and site
     logging.info('Retrieve cell-site total coverage')
@@ -300,8 +365,14 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
         .pivot(index='cell', columns='pos', values='DP')
         .fillna(0).reindex(cells).fillna(0)
     )
+    if molecules:
+        COV = np.rint(COV / f)
 
-    return _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=quality)
+    afm = _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=quality)
+    if molecules:
+        afm.uns['reads_per_molecule'] = f
+
+    return afm
 
 
 ##
@@ -479,6 +550,7 @@ def make_afm(
     pp_method: str = 'maegatk',
     ref: str = 'rCRS',
     multi_allelic_sites: bool = False,
+    molecules: bool = None,
     **kwargs
     ) -> AnnData:
     """
@@ -506,6 +578,11 @@ def make_afm(
         Keep every alternative allele observed at a site, one variant each (as redeemR).
         By default only the dominant one is kept: sequencing error alone puts all three
         alleles at nearly every site of a large dataset. Default is False.
+    molecules : bool, optional
+        maegatk / mgatk tables only: convert read counts to molecules (alternative
+        molecules read by both mates; coverage divided by the reads per molecule, estimated
+        from the strand counts). None (default) decides from the assay: on for mtscATAC,
+        whose reads are not UMI-collapsed, off for MAESTER (UMI consensus counts).
     **kwargs
         Reader-specific options (RedeemV: `edge_trim`, default 9; `treshold`, default
         "Sensitive").
@@ -535,7 +612,7 @@ def make_afm(
                            multi_allelic_sites=multi_allelic_sites, **kwargs)
     else:
         afm = _read_allelic_tables(path_ch_matrix, path_meta, sample, scLT_system, pp_method, ref,
-                                   multi_allelic_sites=multi_allelic_sites)
+                                   multi_allelic_sites=multi_allelic_sites, molecules=molecules)
 
     logging.info(f'Allele Frequency Matrix: cell x char {afm.shape}. {T.stop()}')
 
@@ -545,7 +622,7 @@ def make_afm(
 ##
 
 
-def migrate_afm(afm: AnnData, copy: bool = False) -> AnnData | None:
+def migrate_afm(afm: AnnData, multi_allelic_sites: bool = False, copy: bool = False) -> AnnData | None:
     """
     Bring an AFM written by MiTo < 0.3 up to the current contract.
 
@@ -557,10 +634,15 @@ def migrate_afm(afm: AnnData, copy: bool = False) -> AnnData | None:
     negative cell would have a zero denominator and the genotyping would see no evidence
     of absence anywhere.
 
+    Earlier readers also kept every alternative allele of a site; as `make_afm` does now,
+    only the dominant one (most alternative reads across cells) is kept by default.
+
     Parameters
     ----------
     afm : AnnData
         AFM read from a file written by an earlier version.
+    multi_allelic_sites : bool, optional
+        Keep every alternative allele of a site. Default is False.
     copy : bool, optional
         Return a converted copy instead of updating `afm` in place. Default is False.
 
@@ -598,6 +680,14 @@ def migrate_afm(afm: AnnData, copy: bool = False) -> AnnData | None:
 
     # AF is recomputed, since its denominator has just changed for the negative cells
     afm.X = csr_matrix((AD/np.maximum(DP, 1)).astype(np.float32))
+
+    if not multi_allelic_sites:
+        pos = afm.var_names.str.split('_').str[0]
+        support = pd.Series(AD.sum(0), index=afm.var_names)
+        dominant = support.groupby(pos.values).idxmax()
+        n0 = afm.shape[1]
+        afm._inplace_subset_var(afm.var_names.isin(dominant.values))
+        logging.info(f'Keep the dominant alternative allele per site: {afm.shape[1]} of {n0} MT-SNVs')
 
     return afm if copy else None
 

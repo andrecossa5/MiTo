@@ -8,11 +8,12 @@ import warnings
 import numpy as np
 import pandas as pd
 from anndata import AnnData
-from scipy.stats import fisher_exact
+from scipy.stats import binom, fisher_exact
+from scipy.stats import chi2 as chi2_dist
 from statsmodels.stats.multitest import multipletests
 
 from mito.ut.positions import mask_mt_sites
-from mito.ut.utils import load_common_dbSNP, load_edits_REDIdb
+from mito.ut.utils import load_common_dbSNP, load_edits_REDIdb, load_rsrs50
 
 ##
 
@@ -255,6 +256,200 @@ def filter_candidate_variants(
         test &= afm.var['quality']>=min_var_quality
 
     afm._inplace_subset_var(test.values)
+
+    return afm if copy else None
+
+
+##
+
+
+# rCRS regions of recurrent artefacts: the 303-315 and 513-525 homopolymers, the 3107N
+# reference gap, and the 16182-16193 homopolymer (redeemR blacklist).
+BLACKLIST_REGIONS = ((302, 315), (513, 525), (3105, 3109), (16182, 16187))
+
+
+def _qvalue(p):
+    """Storey q-values, with pi0 estimated at lambda = .5 (as redeemR, via qvalue)."""
+    p = np.asarray(p, float)
+    if p.size == 0:
+        return p
+    pi0 = min(1.0, np.mean(p>0.5) / 0.5)
+    return np.minimum(multipletests(p, method='fdr_bh')[1] * pi0, 1.0)
+
+
+def _binomial_gof(counts, depth):
+    """
+    Chi-square goodness of fit of a variant's per-cell alt counts to one binomial at the
+    site's mean depth (redeemR `goodness_of_fit_test`): sequencing noise is binomial,
+    a heteroplasmy carried by some cells only is not.
+    """
+    depth = max(int(depth), int(counts.max()))
+    obs = np.bincount(counts, minlength=depth+1)[:depth+1]
+    p_hat = counts.sum() / (counts.size * depth)
+    exp = counts.size * binom.pmf(np.arange(depth+1), depth, p_hat)
+    exp[exp==0] = 1e-318
+    chi2 = ((obs-exp)**2 / exp).sum()
+    return chi2, chi2_dist.sf(chi2, df=depth)
+
+
+def overdispersion_stats(afm: AnnData, min_cell_coverage: float = 10, min_n_positive: int = 2) -> pd.DataFrame:
+    """
+    Per-variant statistics of the over-dispersion candidate stage (redeemR Filter-2, Weng
+    et al., 2024), computed over the cells with mean MT coverage >= `min_cell_coverage`.
+
+    Returns a table indexed by variant: carriers, carrier fraction among covered cells,
+    homoplasmy flag, median depth, the chi-square statistic and its p- and q-value
+    (variants not tested get statistic -inf, p- and q-value 1).
+    """
+
+    if 'mean_site_coverage' in afm.obs.columns:
+        cov = afm.obs['mean_site_coverage'].values
+    else:
+        cov = _dense(afm.layers['DP']).mean(1)
+    qualified = cov>=min_cell_coverage
+
+    AD = afm.layers['AD'][qualified]
+    AD = AD.tocsc() if hasattr(AD, 'tocsc') else AD
+    DP = _dense(afm.layers['DP'])[qualified]
+    carriers = (AD>0)
+    n_carriers = np.asarray(carriers.sum(0)).ravel()
+    n_covered = np.maximum((DP>0).sum(0), 1)
+    carrier_frac = n_carriers / n_covered
+    tab = pd.DataFrame({
+        'n_carriers' : n_carriers, 'carrier_frac' : carrier_frac,
+        'median_depth' : np.median(DP, axis=0), 'homoplasmic' : False,
+        'stat' : -np.inf, 'p' : 1.0, 'q' : 1.0,
+    }, index=afm.var_names)
+
+    candidates = np.flatnonzero(n_carriers>=min_n_positive)
+    if candidates.size == 0:
+        return tab
+
+    A = _dense(AD[:, candidates]).astype(np.int64)
+    D = np.maximum(DP[:, candidates], A).astype(np.int64)
+    with np.errstate(all='ignore'), warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        af = np.where(A>0, A / np.maximum(D, 1), np.nan)
+        mean_af = np.nanmean(af, 0)
+        vmr = np.nanvar(af, 0, ddof=1) / mean_af
+    homo = (carrier_frac[candidates]>0.75) & (mean_af>0.75) & (vmr<0.01)
+    tab.iloc[candidates, tab.columns.get_loc('homoplasmic')] = homo
+
+    # As redeemR: counts over the cells carrying any heteroplasmic candidate
+    tested = ~homo
+    rows = (A[:, tested]>0).any(1)
+    stat = np.full(candidates.size, -np.inf)
+    p = np.ones(candidates.size)
+    for j in np.flatnonzero(tested):
+        stat[j], p[j] = _binomial_gof(A[rows, j], D[:, j].mean())
+    q = np.ones(candidates.size)
+    q[tested] = _qvalue(p[tested])
+
+    tab.iloc[candidates, tab.columns.get_loc('stat')] = stat
+    tab.iloc[candidates, tab.columns.get_loc('p')] = p
+    tab.iloc[candidates, tab.columns.get_loc('q')] = q
+
+    return tab
+
+
+def filter_overdispersed_variants(
+    afm: AnnData,
+    min_cell_coverage: float = 10,
+    min_n_positive: int = 2,
+    q_max: float = 0.05,
+    min_median_depth: float = 5,
+    max_carrier_frac: float = 0.75,
+    blacklist: bool = True,
+    ancestral: bool = True,
+    copy: bool = False
+    ) -> AnnData | None:
+    """
+    Select candidate MT-SNVs whose counts are over-dispersed across cells.
+
+    The variant-level stages of redeemR Filter-2 (Weng et al., 2024), the input of
+    MitoDrift, on any AFM with molecule counts (MAESTER, ReDeeM):
+
+    * statistics over the cells with mean MT coverage >= `min_cell_coverage`
+    * carried (AD > 0) by at least `min_n_positive` of them, and not homoplasmic
+    * per-cell alt counts over-dispersed relative to one binomial at the site's mean
+      depth (chi-square goodness of fit, Storey q <= `q_max`): sequencing errors spread
+      evenly over cells, a heteroplasmy is concentrated in the cells that carry it
+    * outside the blacklisted artefact regions, and not an ancestral RSRS variant
+    * median depth >= `min_median_depth`, and carried by at most `max_carrier_frac` of
+      the covered cells
+
+    Unlike `mito.pp.filter_candidate_variants`, no floor on the number of carriers above
+    two, nor on alt counts per carrier: markers of two-cell clones, seen once in each,
+    stay testable. Statistics are stored in .var (`od_stat`, `od_q`).
+
+    Parameters
+    ----------
+    afm : AnnData
+        Allele Frequency Matrix, with AD and DP layers.
+    min_cell_coverage : float, optional
+        Mean MT coverage of the cells the statistics are computed on. Default is 10.
+    min_n_positive : int, optional
+        Minimum number of carriers. Default is 2.
+    q_max : float, optional
+        Maximum q-value of the over-dispersion test. Default is 0.05.
+    min_median_depth : float, optional
+        Minimum median depth at the site. Default is 5.
+    max_carrier_frac : float, optional
+        Maximum fraction of covered cells carrying the variant. Default is 0.75.
+    blacklist : bool, optional
+        Remove variants in `BLACKLIST_REGIONS`. Default is True.
+    ancestral : bool, optional
+        Remove the 50 RSRS-defining variants (MITOMAP RSRS50). Default is True.
+    copy : bool, optional
+        Return a modified copy instead of updating `afm` in place. Default is False.
+
+    Returns
+    -------
+    AnnData | None
+        Updated AFM if `copy` is True, otherwise None.
+    """
+
+    afm = afm.copy() if copy else afm
+    tab = overdispersion_stats(afm, min_cell_coverage=min_cell_coverage, min_n_positive=min_n_positive)
+
+    keep = (tab['n_carriers']>=min_n_positive) & ~tab['homoplasmic'] & (tab['q']<=q_max)
+    keep &= (tab['median_depth']>=min_median_depth) & (tab['carrier_frac']<=max_carrier_frac)
+    pos = afm.var['pos'].values if 'pos' in afm.var.columns else \
+          afm.var_names.str.split('_').str[0].astype(int).values
+    if blacklist:
+        for start, end in BLACKLIST_REGIONS:
+            keep &= ~((pos>=start) & (pos<=end))
+    if ancestral:
+        keep &= ~afm.var_names.isin(load_rsrs50())
+
+    afm.var['od_stat'] = tab['stat'].values
+    afm.var['od_q'] = tab['q'].values
+    logging.info(f'Over-dispersed candidates: {int(keep.sum())}/{afm.shape[1]}')
+    afm._inplace_subset_var(keep.values)
+
+    return afm if copy else None
+
+
+def cap_candidates(afm: AnnData, max_candidates: int = 1000, min_cell_coverage: float = 10,
+                   copy: bool = False) -> AnnData | None:
+    """
+    Keep at most `max_candidates` MT-SNVs, the most over-dispersed ones (`od_stat`, from
+    `mito.pp.filter_overdispersed_variants`, computed here if missing).
+    """
+
+    afm = afm.copy() if copy else afm
+    if max_candidates is None or afm.shape[1]<=max_candidates:
+        return afm if copy else None
+    if 'od_stat' not in afm.var.columns:
+        afm.var['od_stat'] = overdispersion_stats(afm, min_cell_coverage=min_cell_coverage)['stat'].values
+    order = np.argsort(-afm.var['od_stat'].values, kind='stable')
+    keep = np.zeros(afm.shape[1], bool)
+    keep[order[:max_candidates]] = True
+    logging.warning(
+        f'{afm.shape[1]} candidate MT-SNVs: keeping the {max_candidates} most over-dispersed '
+        f'(max_candidates). Raise it to test more, at a cost in time and memory.'
+    )
+    afm._inplace_subset_var(keep)
 
     return afm if copy else None
 

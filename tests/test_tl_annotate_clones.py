@@ -195,3 +195,41 @@ def test_clonal_fate_bias_runs_on_the_annotation(annotated):
                                         target_state="high")
     assert {"perc_in_target_state", "odds_ratio", "FDR"} <= set(df.columns)
     assert len(df) == tree.cell_meta["MiTo_clone"].nunique()
+
+
+# -- the small-clone pass ---------------------------------------------------
+
+def _small_clade(tree, max_cells=4):
+    from mito.ut.phylo_utils import get_clades
+    return next((n, sorted(v)) for n, v in get_clades(tree, with_root=False).items() if 2 <= len(v) <= max_cells)
+
+
+def test_small_clone_pass_labels_a_marked_small_clade(tree):
+    node, leaves = _small_clade(tree)
+    cells = list(tree.leaves)
+    B = np.zeros((len(cells), 2), bool)
+    B[[cells.index(c) for c in leaves], 0] = True          # exactly the clade
+    B[[0, len(cells) - 1], 1] = True                       # two cells far apart
+    labels = pd.Series('unassigned', index=cells)
+    new, n = mt.tl.small_clone_pass(tree, B, cells, labels)
+    assert n == 1
+    assert (new.loc[leaves] == node).all()
+    assert (new.drop(leaves) == 'unassigned').all()
+
+
+def test_small_clones_are_off_by_default(annotated):
+    afm, _ = annotated
+    p = afm.uns['mito']['annotate_clones']['params']
+    assert p['small_clones'] is False
+    assert afm.uns['mito']['annotate_clones']['n_small_clones'] == 0
+
+
+def test_small_clones_only_add_clones_of_at_most_max_cells(afm_filtered, tree):
+    mt.tl.annotate_clones(tree, afm_filtered)
+    before = afm_filtered.obs['MiTo_clone'].astype(str)
+    mt.tl.annotate_clones(tree, afm_filtered, small_clones=True, small_clones_max_cells=3)
+    after = afm_filtered.obs['MiTo_clone'].astype(str)
+    changed = before != after
+    sizes = after.value_counts()
+    assert (sizes[after[changed]] <= 3).all()
+    assert afm_filtered.uns['mito']['annotate_clones']['params']['small_clones'] is True

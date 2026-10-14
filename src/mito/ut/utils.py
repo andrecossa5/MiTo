@@ -216,6 +216,14 @@ def load_common_dbSNP():
 ##
 
 
+def load_rsrs50():
+    with open(os.path.join(path_assets, 'RSRS50_MT.txt')) as f:
+        return [x.strip() for x in f if x.strip() and not x.startswith('#')]
+
+
+##
+
+
 def load_edits_REDIdb():
     edits = pd.read_csv(os.path.join(path_assets, 'REDIdb_MT.txt.gz'), index_col=0, sep='\t')
     edits = edits.query('nSamples>100')

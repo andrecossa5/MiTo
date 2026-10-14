@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Added
+- **Over-dispersion candidate stage** (`mt.pp.filter_overdispersed_variants`), the
+  variant-level part of redeemR Filter-2 (MitoDrift's input): carriers >= 2, no
+  homoplasmy, chi-square test of the per-cell counts against one binomial (q <= .05),
+  blacklisted regions and RSRS50 ancestral variants removed, median depth >= 5. Default
+  candidate stage of `filter_afm` for MAESTER and ReDeeM (`candidates=`); mtscATAC
+  keeps the read-level thresholds.
+- **`max_candidates=1000`** in `filter_afm` (`mt.pp.cap_candidates`): the most
+  over-dispersed candidates are kept, with a warning.
+- **Small-clone pass** (`mt.tl.small_clone_pass`, `annotate_clones(small_clones=True)`,
+  off by default): a character carried by 2-4 cells that are exactly a clade becomes
+  a clone.
+### Changed
+- **Reader**: one alternative allele per site, the dominant one.
+- `filter_afm(filter_artefacts=None)`: dbSNP / REDIdb filter on for MAESTER only.
+- `filter_afm(min_snr=None)`: the signal-to-background filter runs after the
+  threshold candidate stage only (`.var['snr']` is still written).
+
 ## [0.3.0] - 2026-09-21
 ### Changed
 - **MT-only scope.** MiTo now covers MAESTER, mtscATAC and ReDeeM data

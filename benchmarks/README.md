@@ -49,6 +49,7 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `redeem_small.py` | ReDeeM small clones: genotyping (binom 1e-3/1e-2/any molecule) x clonality on/off x tau x min_cells x D2, Filter-2 port on all cells | `redeem_small.csv` |
 | `redeem_compare.py` | MitoDrift vs MiTo 0.3.0 vs proposed MiTo, same LARRY cells and metrics | `redeem_compare.csv` |
 | `overdispersion.py redeem \| redeem_qcells \| maester \| sims` | generic Filter-2-style candidate stage (χ² or Tarone, blacklist/RSRS50, median depth, cap 1000) on any AFM vs MiTo 0.3.0 candidate filter | `overdispersion_*.csv` |
+| `ablation.py mda \| redeem \| sims` | package `filter_afm` with one downstream stage off at a time (artefacts, provisional calls, clonality, SNR, four-gamete, all), vs 0.3.0 thresholds; D2 off/on | `ablation_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)
@@ -137,6 +138,25 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - Still just under MitoDrift's ARI_all (.632/.635).
 - **24 MAESTER sims:** mean ARI .755→.788. All of the gain comes from one sim (5 clones, depth3, seed 0: .118→.924). Every other sim is within ±.003, so there is no regression.
 
+## Results (2026-10-14): stage ablation, package implementation
+
+`ablation.py` runs the package's `filter_afm` (over-dispersion, cap 1000), with one downstream stage off at a time. Values are ARI / ARI_all, D2 off.
+
+| Stage switched off | MDA_clones | MDA_lung | MDA_PT | ReDeeM | Sims (24) |
+|---|---|---|---|---|---|
+| none | .877/.746 | .958/.903 | .841/.453 | .814/.626 | .788/.558 |
+| SNR | .895/.758 | .958/.903 | .841/.453 | .814/.626 | .787/.557 |
+| dbSNP/REDIdb | .877/.746 | .956/.904 | .841/.453 | .818/.644 | .788/.559 |
+| provisional α/10 → α | .877/.746 | .957/.904 | .835/.454 | .813/.613 | .779/.551 |
+| clonality | .853/.706 | .954/.893 | .818/.424 | .810/.609 | .742/.539 |
+| four-gamete | .885/.804 | .945/.902 | .719/.509 | .800/.616 | .705/.569 |
+| 0.3.0 thresholds | .877/.746 | .959/.904 | .759/.394 | .794/.613 | .755/.551 |
+
+- **Defaults adopted:**
+  - SNR filter skipped after the over-dispersion stage;
+  - dbSNP/REDIdb on for MAESTER only.
+- **Checked with the new defaults** (D2 on): MDA_PT .845/.453, MDA_clones .896/.758, ReDeeM (cells with coverage ≥10) .813/**.644**, recall 57%. MitoDrift: .632/.635.
+
 ## Decisions taken
 
 - Plan:
@@ -147,6 +167,11 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 - 2026-10-14:
   - ReDeeM front end = faithful Filter-2 port (χ²);
   - reader: dominant allele default + `multi_allelic_sites=True` option.
+  - over-dispersion candidate stage = default for MAESTER/ReDeeM (implemented);
+  - `max_candidates=1000` (implemented);
+  - D2 = `annotate_clones(small_clones=False)` option (implemented);
+  - SNR off after over-dispersion; artefacts on for MAESTER only (implemented).
+- Next: mtscATAC.
 
 ## Open questions (user) — answer before Phase 2
 
@@ -169,7 +194,7 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - `barcode_map=`;
   - `read_counts_table`.
 - **pp:**
-  - Filter-2 front end for ReDeeM;
+  - ~~Filter-2 front end~~ (done: `candidates='overdispersion'`);
   - `read_scale` in `call_genotypes`;
   - per-`scLT_system` presets in `filter_afm(preset=)`;
   - `max_candidates=1000`;

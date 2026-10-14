@@ -117,6 +117,45 @@ def _read_reference(ref='rCRS', path=None):
 ##
 
 
+def _dominant_alt(long, pos_col='pos', base_col='alt', count_col='AD'):
+    """
+    Keep one alternative allele per MT site: the one with the most alternative reads
+    across cells.
+
+    Every site shows all three alternative alleles once a dataset is large enough -
+    sequencing error alone puts single reads everywhere (on a 4,637-cell mgatk run,
+    16,120 of 16,568 sites had all three). Dropping such sites as "multi-allelic" would
+    discard the entire genome, and picking by mere presence is meaningless; the dominant
+    allele is the only candidate worth genotyping, and whether it is real is decided
+    downstream by the candidate and clonality filters.
+
+    Sites where a second allele also carries real signal are reported in the log: a
+    genuine one will be rare, and is a sign of a repeat or an alignment artefact.
+    """
+
+    support = long.groupby([pos_col, base_col])[count_col].sum()
+    dominant = support.groupby(level=0).idxmax().map(lambda x: x[1])
+
+    runner_up = (
+        support.groupby(level=0)
+        .apply(lambda x: x.sort_values(ascending=False).iloc[1] / x.max() if len(x) > 1 else 0.0)
+    )
+    n_ambiguous = int((runner_up >= 0.5).sum())
+    if n_ambiguous:
+        logging.info(
+            f'{n_ambiguous} site(s) where a second alternative allele carries >=50% of the '
+            f'dominant one\'s reads: the dominant allele is kept for all of them.'
+        )
+
+    keep = long[base_col] == long[pos_col].map(dominant)
+    logging.info(f'Keep the dominant alternative allele per site: {int(keep.sum())} of {len(long)} basecalls')
+
+    return long.loc[keep].copy()
+
+
+##
+
+
 def _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=None):
     """
     Assemble the AnnData from aligned (cells x variants) AD and (cells x sites) coverage.
@@ -126,16 +165,17 @@ def _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=None):
     quality : pd.Series over AD's columns, or None
     """
 
-    # Variant metadata, and multi-allelic sites out: a site with two alternative alleles
-    # cannot be genotyped one allele at a time (their AFs are not independent).
+    # One variant per site: the readers keep the dominant alternative allele, so the
+    # allele frequencies of a site are those of a single, well-defined substitution.
     var = AD.columns.to_series().to_frame('mut')
     var['pos'] = var['mut'].map(lambda x: int(x.split('_')[0]))
     var['ref'] = var['mut'].map(lambda x: x.split('_')[1].split('>')[0])
     var['alt'] = var['mut'].map(lambda x: x.split('_')[1].split('>')[1])
-    n0 = var.shape[0]
-    var = var.loc[var['pos'].map(var['pos'].value_counts())==1].sort_values('pos')
-    if n0>var.shape[0]:
-        logging.info(f'Exclude {n0-var.shape[0]} MT-SNVs at multi-allelic sites')
+    duplicated = var['pos'].map(var['pos'].value_counts())>1
+    if duplicated.any():
+        logging.info(f'Exclude {int(duplicated.sum())} MT-SNVs at sites with several alleles')
+        var = var.loc[~duplicated]
+    var = var.sort_values('pos')
     AD = AD[var.index].copy()
 
     # Per-variant coverage: the coverage of its site, for every cell
@@ -237,14 +277,9 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
 
     # Alternative basecalls only, one alternative allele per (cell, site)
     logging.info('Filter variant allele basecalls')
-    long = long.query('base!=ref').copy()
-    long['nunique'] = long.groupby(['cell', 'pos'])['base'].transform('nunique')
-    long = (
-        long.query('nunique==1')
-        .drop(columns=['nunique'])
-        .rename(columns={'counts':'AD', 'base':'alt'})
-    )
-    logging.info(f'Unique variant basecalls: {long.shape[0]}')
+    long = long.query('base!=ref').rename(columns={'counts':'AD', 'base':'alt'}).copy()
+    logging.info(f'Alternative basecalls: {long.shape[0]}')
+    long = _dominant_alt(long)
 
     # Coverage, for every cell and site
     logging.info('Retrieve cell-site total coverage')
@@ -302,12 +337,23 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
     logging.info(f'Process RedeemV basecalls from: {path_basecalls}')
 
     # 14 columns: MoleculeID (CB_start_end), CellBC, Pos, Variant, V, Ref, FamSize,
-    # V-counts, CSS, DB_Cts, SG_Cts, Is+, Is-, TotalDepth
+    # V-counts, CSS, DB_Cts, SG_Cts, Is+, Is-, TotalDepth. Only six are used, and the
+    # table runs to hundreds of millions of rows on a real run, so the rest are not read.
     cols = ['UMI', 'Cell', 'Pos', 'Variants', 'Call', 'Ref', 'FamSize',
             'GT_Cts', 'CSS', 'DB_Cts', 'SG_Cts', 'Plus', 'Minus', 'Depth']
-    basecalls = pd.read_csv(path_basecalls, sep='\t', header=None, names=cols)
+    used = ['UMI', 'Cell', 'Pos', 'Call', 'Ref', 'Depth']
+    basecalls = pd.read_csv(
+        path_basecalls, sep='\t', header=None, names=cols,
+        usecols=[cols.index(c) for c in used],
+        # NB: RedeemV writes the count columns as floats ("29.0"), so Depth is read as
+        # float and cast once the arithmetic is done.
+        dtype={'UMI':'string', 'Cell':'category', 'Pos':np.int32,
+               'Call':'category', 'Ref':'category', 'Depth':np.float32}
+    )
+    # NB: Ref/Call are categorical (memory), so they are cast before concatenation
     basecalls['Variants'] = (
-        basecalls['Pos'].astype(str) + '_' + basecalls['Ref'] + '>' + basecalls['Call']
+        basecalls['Pos'].astype(str) + '_'
+        + basecalls['Ref'].astype(str) + '>' + basecalls['Call'].astype(str)
     )
 
     logging.info('Count AD before edge-trimming')
@@ -345,12 +391,12 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
         .query('AD_trimmed>0')
     )
 
-    # One alternative allele per (cell, site)
-    long['Pos'] = long['Variants'].map(lambda x: int(x.split('_')[0]))
-    long['Alt'] = long['Variants'].map(lambda x: x.split('_')[1].split('>')[1])
-    long['nunique'] = long.groupby(['Cell', 'Pos'])['Alt'].transform('nunique')
-    long = long.query('nunique==1').copy()
-    logging.info(f'Unique variant basecalls: {long.shape[0]}')
+    # One alternative allele per site: the dominant one, as in the read-level readers
+    long['pos'] = long['Variants'].map(lambda x: int(x.split('_')[0]))
+    long['alt'] = long['Variants'].map(lambda x: x.split('_')[1].split('>')[1])
+    long = _dominant_alt(long.rename(columns={'AD_trimmed':'AD'}), count_col='AD')
+    long = long.rename(columns={'AD':'AD_trimmed'})
+    logging.info(f'Alternative basecalls kept: {long.shape[0]}')
     if sample is not None:
         long['Cell'] = long['Cell'].map(lambda x: f'{x}_{sample}')
 
@@ -359,9 +405,12 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
     if not os.path.exists(path_cov):
         raise ValueError(f'Missing RedeemV coverage table: {path_cov}')
     logging.info('Add full site-coverage matrix')
-    cov = pd.read_csv(path_cov, sep='\t', header=None)
-    cov.columns = ['Cell', 'Pos'] + REDEEM_THRESHOLDS
-    cov = cov[['Cell', 'Pos', treshold]].rename(columns={treshold:'DP'})
+    cov_cols = ['Cell', 'Pos'] + REDEEM_THRESHOLDS
+    cov = pd.read_csv(
+        path_cov, sep='\t', header=None, names=cov_cols,
+        usecols=[0, 1, cov_cols.index(treshold)],
+        dtype={'Cell':'category', 'Pos':np.int32, treshold:np.int32}
+    ).rename(columns={treshold:'DP'})
     if sample is not None:
         cov['Cell'] = cov['Cell'].map(lambda x: f'{x}_{sample}')
 

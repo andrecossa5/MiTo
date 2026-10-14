@@ -11,6 +11,7 @@ from cassiopeia.data import CassiopeiaTree
 from scipy import stats
 
 from mito.pp._graph import knn_kernel
+from mito.ut.phylo_utils import get_clades
 from mito.ut.provenance import record
 
 from .cutting import evidence_cut
@@ -115,6 +116,44 @@ def rescue_unassigned(
 ##
 
 
+def small_clone_pass(
+    tree: CassiopeiaTree,
+    B: np.array,
+    cells: list,
+    labels: pd.Series,
+    max_cells: int = 4
+    ) -> tuple[pd.Series, int]:
+    """
+    Clones below the cut's `min_cells`: a character called in 2 to `max_cells` cells, whose
+    carriers are exactly a clade of the tree, makes those carriers a clone (labelled by
+    the clade's node). The carriers are relabelled whatever their previous label.
+
+    Returns the new labels and the number of clones added.
+    """
+
+    clade_of = {
+        frozenset(leaves) : node for node, leaves in
+        get_clades(tree, with_root=False, with_singletons=False).items()
+        if len(leaves) <= max_cells
+    }
+    cells = np.asarray(cells)
+    labels = labels.copy()
+    n_new = 0
+    for j in range(B.shape[1]):
+        carriers = B[:, j]
+        if not 2 <= carriers.sum() <= max_cells:
+            continue
+        node = clade_of.get(frozenset(cells[carriers]))
+        if node is not None:
+            labels.loc[cells[carriers]] = node
+            n_new += 1
+
+    return labels, n_new
+
+
+##
+
+
 def annotate_clones(
     tree: CassiopeiaTree,
     afm: AnnData,
@@ -126,6 +165,8 @@ def annotate_clones(
     min_supported: int = 2,
     one_sided: bool = False,
     tau: float = 0.25,
+    small_clones: bool = False,
+    small_clones_max_cells: int = 4,
     rescue: bool = False,
     key_added: str = 'MiTo_clone',
     copy: bool = False
@@ -133,7 +174,7 @@ def annotate_clones(
     """
     Infer discrete clone labels from a MT-SNVs phylogeny.
 
-    Two steps:
+    Two steps, and an optional third:
 
     1. **evidence cut** (`mito.tl.evidence_cut`): the tree is cut where, and only where,
        the characters pay for the split - a clade is subdivided only if at least
@@ -141,6 +182,10 @@ def annotate_clones(
     2. **abstention**: a cell keeps its label only if one of its calls is corroborated by
        its neighbourhood (weighted fraction of carriers >= `tau`). Cells that fail are
        labelled "unassigned" rather than forced into the nearest clade.
+    3. **small clones** (`mito.tl.small_clone_pass`), optional: a character carried by 2 to
+       `small_clones_max_cells` cells that are exactly a clade of the tree makes them a
+       clone, below the cut's `min_cells`. It gains recall of the smallest clones, at some
+       cost in precision, where single markers are reliable (molecule counts).
 
     This replaces the grid search over similarity percentile, mutation enrichment and
     merging thresholds of the published annotator, which needed per-dataset overrides to
@@ -157,6 +202,10 @@ def annotate_clones(
     tau : float, optional
         Neighbourhood corroboration required to keep a label; 0 disables abstention.
         Default is 0.25.
+    small_clones : bool, optional
+        Run the small-clone pass after the abstention. Default is False.
+    small_clones_max_cells : int, optional
+        Largest clone the small-clone pass creates. Default is 4.
     rescue : bool, optional
         Try to assign left-over cells from pooled reads over clone markers
         (`mito.tl.rescue_unassigned`). Default is False.
@@ -194,6 +243,11 @@ def annotate_clones(
     if tau:
         labels = labels.mask(best_support<tau, 'unassigned')
 
+    n_small = 0
+    if small_clones:
+        labels, n_small = small_clone_pass(tree, B, cells, labels, max_cells=small_clones_max_cells)
+        logging.info(f'Small-clone pass: {n_small} clones of 2-{small_clones_max_cells} cells')
+
     if rescue:
         labels = rescue_unassigned(labels, afm)
 
@@ -224,8 +278,10 @@ def annotate_clones(
         'params' : {
             'alpha':alpha, 'min_in':min_in, 'ratio':ratio, 'self_min_in':self_min_in,
             'min_cells':min_cells, 'min_supported':min_supported, 'one_sided':one_sided,
-            'tau':tau, 'rescue':rescue
+            'tau':tau, 'small_clones':small_clones,
+            'small_clones_max_cells':small_clones_max_cells, 'rescue':rescue
         },
+        'n_small_clones' : int(n_small),
         'clones' : clones,
         'frac_assigned' : float(ok.mean())
     })

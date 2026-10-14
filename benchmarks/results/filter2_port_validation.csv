@@ -1,0 +1,5 @@
+test,median_depth,n,deposited,shared,jaccard,only_port,only_deposited
+chi2,5,1087,697,697,0.6412,390,0
+chi2,0,1087,697,697,0.6412,390,0
+tarone,5,1129,697,697,0.6174,432,0
+tarone,0,1129,697,697,0.6174,432,0

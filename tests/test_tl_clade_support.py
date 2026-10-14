@@ -64,6 +64,12 @@ def test_annotate_clones_reports_and_filters_on_support(annotated):
     assert (afm.obs['MiTo_clone'] != 'unassigned').sum() == before
 
 
+def test_annotate_clones_computes_support_when_the_tree_has_none(afm_filtered, tree):
+    mt.tl.annotate_clones(tree, afm_filtered, n_boot=10)
+    assert 'clade_support' in afm_filtered.uns['mito']
+    assert afm_filtered.uns['mito']['annotate_clones']['clones']['support'].notna().all()
+
+
 def test_min_support_needs_support(afm_filtered, tree):
     with pytest.raises(ValueError, match='clade_support'):
-        mt.tl.annotate_clones(tree, afm_filtered, min_support=0.5)
+        mt.tl.annotate_clones(tree, afm_filtered, support=False, min_support=0.5)

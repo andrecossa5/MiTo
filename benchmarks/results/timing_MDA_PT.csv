@@ -1,0 +1,6 @@
+step,secs,cells,variants,clones,support_secs
+make_afm (maegatk tables),68.58,4761.0,13063.0,,
+filter_cells,0.2,2756.0,12896.0,,
+filter_afm,5.35,1473.0,98.0,,
+build_tree (UPGMA),0.05,,,,
+annotate_clones (incl. 100 support replicates),3.36,,,43.0,3.28 s

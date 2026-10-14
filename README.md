@@ -44,7 +44,7 @@ afm = mt.io.make_afm('path/to/maegatk_output', scLT_system='MAESTER', pp_method=
 mt.pp.filter_cells(afm, cell_filter='filter2')     # 'filter1' (default) for ReDeeM / mtscATAC
 mt.pp.filter_afm(afm)
 
-# Phylogeny, clade support (count resampling) and clones
+# Phylogeny and clones (with clade support from count resampling)
 tree = mt.tl.build_tree(afm, solver='UPMGA')
 mt.tl.clade_support(tree, afm)                    # optional: support of every clade
 mt.tl.annotate_clones(tree, afm)                  # min_support=0.5 for higher precision

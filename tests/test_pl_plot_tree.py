@@ -170,7 +170,12 @@ def test_leaf_labels_outside_the_right_orientation_are_refused(annotated_tree):
 
 def test_internal_nodes_need_the_attribute_and_say_where_to_get_it(annotated_tree):
     with pytest.raises(ValueError, match="compute_fitness"):
-        mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": "support"}, ax=_ax())
+        mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": "fitness"}, ax=_ax())
+
+
+def test_internal_nodes_coloured_by_clade_support(annotated_tree):
+    # annotate_clones computes clade support, so it can be drawn right away
+    mt.pl.plot_tree(annotated_tree, internal_nodes={"feature": "support", "show": True}, ax=_ax())
 
 
 @pytest.mark.parametrize("feature", ["fitness", "expansion_pvalue"])

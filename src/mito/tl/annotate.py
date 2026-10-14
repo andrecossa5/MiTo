@@ -15,6 +15,7 @@ from mito.ut.phylo_utils import get_clades
 from mito.ut.provenance import record
 
 from .cutting import evidence_cut
+from .support import clade_support
 
 ##
 
@@ -184,6 +185,8 @@ def annotate_clones(
     tau: float = 0.25,
     small_clones: bool = False,
     small_clones_max_cells: int = 4,
+    support: bool = True,
+    n_boot: int = 100,
     min_support: float = None,
     rescue: bool = False,
     key_added: str = 'MiTo_clone',
@@ -226,9 +229,14 @@ def annotate_clones(
         Run the small-clone pass after the abstention. Default is False.
     small_clones_max_cells : int, optional
         Largest clone the small-clone pass creates. Default is 4.
+    support : bool, optional
+        Compute clade support (`mito.tl.clade_support`, count resampling) if the tree has
+        none, so that every clone's support is reported. Default is True.
+    n_boot : int, optional
+        Replicates of that computation. Default is 100.
     min_support : float, optional
         Leave unassigned the cells of clones whose clade support is below this value
-        (`mito.tl.clade_support`, which must have been run on the tree). A precision
+        (`mito.tl.clade_support`). A precision
         knob: on our benchmarks 0.5 raised ARI on the assigned cells (pL1000 ReDeeM .84 ->
         .88, MDA_PT .84 -> .87) at the cost of the cells of weakly supported clones.
         Default is None (no filter; the support of each clone is reported either way).
@@ -255,6 +263,8 @@ def annotate_clones(
         raise ValueError('annotate_clones needs genotypes in afm.layers["bin"]: run mito.pp.filter_afm.')
 
     cells = list(afm.obs_names)
+    if support and np.isnan(_node_support(tree, tree.root)):
+        clade_support(tree, afm, n_boot=n_boot)
     B = afm.layers['bin'].toarray()>0
     X = afm.X.toarray()
 
@@ -321,7 +331,8 @@ def annotate_clones(
             'alpha':alpha, 'min_in':min_in, 'ratio':ratio, 'self_min_in':self_min_in,
             'min_cells':min_cells, 'min_supported':min_supported, 'one_sided':one_sided,
             'tau':tau, 'small_clones':small_clones,
-            'small_clones_max_cells':small_clones_max_cells, 'min_support':min_support,
+            'small_clones_max_cells':small_clones_max_cells, 'support':support,
+            'n_boot':n_boot, 'min_support':min_support,
             'rescue':rescue
         },
         'n_small_clones' : int(n_small),

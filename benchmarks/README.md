@@ -48,6 +48,7 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `redeem_e2e.py` | MiTo on ReDeeM: deposited Filter-2, port (χ²/Tarone, all vs labelled cells), current reader | `redeem_e2e.csv` |
 | `redeem_small.py` | ReDeeM small clones: genotyping (binom 1e-3/1e-2/any molecule) x clonality on/off x tau x min_cells x D2, Filter-2 port on all cells | `redeem_small.csv` |
 | `redeem_compare.py` | MitoDrift vs MiTo 0.3.0 vs proposed MiTo, same LARRY cells and metrics | `redeem_compare.csv` |
+| `overdispersion.py redeem \| redeem_qcells \| maester \| sims` | generic Filter-2-style candidate stage (χ² or Tarone, blacklist/RSRS50, median depth, cap 1000) on any AFM vs MiTo 0.3.0 candidate filter | `overdispersion_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)
@@ -121,6 +122,20 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 - **On all ~4k cells:** ARI_all .612, recall 57%.
 - **MiTo 0.3.0 defaults from raw redeemV:** ARI_all .593, recall 51%, precision .71.
 - **Remaining gap:** yield and small-clone precision. MiTo's tree has no clade confidence (tree precision .45 vs .77), so this is the bootstrap clade-support question.
+
+## Results (2026-10-14): one overdispersion candidate stage for all UMI assays
+
+`overdispersion.py`: Filter-2's variant-level steps applied to any AFM, then `filter_afm` with candidate thresholds opened. Values are D2 off unless stated.
+- **MAESTER, current reader:**
+  - MDA_PT: ARI .759→.841, ARI_all .394→.453, precision .29→.41;
+  - MDA_clones and MDA_lung: unchanged (.877/.746, .958/.903);
+  - χ² is better than Tarone here (Tarone passes about 2× as many variants, hitting the cap on lung).
+- **ReDeeM, raw redeemV trim 9:**
+  - all 4,630 cells downstream: no gain (.791/.610);
+  - only cells with mean coverage ≥10 (3,721): ARI .814, ARI_all .625, tree recall 68%; with D2, recall 55% and ARI_all .628. This recovers the exact port (.813/.629).
+  - MiTo defaults on the same cells stay at .794/.613, so the gain needs both steps.
+  - Still just under MitoDrift's ARI_all (.632/.635).
+- **24 MAESTER sims:** mean ARI .755→.788. All of the gain comes from one sim (5 clones, depth3, seed 0: .118→.924). Every other sim is within ±.003, so there is no regression.
 
 ## Decisions taken
 

@@ -1,0 +1,5 @@
+dataset,front,D2,n_vars_in,n_front,n_chars,cells_kept,n_new,secs,n_truth,n_assigned,yield_,n_labels,ARI,NMI,ARI_all,precision,recall,recall_0.01-1,recall_0.0025-0.01,recall_0.001-0.0025,tree_precision,tree_recall,tree_recall_0.01-1,tree_recall_0.0025-0.01,tree_recall_0.001-0.0025,n_pass_before_cap
+pL1000_redeemv_trim9_qcells,mito_default,False,13978,,510,2344,0,119,1362,878,0.6446,165,0.7939,0.9438,0.6126,0.7333,0.4688,0.6154,0.6239,0.3095,0.4285,0.6328,0.7692,0.7009,0.5556,
+pL1000_redeemv_trim9_qcells,mito_default,True,13978,,510,2344,45,119,1362,901,0.6615,183,0.7911,0.9446,0.6109,0.7049,0.5,0.6154,0.6154,0.381,0.4285,0.6328,0.7692,0.7009,0.5556,
+pL1000_redeemv_trim9_qcells,overdisp_chi2,False,13978,1000.0,614,2444,0,122,1362,882,0.6476,169,0.814,0.9471,0.6252,0.7396,0.4844,0.6154,0.6496,0.3175,0.455,0.6836,0.7692,0.7265,0.6349,1058.0
+pL1000_redeemv_trim9_qcells,overdisp_chi2,True,13978,1000.0,614,2444,103,122,1362,934,0.6858,203,0.8103,0.9476,0.6275,0.6946,0.5469,0.6154,0.6496,0.4444,0.455,0.6836,0.7692,0.7265,0.6349,1058.0

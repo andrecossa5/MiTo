@@ -77,7 +77,6 @@ At a glance
    mt.pp.filter_afm(afm)
 
    tree = mt.tl.build_tree(afm, solver='UPMGA')
-   mt.tl.clade_support(tree, afm)
    mt.tl.annotate_clones(tree, afm)
 
    mt.pl.plot_tree(tree, annot='MiTo_clone')

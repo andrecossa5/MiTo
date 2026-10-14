@@ -27,9 +27,10 @@ mtscATAC.
   draws every cell's alternative molecules again, re-calls genotypes and rebuilds the
   UPGMA tree; support is the transfer bootstrap expectation (Lemoine et al., 2018;
   `method="exact"` for Felsenstein's). 100 replicates: 0.3 s (340 cells) to 13 s
-  (2,400 cells). Written on the tree nodes; `annotate_clones` reports each clone's
-  support and `annotate_clones(min_support=...)` leaves weakly supported clones
-  unassigned. On pL1000 ReDeeM, clade precision of the tree .49 -> .81 at support
+  (2,400 cells). Written on the tree nodes. `annotate_clones` computes it when the
+  tree has none (`support=True`, `n_boot=100`) and reports each clone's support;
+  `annotate_clones(min_support=...)` leaves weakly supported clones unassigned (off by
+  default). On pL1000 ReDeeM, clade precision of the tree .49 -> .81 at support
   >= .5 (recall .65 -> .59).
 - **Small-clone pass** (`mt.tl.small_clone_pass`, `annotate_clones(small_clones=True)`,
   off by default): a character carried by 2-4 cells that are exactly a clade becomes

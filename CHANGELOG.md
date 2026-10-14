@@ -16,7 +16,12 @@ All notable changes to this project will be documented in this file.
   off by default): a character carried by 2-4 cells that are exactly a clade becomes
   a clone.
 ### Changed
-- **Reader**: one alternative allele per site, the dominant one.
+- **Reader**: one alternative allele per site, the dominant one;
+  `make_afm(multi_allelic_sites=True)` keeps every allele (as redeemR). The quality
+  filter no longer drops sites with several alleles.
+- RedeemV reader: `edge_trim=9` by default (redeemR Filter-2; was 4).
+- `filter_cells(mean_cov_all=10)` (was 20): redeemR's qualified cells. MAESTER's
+  `filter2` is unaffected.
 - `filter_afm(filter_artefacts=None)`: dbSNP / REDIdb filter on for MAESTER only.
 - `filter_afm(min_snr=None)`: the signal-to-background filter runs after the
   threshold candidate stage only (`.var['snr']` is still written).

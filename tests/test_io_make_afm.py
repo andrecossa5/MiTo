@@ -163,6 +163,34 @@ def test_missing_tables_name_what_is_expected(tmp_path):
         mt.io.make_afm(tmp_path / "empty", scLT_system="MAESTER", pp_method="maegatk")
 
 
+def test_multi_allelic_sites_keep_every_allele(maegatk_tables):
+    folder, meta = maegatk_tables
+    # A second, weaker alternative allele at the first marker site
+    p = meta["positions"][0]
+    other = next(b for b in "ACGT" if b not in (meta["ref"][p], meta["alt"][p]))
+    path = folder / f"{other}.txt.gz"
+    table = pd.read_csv(path, header=None)
+    extra = pd.DataFrame([[p, c, 1, 35.0, 1, 35.0] for c in meta["cells"][:3]])
+    pd.concat([table, extra]).to_csv(path, header=False, index=False)
+
+    one = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
+    every = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk", multi_allelic_sites=True)
+    assert one.var["pos"].value_counts().max() == 1
+    assert f"{p}_{meta['ref'][p]}>{meta['alt'][p]}" in one.var_names
+    assert set(every.var_names) - set(one.var_names) == {f"{p}_{meta['ref'][p]}>{other}"}
+
+
+def test_redeem_edge_trim_defaults_to_redeemR(redeem_tables):
+    import inspect
+
+    from mito.io.format_afm import _read_redeem
+    assert inspect.signature(_read_redeem).parameters["edge_trim"].default == 9
+    folder, _ = redeem_tables
+    trimmed = mt.io.make_afm(folder, scLT_system="ReDeeM", pp_method="redeem-v")
+    loose = mt.io.make_afm(folder, scLT_system="ReDeeM", pp_method="redeem-v", edge_trim=0)
+    assert trimmed.layers["AD"].sum() <= loose.layers["AD"].sum()
+
+
 def test_redeem_threshold_is_validated(redeem_tables):
     with pytest.raises(ValueError, match="treshold"):
         mt.io.make_afm(redeem_tables[0], scLT_system="ReDeeM", pp_method="redeem-v",

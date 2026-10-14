@@ -170,7 +170,8 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - over-dispersion candidate stage = default for MAESTER/ReDeeM (implemented);
   - `max_candidates=1000` (implemented);
   - D2 = `annotate_clones(small_clones=False)` option (implemented);
-  - SNR off after over-dispersion; artefacts on for MAESTER only (implemented).
+  - SNR off after over-dispersion; artefacts on for MAESTER only (implemented);
+  - `multi_allelic_sites` option, redeemV `edge_trim=9`, `filter_cells(mean_cov_all=10)` (implemented).
 - Next: mtscATAC.
 
 ## Open questions (user) — answer before Phase 2
@@ -187,10 +188,10 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 ## Next (Phase 2, after the open questions)
 
 - **io:**
-  - `multi_allelic_sites` option;
+  - ~~`multi_allelic_sites` option~~ (done);
   - per-strand AD layers for read-level input;
   - DP = A+C+G+T fallback;
-  - redeemV `edge_trim=9` default;
+  - ~~redeemV `edge_trim=9` default~~ (done);
   - `barcode_map=`;
   - `read_counts_table`.
 - **pp:**

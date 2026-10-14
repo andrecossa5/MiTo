@@ -165,17 +165,13 @@ def _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=None):
     quality : pd.Series over AD's columns, or None
     """
 
-    # One variant per site: the readers keep the dominant alternative allele, so the
-    # allele frequencies of a site are those of a single, well-defined substitution.
+    # How many alleles per site is the reader's decision (`multi_allelic_sites`): by
+    # default one, the dominant alternative allele.
     var = AD.columns.to_series().to_frame('mut')
     var['pos'] = var['mut'].map(lambda x: int(x.split('_')[0]))
     var['ref'] = var['mut'].map(lambda x: x.split('_')[1].split('>')[0])
     var['alt'] = var['mut'].map(lambda x: x.split('_')[1].split('>')[1])
-    duplicated = var['pos'].map(var['pos'].value_counts())>1
-    if duplicated.any():
-        logging.info(f'Exclude {int(duplicated.sum())} MT-SNVs at sites with several alleles')
-        var = var.loc[~duplicated]
-    var = var.sort_values('pos')
+    var = var.sort_values(['pos', 'alt'])
     AD = AD[var.index].copy()
 
     # Per-variant coverage: the coverage of its site, for every cell
@@ -214,7 +210,8 @@ def _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=None):
 
 
 def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
-                         scLT_system='MAESTER', pp_method='maegatk', ref='rCRS'):
+                         scLT_system='MAESTER', pp_method='maegatk', ref='rCRS',
+                         multi_allelic_sites=False):
     """
     Read maegatk / mgatk per-base allelic tables.
 
@@ -279,7 +276,8 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
     logging.info('Filter variant allele basecalls')
     long = long.query('base!=ref').rename(columns={'counts':'AD', 'base':'alt'}).copy()
     logging.info(f'Alternative basecalls: {long.shape[0]}')
-    long = _dominant_alt(long)
+    if not multi_allelic_sites:
+        long = _dominant_alt(long)
 
     # Coverage, for every cell and site
     logging.info('Retrieve cell-site total coverage')
@@ -313,7 +311,8 @@ REDEEM_THRESHOLDS = ['Total', 'VerySensitive', 'Sensitive', 'Specific']
 
 
 def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDeeM',
-                 pp_method='redeem-v', edge_trim=4, treshold='Sensitive', **kwargs):
+                 pp_method='redeem-v', edge_trim=9, treshold='Sensitive',
+                 multi_allelic_sites=False, **kwargs):
     """
     Read RedeemV output (Weng et al., 2024).
 
@@ -324,7 +323,9 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
     coverage table so that alternative counts and depth agree.
 
     Basecalls within `edge_trim` bp of a fragment end are discarded, and the coverage of
-    the trimmed basecalls is removed from the site's depth.
+    the trimmed basecalls is removed from the site's depth. The default, 9, is redeemR's
+    (Filter-2, the input of MitoDrift): fragment ends concentrate damage and
+    end-repair artefacts.
     """
 
     if treshold not in REDEEM_THRESHOLDS:
@@ -394,8 +395,9 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
     # One alternative allele per site: the dominant one, as in the read-level readers
     long['pos'] = long['Variants'].map(lambda x: int(x.split('_')[0]))
     long['alt'] = long['Variants'].map(lambda x: x.split('_')[1].split('>')[1])
-    long = _dominant_alt(long.rename(columns={'AD_trimmed':'AD'}), count_col='AD')
-    long = long.rename(columns={'AD':'AD_trimmed'})
+    if not multi_allelic_sites:
+        long = _dominant_alt(long.rename(columns={'AD_trimmed':'AD'}), count_col='AD')
+        long = long.rename(columns={'AD':'AD_trimmed'})
     logging.info(f'Alternative basecalls kept: {long.shape[0]}')
     if sample is not None:
         long['Cell'] = long['Cell'].map(lambda x: f'{x}_{sample}')
@@ -476,6 +478,7 @@ def make_afm(
     scLT_system: str = 'MAESTER',
     pp_method: str = 'maegatk',
     ref: str = 'rCRS',
+    multi_allelic_sites: bool = False,
     **kwargs
     ) -> AnnData:
     """
@@ -499,8 +502,13 @@ def make_afm(
         Pre-processing pipeline: "maegatk", "mgatk" or "redeem-v". Default is "maegatk".
     ref : str, optional
         "rCRS", or a path to a custom MT reference (FASTA). Default is "rCRS".
+    multi_allelic_sites : bool, optional
+        Keep every alternative allele observed at a site, one variant each (as redeemR).
+        By default only the dominant one is kept: sequencing error alone puts all three
+        alleles at nearly every site of a large dataset. Default is False.
     **kwargs
-        Reader-specific options (RedeemV: `edge_trim`, `treshold`).
+        Reader-specific options (RedeemV: `edge_trim`, default 9; `treshold`, default
+        "Sensitive").
 
     Returns
     -------
@@ -523,9 +531,11 @@ def make_afm(
     T.start()
 
     if pp_method == 'redeem-v':
-        afm = _read_redeem(path_ch_matrix, path_meta, sample, scLT_system, pp_method, **kwargs)
+        afm = _read_redeem(path_ch_matrix, path_meta, sample, scLT_system, pp_method,
+                           multi_allelic_sites=multi_allelic_sites, **kwargs)
     else:
-        afm = _read_allelic_tables(path_ch_matrix, path_meta, sample, scLT_system, pp_method, ref)
+        afm = _read_allelic_tables(path_ch_matrix, path_meta, sample, scLT_system, pp_method, ref,
+                                   multi_allelic_sites=multi_allelic_sites)
 
     logging.info(f'Allele Frequency Matrix: cell x char {afm.shape}. {T.stop()}')
 

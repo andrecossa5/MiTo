@@ -121,8 +121,7 @@ def filter_low_quality_variants(
     ) -> AnnData | None:
     """
     Baseline MT-SNVs filter: site coverage, base call quality, positive cells, and
-    (MAESTER) only sites in MT-genes. Sites with more than one alternative allele are
-    dropped as well, since they cannot be genotyped independently.
+    (MAESTER) only sites in MT-genes.
 
     Parameters
     ----------
@@ -163,10 +162,6 @@ def filter_low_quality_variants(
     else:
         logging.info('No per-variant base quality available: skipping the quality threshold.')
     afm._inplace_subset_var(test.values)
-
-    # Exclude sites with more than one alt allele observed
-    var_sites = afm.var_names.map(lambda x: x.split('_')[0])
-    afm._inplace_subset_var((var_sites.value_counts()[var_sites]==1).values)
 
     # Exclude variants and cells not observed at all
     afm._inplace_subset_obs((afm.X>0).sum(axis=1).A1>0)

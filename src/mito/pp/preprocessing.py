@@ -34,7 +34,7 @@ def filter_cells(
     cell_subset: Iterable[str] = None,
     cell_filter: str = 'filter1',
     nmads: int = 5,
-    mean_cov_all: float = 20,
+    mean_cov_all: float = 10,
     median_cov_target: int = 25,
     min_perc_covered_sites: float = .75,
     copy: bool = False
@@ -56,7 +56,7 @@ def filter_cells(
     nmads : int, optional
         Number of Minimum Absolute Deviations to filter cells with high MT-library UMI counts. Default is 5.
     mean_cov_all : int, optional
-        Minimum mean consensus (at least 3-supporting-reads) UMI coverage across the MT-genome per cell. Default is 20.
+        Minimum mean consensus (at least 3-supporting-reads) UMI coverage across the MT-genome per cell. Default is 10 (redeemR's qualified cells).
     median_cov_target : int, optional
         Minimum median UMI coverage at target MT-sites (only for MAESTER data). Default is 25.
     min_perc_covered_sites : float, optional

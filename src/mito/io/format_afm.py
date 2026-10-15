@@ -318,6 +318,120 @@ def _read_base_table(path):
         yield df
 
 
+def _assemble_alt_rows(alt, counts, names, n_cov_cells, COV_all, listed, ref_base, n_pos, *,
+                       sample=None, path_meta=None, multi_allelic_sites=False, molecules=False,
+                       f=1.0, has_quality=False, scLT_system='MAESTER', pp_method='maegatk'):
+    """
+    AFM from alternative basecalls and a coverage matrix, shared by `make_afm` (maegatk /
+    mgatk tables) and `make_afm_from_counts`.
+
+    alt : dict of aligned arrays - pos, cell (index into `names`), base (0-3: A C G T),
+        fw, rev, qual (NaN if none); `counts` the alternative reads (or molecules) per row.
+    COV_all, listed : (n_cov_cells, n_pos) coverage, and whether the table lists the pair.
+    """
+
+    BASES = np.array(['A', 'C', 'G', 'T'])
+    # One alternative allele per site: the dominant one (most alternative reads)
+    if not multi_allelic_sites:
+        support = np.bincount(alt['pos'].astype(np.int64)*4 + alt['base'], weights=counts,
+                              minlength=n_pos*4).reshape(n_pos, 4)
+        dominant = support.argmax(1)                        # first maximum: A < C < G < T
+        srt = np.sort(support, 1)
+        n_ambiguous = int(((srt[:,-2] >= 0.5*srt[:,-1]) & (srt[:,-2] > 0)).sum())
+        if n_ambiguous:
+            logging.info(
+                f'{n_ambiguous} site(s) where a second alternative allele carries >=50% of the '
+                f'dominant one\'s reads: the dominant allele is kept for all of them.'
+            )
+        keep = alt['base'] == dominant[alt['pos']]
+        logging.info(f'Keep the dominant alternative allele per site: {int(keep.sum())} of {keep.size} basecalls')
+        alt = {k:v[keep] for k, v in alt.items()}
+        counts = counts[keep]
+
+    rule = None
+    if molecules:
+        rule = 'both_strands' if f - 1 >= 0.5 else 'reads_over_f'
+        AD = np.minimum(alt['fw'], alt['rev']) if rule == 'both_strands' else np.rint(counts / f)
+        logging.info(
+            f'Alternative molecules ({rule}, {f - 1:.0%} of molecules read by both mates): '
+            f'{int((AD>0).sum())} (cell, variant) pairs'
+        )
+    else:
+        AD = counts
+    nz = AD > 0
+    alt = {k:v[nz] for k, v in alt.items()}
+    AD = AD[nz].astype(np.int64)
+
+    # Cells: observed with an alternative basecall and in the coverage table, as annotated
+    if sample is not None:
+        names = [f'{x}_{sample}' for x in names]
+    observed = {names[i] for i in np.unique(alt['cell']) if i < n_cov_cells}
+    cell_meta, cells = _select_cells(path_meta, observed)
+    row = np.full(len(names), -1, dtype=np.int64)
+    name_pos = {c:i for i, c in enumerate(names)}
+    row[[name_pos[c] for c in cells]] = np.arange(len(cells))
+
+    in_cells = row[alt['cell']] >= 0
+    alt = {k:v[in_cells] for k, v in alt.items()}
+    AD = AD[in_cells]
+    r = row[alt['cell']]
+
+    # Variants carried by the selected cells, ordered by position and allele
+    vkey = alt['pos'].astype(np.int64)*4 + alt['base']
+    uvar, col = np.unique(vkey, return_inverse=True)
+    v_pos = (uvar // 4).astype(np.int64)
+    v_alt = BASES[uvar % 4]
+    v_ref = np.array([ref_base.get(int(p), 'N') for p in v_pos])
+    var = pd.DataFrame({'pos':v_pos, 'ref':v_ref, 'alt':v_alt},
+                       index=[f'{p}_{a}>{b}' for p, a, b in zip(v_pos, v_ref, v_alt, strict=True)])
+    if has_quality:
+        q = alt['qual']
+        ok = np.isfinite(q)
+        s_ = np.bincount(col[ok], weights=q[ok], minlength=uvar.size)
+        n_ = np.bincount(col[ok], minlength=uvar.size)
+        with np.errstate(all='ignore'):
+            var['quality'] = s_ / np.where(n_>0, n_, np.nan)
+
+    # Coverage of the selected cells, over the positions the table holds for them
+    src = np.array([name_pos[c] for c in cells], dtype=np.int64)
+    present = np.flatnonzero(listed[src].any(0))
+    col_of = np.full(n_pos, -1, dtype=np.int64)
+    col_of[present] = np.arange(present.size)
+    COV = COV_all[np.ix_(src, present)]
+    if molecules:
+        COV = np.rint(COV / f).astype(np.int32)
+    if (col_of[v_pos] < 0).any():
+        raise ValueError(f'Coverage table misses {int((col_of[v_pos]<0).sum())} of the sites carrying MT-SNVs.')
+
+    dtype = _coverage_dtype(COV)
+    DP = COV[:, col_of[v_pos]]
+    DP[r, col] = np.maximum(DP[r, col], AD)
+    DP = DP.astype(dtype)
+    AF = (AD / np.maximum(DP[r, col], 1)).astype(np.float32)
+    shape = (len(cells), uvar.size)
+    ad_dtype = np.int16 if AD.max(initial=0) <= np.iinfo(np.int16).max else np.int32
+
+    afm = AnnData(
+        X=csr_matrix((AF, (r, col)), shape=shape),
+        obs=cell_meta,
+        var=var,
+        layers={'AD':csr_matrix((AD.astype(ad_dtype), (r, col)), shape=shape), 'DP':DP},
+        uns={'scLT_system':scLT_system, 'pp_method':pp_method}
+    )
+    afm.obs['mean_site_coverage'] = COV.mean(axis=1)
+    if scLT_system in TARGETED_SYSTEMS:
+        target = np.asarray(mask_mt_sites(pd.Index(present)))
+        afm.obs['median_target_site_coverage'] = np.median(COV[:, target], axis=1)
+        afm.obs['frac_target_site_covered'] = (COV[:, target]>0).sum(1) / target.sum()
+    if molecules:
+        afm.uns['molecules'] = {'reads_per_molecule':f, 'frac_both_mates':f - 1, 'alt_rule':rule}
+
+    return afm
+
+
+##
+
+
 def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
                          scLT_system='MAESTER', pp_method='maegatk', ref='rCRS',
                          multi_allelic_sites=False, molecules=None):
@@ -451,103 +565,12 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
         logging.info(f'Reads per molecule, from the strand counts: {f:.2f}')
         del strand_fw, strand_rev
 
-    # One alternative allele per site: the dominant one (most alternative reads)
-    if not multi_allelic_sites:
-        support = np.bincount(alt['pos'].astype(np.int64)*4 + alt['base'], weights=counts,
-                              minlength=n_pos*4).reshape(n_pos, 4)
-        dominant = support.argmax(1)                        # first maximum: A < C < G < T
-        srt = np.sort(support, 1)
-        n_ambiguous = int(((srt[:,-2] >= 0.5*srt[:,-1]) & (srt[:,-2] > 0)).sum())
-        if n_ambiguous:
-            logging.info(
-                f'{n_ambiguous} site(s) where a second alternative allele carries >=50% of the '
-                f'dominant one\'s reads: the dominant allele is kept for all of them.'
-            )
-        keep = alt['base'] == dominant[alt['pos']]
-        logging.info(f'Keep the dominant alternative allele per site: {int(keep.sum())} of {keep.size} basecalls')
-        alt = {k:v[keep] for k, v in alt.items()}
-        counts = counts[keep]
-
-    rule = None
-    if molecules:
-        rule = 'both_strands' if f - 1 >= 0.5 else 'reads_over_f'
-        AD = np.minimum(alt['fw'], alt['rev']) if rule == 'both_strands' else np.rint(counts / f)
-        logging.info(
-            f'Alternative molecules ({rule}, {f - 1:.0%} of molecules read by both mates): '
-            f'{int((AD>0).sum())} (cell, variant) pairs'
-        )
-    else:
-        AD = counts
-    nz = AD > 0
-    alt = {k:v[nz] for k, v in alt.items()}
-    AD = AD[nz].astype(np.int64)
-
-    # Cells: observed with an alternative basecall and in the coverage table, as annotated
-    if sample is not None:
-        names = [f'{x}_{sample}' for x in names]
-    observed = {names[i] for i in np.unique(alt['cell']) if i < n_cov_cells}
-    cell_meta, cells = _select_cells(path_meta, observed)
-    row = np.full(len(names), -1, dtype=np.int64)
-    name_pos = {c:i for i, c in enumerate(names)}
-    row[[name_pos[c] for c in cells]] = np.arange(len(cells))
-
-    in_cells = row[alt['cell']] >= 0
-    alt = {k:v[in_cells] for k, v in alt.items()}
-    AD = AD[in_cells]
-    r = row[alt['cell']]
-
-    # Variants carried by the selected cells, ordered by position and allele
-    vkey = alt['pos'].astype(np.int64)*4 + alt['base']
-    uvar, col = np.unique(vkey, return_inverse=True)
-    v_pos = (uvar // 4).astype(np.int64)
-    v_alt = BASES[uvar % 4]
-    v_ref = np.array([ref_base.get(int(p), 'N') for p in v_pos])
-    var = pd.DataFrame({'pos':v_pos, 'ref':v_ref, 'alt':v_alt},
-                       index=[f'{p}_{a}>{b}' for p, a, b in zip(v_pos, v_ref, v_alt, strict=True)])
-    if has_quality:
-        q = alt['qual']
-        ok = np.isfinite(q)
-        s_ = np.bincount(col[ok], weights=q[ok], minlength=uvar.size)
-        n_ = np.bincount(col[ok], minlength=uvar.size)
-        with np.errstate(all='ignore'):
-            var['quality'] = s_ / np.where(n_>0, n_, np.nan)
-
-    # Coverage of the selected cells, over the positions the table holds for them
-    src = np.array([name_pos[c] for c in cells], dtype=np.int64)
-    present = np.flatnonzero(listed[src].any(0))
-    col_of = np.full(n_pos, -1, dtype=np.int64)
-    col_of[present] = np.arange(present.size)
-    COV = COV_all[np.ix_(src, present)]
-    del COV_all, listed
-    if molecules:
-        COV = np.rint(COV / f).astype(np.int32)
-    if (col_of[v_pos] < 0).any():
-        raise ValueError(f'Coverage table misses {int((col_of[v_pos]<0).sum())} of the sites carrying MT-SNVs.')
-
-    dtype = _coverage_dtype(COV)
-    DP = COV[:, col_of[v_pos]]
-    DP[r, col] = np.maximum(DP[r, col], AD)
-    DP = DP.astype(dtype)
-    AF = (AD / np.maximum(DP[r, col], 1)).astype(np.float32)
-    shape = (len(cells), uvar.size)
-    ad_dtype = np.int16 if AD.max(initial=0) <= np.iinfo(np.int16).max else np.int32
-
-    afm = AnnData(
-        X=csr_matrix((AF, (r, col)), shape=shape),
-        obs=cell_meta,
-        var=var,
-        layers={'AD':csr_matrix((AD.astype(ad_dtype), (r, col)), shape=shape), 'DP':DP},
-        uns={'scLT_system':scLT_system, 'pp_method':pp_method}
+    return _assemble_alt_rows(
+        alt, counts, names, n_cov_cells, COV_all, listed, ref_base, n_pos,
+        sample=sample, path_meta=path_meta, multi_allelic_sites=multi_allelic_sites,
+        molecules=molecules, f=f, has_quality=has_quality,
+        scLT_system=scLT_system, pp_method=pp_method,
     )
-    afm.obs['mean_site_coverage'] = COV.mean(axis=1)
-    if scLT_system in TARGETED_SYSTEMS:
-        target = np.asarray(mask_mt_sites(pd.Index(present)))
-        afm.obs['median_target_site_coverage'] = np.median(COV[:, target], axis=1)
-        afm.obs['frac_target_site_covered'] = (COV[:, target]>0).sum(1) / target.sum()
-    if molecules:
-        afm.uns['molecules'] = {'reads_per_molecule':f, 'frac_both_mates':f - 1, 'alt_rule':rule}
-
-    return afm
 
 
 ##
@@ -692,12 +715,13 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
 
 def _select_cells(path_meta, observed):
     """
-    Cells to assemble the AFM for: those in the metadata, if provided, else all observed.
+    Cells to assemble the AFM for: those in the metadata (a .csv path or a DataFrame),
+    if provided, else all observed.
     """
 
-    if path_meta not in [None, 'null'] and os.path.exists(path_meta):
+    if isinstance(path_meta, pd.DataFrame) or (path_meta not in [None, 'null'] and os.path.exists(path_meta)):
         logging.info('Filter for annotated cells (i.e., sample CBs in cell_meta)')
-        cell_meta = pd.read_csv(path_meta, index_col=0)
+        cell_meta = path_meta.copy() if isinstance(path_meta, pd.DataFrame) else pd.read_csv(path_meta, index_col=0)
         cells = [ x for x in cell_meta.index if x in observed ]
         if not cells:
             raise ValueError(
@@ -793,6 +817,112 @@ def make_afm(
     logging.info(f'Allele Frequency Matrix: cell x char {afm.shape}. {T.stop()}')
 
     return afm
+
+
+##
+
+
+def make_afm_from_counts(
+    counts,
+    coverage,
+    cell_meta: pd.DataFrame = None,
+    scLT_system: str = 'MAESTER',
+    pp_method: str = 'counts',
+    ref: str = 'rCRS',
+    multi_allelic_sites: bool = False,
+    ) -> AnnData:
+    """
+    Assemble an Allele Frequency Matrix from long tables of counts, for data that did not
+    go through maegatk / mgatk / RedeemV (another pipeline, a published matrix).
+
+    Parameters
+    ----------
+    counts : pd.DataFrame or str
+        Alternative allele counts, one row per cell and variant (a .csv path is read):
+        columns "cell", "pos" (1-based), "alt" and "AD" (alternative molecules), and
+        optionally "ref" (checked against the reference) and "quality" (mean base quality).
+        Rows with AD = 0 are ignored.
+    coverage : pd.DataFrame or str
+        Coverage, one row per cell and site: columns "cell", "pos" and "DP". Every site
+        carrying a variant must be listed; a site a cell has no row for counts as not
+        covered (DP = 0) - which is how genotyping tells "not covered" from "covered, no
+        alternative molecule", so include the covered sites without alternative molecules.
+    cell_meta : pd.DataFrame, optional
+        Cell metadata, indexed by cell name; only its cells are kept, in its order.
+        Default is None (every cell with at least one alternative molecule).
+    scLT_system : str, optional
+        Assay, as in `make_afm`: "MAESTER", "mtscATAC" or "ReDeeM". Default is "MAESTER".
+    pp_method : str, optional
+        Label stored in .uns["pp_method"]. Default is "counts".
+    ref : str, optional
+        "rCRS", or a path to a custom MT reference (FASTA). Default is "rCRS".
+    multi_allelic_sites : bool, optional
+        Keep every alternative allele of a site; by default only the one with the most
+        alternative molecules. Default is False.
+
+    Returns
+    -------
+    AnnData
+        The AFM, with the same contract as `make_afm`'s.
+    """
+
+    if scLT_system not in SCLT_SYSTEMS:
+        raise ValueError(f'scLT_system must be one of {SCLT_SYSTEMS}. Provided: {scLT_system}')
+    counts = pd.read_csv(counts) if isinstance(counts, str) else counts.copy()
+    coverage = pd.read_csv(coverage) if isinstance(coverage, str) else coverage.copy()
+    for name, df, cols in (('counts', counts, ['cell', 'pos', 'alt', 'AD']), ('coverage', coverage, ['cell', 'pos', 'DP'])):
+        missing = [c for c in cols if c not in df.columns]
+        if missing:
+            raise ValueError(f'{name} needs the columns {cols}; missing: {missing}.')
+
+    ref_base = _read_reference(ref)
+    n_pos = max(ref_base) + 2
+    counts = counts.loc[counts['AD'] > 0]
+    pos = counts['pos'].to_numpy(np.int64)
+    if (pos < 1).any() or (pos >= n_pos).any():
+        raise ValueError(f'Positions must be 1-based MT coordinates (1-{n_pos-2}).')
+    code = {'A':0, 'C':1, 'G':2, 'T':3}
+    base = counts['alt'].astype(str).str.upper().map(code)
+    if base.isna().any():
+        raise ValueError(f'alt must be one of A, C, G, T; found {sorted(set(counts["alt"][base.isna()]))}.')
+    base = base.to_numpy(np.int8)
+    ref_of_pos = np.array([ref_base.get(int(p), 'N') for p in pos])
+    if (np.array(['A', 'C', 'G', 'T'])[base] == ref_of_pos).any():
+        raise ValueError('Some rows have alt equal to the reference base: they are not variants.')
+    if 'ref' in counts.columns:
+        bad = counts['ref'].astype(str).str.upper().to_numpy() != ref_of_pos
+        if bad.any():
+            raise ValueError(f'{int(bad.sum())} row(s) have a ref base that differs from the {ref} reference.')
+    if counts.duplicated(['cell', 'pos', 'alt']).any():
+        raise ValueError('counts has several rows for the same cell, pos and alt.')
+
+    # One index of cells, coverage first (as the table readers)
+    names = list(pd.unique(coverage['cell'].astype(str)))
+    index = {c:i for i, c in enumerate(names)}
+    n_cov_cells = len(names)
+    for c in pd.unique(counts['cell'].astype(str)):
+        if c not in index:
+            index[c] = len(names)
+            names.append(c)
+    COV_all = np.zeros((n_cov_cells, n_pos), dtype=np.int32)
+    listed = np.zeros((n_cov_cells, n_pos), dtype=bool)
+    cr = coverage['cell'].astype(str).map(index).to_numpy(np.int64)
+    cp = coverage['pos'].to_numpy(np.int64)
+    COV_all[cr, cp] = coverage['DP'].to_numpy(np.int64)
+    listed[cr, cp] = True
+
+    AD = counts['AD'].to_numpy(np.int64)
+    alt = {
+        'pos':pos, 'cell':counts['cell'].astype(str).map(index).to_numpy(np.int64), 'base':base,
+        'fw':AD, 'rev':np.zeros_like(AD),
+        'qual':counts['quality'].to_numpy(float) if 'quality' in counts.columns else np.full(AD.size, np.nan),
+    }
+
+    return _assemble_alt_rows(
+        alt, AD, names, n_cov_cells, COV_all, listed, ref_base, n_pos,
+        path_meta=cell_meta, multi_allelic_sites=multi_allelic_sites,
+        has_quality='quality' in counts.columns, scLT_system=scLT_system, pp_method=pp_method,
+    )
 
 
 ##

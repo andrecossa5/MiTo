@@ -17,7 +17,7 @@ from conftest import build_afm
 MODULES = ["io", "pp", "tl", "pl", "ut"]
 
 EXPORTS = {
-    "io": ["make_afm", "read_coverage", "read_newick", "write_newick"],
+    "io": ["make_afm", "make_afm_from_counts", "read_coverage", "read_newick", "write_newick"],
     "pp": [
         "filter_cells", "filter_afm",
         "annotate_vars", "filter_low_quality_variants", "filter_overdispersed_variants",

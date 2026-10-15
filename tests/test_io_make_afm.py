@@ -295,3 +295,57 @@ def test_with_overlapping_mates_alternative_molecules_need_both_strands(mgatk_ta
     folder, _ = mgatk_tables
     mols = mt.io.make_afm(folder, scLT_system="mtscATAC", pp_method="mgatk")
     assert mols.uns["molecules"]["alt_rule"] == "both_strands"
+
+
+# -- from long count tables -------------------------------------------------
+
+def _long_tables(afm):
+    """An AFM exported as the counts + coverage tables make_afm_from_counts reads."""
+    AD = afm.layers["AD"].tocoo()
+    counts = pd.DataFrame({"cell": afm.obs_names[AD.row], "pos": afm.var["pos"].values[AD.col],
+                           "ref": afm.var["ref"].values[AD.col], "alt": afm.var["alt"].values[AD.col],
+                           "AD": AD.data})
+    DP = np.asarray(afm.layers["DP"])
+    sites = afm.var.drop_duplicates("pos")
+    j = [list(afm.var_names).index(v) for v in sites.index]
+    coverage = pd.DataFrame({"cell": np.repeat(afm.obs_names, len(j)),
+                             "pos": np.tile(sites["pos"].values, afm.shape[0]),
+                             "DP": DP[:, j].ravel()})
+    return counts, coverage
+
+
+def test_counts_tables_give_back_the_same_matrices(maegatk_tables):
+    folder, _ = maegatk_tables
+    afm = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
+    counts, coverage = _long_tables(afm)
+    back = mt.io.make_afm_from_counts(counts, coverage, scLT_system="MAESTER")
+    _assert_contract(back)
+    assert list(back.var_names) == list(afm.var_names)
+    cells = back.obs_names
+    assert (back.layers["AD"].toarray() == afm[cells].layers["AD"].toarray()).all()
+    assert (np.asarray(back.layers["DP"]) == np.asarray(afm[cells].layers["DP"])).all()
+    assert np.allclose(back.X.toarray(), afm[cells].X.toarray())
+
+
+def test_counts_tables_keep_the_cells_of_the_metadata_in_its_order(maegatk_tables):
+    folder, _ = maegatk_tables
+    afm = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
+    counts, coverage = _long_tables(afm)
+    meta = pd.DataFrame({"group": "a"}, index=list(afm.obs_names[10:30][::-1]))
+    back = mt.io.make_afm_from_counts(counts, coverage, cell_meta=meta)
+    assert list(back.obs_names) == list(meta.index)
+    assert "group" in back.obs.columns
+
+
+@pytest.mark.parametrize("bad, match", [
+    (lambda c, v: (c.drop(columns="AD"), v), "AD"),
+    (lambda c, v: (c.assign(alt="N"), v), "alt must be"),
+    (lambda c, v: (c.assign(alt=c["ref"]), v), "reference base"),
+    (lambda c, v: (pd.concat([c, c.iloc[:1]]), v), "several rows"),
+])
+def test_counts_tables_are_validated(maegatk_tables, bad, match):
+    folder, _ = maegatk_tables
+    afm = mt.io.make_afm(folder, scLT_system="MAESTER", pp_method="maegatk")
+    counts, coverage = _long_tables(afm)
+    with pytest.raises(ValueError, match=match):
+        mt.io.make_afm_from_counts(*bad(counts, coverage))

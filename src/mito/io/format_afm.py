@@ -586,7 +586,7 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
     Read RedeemV output (Weng et al., 2024).
 
     `path_ch_matrix` (or its `final/` sub-folder) must hold
-    `RawGenotypes.<treshold>.StrandBalance` and `QualifiedTotalCts`. RedeemV emits four
+    `RawGenotypes.<treshold>.StrandBalance` and `QualifiedTotalCts` (either gzipped). RedeemV emits four
     consensus-stringency levels, from least to most stringent: Total, VerySensitive,
     Sensitive, Specific; `treshold` selects one, and the same level is read from the
     coverage table so that alternative counts and depth agree.
@@ -601,9 +601,9 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
         raise ValueError(f'treshold must be one of {REDEEM_THRESHOLDS}. Provided: {treshold}')
 
     path_ch_matrix = _resolve_dir(path_ch_matrix)
-    path_basecalls = os.path.join(path_ch_matrix, f'RawGenotypes.{treshold}.StrandBalance')
-    if not os.path.exists(path_basecalls):
-        raise ValueError(f'Missing RedeemV basecalls: {path_basecalls}')
+    path_basecalls = _find(path_ch_matrix, f'RawGenotypes.{treshold}.StrandBalance')
+    if path_basecalls is None:
+        raise ValueError(f'Missing RedeemV basecalls: RawGenotypes.{treshold}.StrandBalance(.gz) in {path_ch_matrix}')
     logging.info(f'Process RedeemV basecalls from: {path_basecalls}')
 
     # 14 columns: MoleculeID (CB_start_end), CellBC, Pos, Variant, V, Ref, FamSize,
@@ -672,9 +672,9 @@ def _read_redeem(path_ch_matrix, path_meta=None, sample=None, scLT_system='ReDee
         long['Cell'] = long['Cell'].map(lambda x: f'{x}_{sample}')
 
     # Coverage, for every cell and site
-    path_cov = os.path.join(path_ch_matrix, 'QualifiedTotalCts')
-    if not os.path.exists(path_cov):
-        raise ValueError(f'Missing RedeemV coverage table: {path_cov}')
+    path_cov = _find(path_ch_matrix, 'QualifiedTotalCts')
+    if path_cov is None:
+        raise ValueError(f'Missing RedeemV coverage table: QualifiedTotalCts(.gz) in {path_ch_matrix}')
     logging.info('Add full site-coverage matrix')
     cov_cols = ['Cell', 'Pos'] + REDEEM_THRESHOLDS
     cov = pd.read_csv(

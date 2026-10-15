@@ -33,7 +33,7 @@ extensions = [
     "nbsphinx",
 ]
 
-exclude_patterns = ["_build", "**.ipynb_checkpoints"]
+exclude_patterns = ["_build", "**.ipynb_checkpoints", "data"]
 
 # -- autodoc / autosummary ---------------------------------------------------
 

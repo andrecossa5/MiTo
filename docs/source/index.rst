@@ -83,11 +83,14 @@ At a glance
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
-   :caption: Getting started
+   :maxdepth: 1
+   :caption: Tutorials
 
    installation
-   tutorials
+   getting_started
+   loading_data
+   benchmark
+   biological_example
 
 .. toctree::
    :hidden:

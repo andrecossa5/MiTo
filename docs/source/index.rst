@@ -4,10 +4,11 @@ MiTo
 **Mitochondrial lineage tracing and single-cell multi-omics in Python**
 
 MiTo turns mitochondrial DNA variation into single-cell phylogenies. It reads
-MAESTER, RedeeM, Cas9 and scWGS output into an :class:`~anndata.AnnData` Allele
-Frequency Matrix, selects informative MT-SNVs, calls single-cell genotypes,
-computes cell–cell distances in mutational space, and reconstructs and annotates
-clonal trees.
+MAESTER (maegatk), mtscATAC (mgatk) and ReDeeM (RedeemV) output into an
+:class:`~anndata.AnnData` Allele Frequency Matrix of molecule counts, selects
+informative MT-SNVs, calls single-cell genotypes, reconstructs the cell phylogeny, and
+annotates its clones with the support of their clades - with the same calls and
+defaults for the three assays.
 
 .. code-block:: bash
 
@@ -16,17 +17,29 @@ clonal trees.
 .. grid:: 2
    :gutter: 3
 
+   .. grid-item-card:: Getting started
+      :link: getting_started
+      :link-type: doc
+
+      The pipeline in four calls, on simulated clones.
+
+   .. grid-item-card:: Loading data
+      :link: loading_data
+      :link-type: doc
+
+      The AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
+
+   .. grid-item-card:: Benchmark
+      :link: benchmark
+      :link-type: doc
+
+      Simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells.
+
    .. grid-item-card:: Installation
       :link: installation
       :link-type: doc
 
       Set up MiTo and its dependencies.
-
-   .. grid-item-card:: Tutorials
-      :link: tutorials
-      :link-type: doc
-
-      A walkthrough of the main workflow, and a ground truth benchmark.
 
    .. grid-item-card:: API reference
       :link: api

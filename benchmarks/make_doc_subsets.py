@@ -88,6 +88,10 @@ def main():
                  atac, 0, pos_col=1, sep='\t')
     pd.DataFrame({'LARRY': truth[gex].values}, index=atac).to_csv(os.path.join(out, 'cells_meta.csv'))
 
+    # LARRY clones of all 1,362 labelled cells, with both barcodes (Benchmark notebook)
+    pd.DataFrame({'gex': truth.index, 'atac': [to_atac.get(g.replace('-1', ''), '') for g in truth.index],
+                  'LARRY': truth.values}).to_csv(os.path.join(OUT, 'pL1000_LARRY.csv'), index=False)
+
     for root, _, files in os.walk(OUT):
         for f in sorted(files):
             p = os.path.join(root, f)

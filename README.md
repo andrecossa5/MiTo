@@ -65,9 +65,13 @@ sequencing noise (redeemR Filter-2, at most `max_candidates=1000`), keeps those 
 carriers are clonal on the cell kNN graph, and genotypes each cell against each
 variant's own error rate.
 
-See the [getting started tutorial](https://mito.readthedocs.io/en/latest/getting_started.html)
-for the full vignette, and the [ground truth benchmark](https://mito.readthedocs.io/en/latest/benchmark.html)
-for a worked example on real MAESTER data.
+Tutorials:
+
+* [Getting started](https://mito.readthedocs.io/en/latest/getting_started.html): the pipeline on simulated clones.
+* [Loading data](https://mito.readthedocs.io/en/latest/loading_data.html): the AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
+* [Benchmark](https://mito.readthedocs.io/en/latest/benchmark.html): simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells, against ground-truth lineage barcodes.
+
+What changed in 0.5.0, and how to move from 0.2: [CHANGELOG.md](CHANGELOG.md).
 
 ## API
 
@@ -93,6 +97,14 @@ cd MiTo
 pip install -e ".[test]"
 pytest
 ```
+
+## Reproducing the paper
+
+The results of the MiTo paper were obtained with **MiTo 0.2.0** (`pip install scmito==0.2.0`)
+and the matching [nf-MiTo](https://github.com/andrecossa5/nf-MiTo) release; the analysis code
+and versions are in [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro).
+MiTo 0.5.0 changes the variant pipeline and the clone annotation (see the CHANGELOG), so
+it does not reproduce those numbers exactly.
 
 ## Citation
 

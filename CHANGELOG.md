@@ -2,10 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0] - 2026-10-14
+## [0.5.0] - 2026-10-15
 One pipeline for the three MT-scLT assays: every AFM holds molecule counts, and
 `filter_afm` runs the same stages with the same defaults on MAESTER, ReDeeM and
 mtscATAC.
+
+0.3.0 was not released on PyPI: from 0.2.0, read the 0.3.0 entry below as well. The
+results of the MiTo paper were obtained with 0.2.0 (`pip install scmito==0.2.0`).
+
+**Migrating from 0.2:** `mt.pp.filter_baseline` / `filter_afm(filtering='MiTo')` ->
+`mt.pp.filter_cells` + `mt.pp.filter_afm`; `mt.tl.MiToTreeAnnotator(tree).clonal_inference()`
+-> `mt.tl.annotate_clones(tree, afm)` (labels in `afm.obs['MiTo_clone']`);
+`mt.tl.bootstrap_MiTo` / `bootstrap_bin` -> `mt.tl.clade_support`; AFMs written by 0.2 ->
+`mt.io.migrate_afm`.
 
 ### Added
 - **Over-dispersion candidate stage** (`mt.pp.filter_overdispersed_variants`), the
@@ -36,6 +45,13 @@ mtscATAC.
   off by default): a character carried by 2-4 cells that are exactly a clade becomes
   a clone.
 - `make_afm(multi_allelic_sites=True)`: keep every alternative allele of a site.
+- **`mt.io.make_afm_from_counts`**: an AFM from long tables of alternative counts and
+  coverage per cell and site, for data from other pipelines; same contract and rules as
+  the readers. The RedeemV reader also accepts gzipped files.
+- **Documentation**: Getting started (simulated flat and nested clones), Loading data
+  (the AFM; maegatk, mgatk, RedeemV and counts tables, on real 50-cell subsets shipped
+  in `docs/source/data`) and Benchmark (simulated, MAESTER, ReDeeM vs mtscATAC on the
+  same cells) notebooks.
 
 ### Changed
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the

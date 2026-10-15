@@ -9,3 +9,7 @@ layout: 50 cells each, 10 from each of the 5 largest ground-truth clones. Writte
 | `maester_MDA_clones/` | MAESTER, maegatk (nf-MiTo layout) | MDA_clones, MiTo paper data (Zenodo 10.5281/zenodo.17225334) | lentiviral barcodes (`GBC`) |
 | `mtscATAC_pL1000/` | mtscATAC, mgatk (positions 1-3,000) | pL1000, MitoDrift data (figshare 10.6084/m9.figshare.31323481) | LARRY barcodes |
 | `redeem_pL1000/` | ReDeeM, RedeemV (positions 1-3,000) | the same cells and deposit | LARRY barcodes |
+
+`pL1000_LARRY.csv`: the LARRY clone of the 1,362 labelled pL1000 cells (MitoDrift's
+final annotation), with their GEX and ATAC barcodes (10x Multiome pairing, from the
+redeemR whitelists), used by the Benchmark notebook.

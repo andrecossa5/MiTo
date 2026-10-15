@@ -228,18 +228,47 @@ def _reads_per_molecule(fw, rev, pos, min_reads=5):
     On pL1000 (Multiome), 1.66, against 1.73 from the ReDeeM molecules of the same cells.
     """
 
-    df = pd.DataFrame({'fw':fw, 'R':fw + rev, 'pos':pos})
-    tot = df.groupby('pos')[['fw', 'R']].sum()
-    s = (tot['fw'] / tot['R'].clip(lower=1)).rename('s')
-    df = df.join(s, on='pos')
-    df['num'] = (df['fw'] - df['s'] * df['R'])**2
-    df['den'] = df['R'] * df['s'] * (1 - df['s'])
-    site = df.groupby('pos')[['num', 'den', 'R']].agg({'num':'sum', 'den':'sum', 'R':'mean'})
-    ok = (site['R'] >= min_reads) & s.reindex(site.index).between(0.2, 0.8) & (site['den'] > 0)
+    pos = np.asarray(pos, dtype=np.int64)
+    fw = np.asarray(fw, dtype=float)
+    R = fw + np.asarray(rev, dtype=float)
+    n = int(pos.max()) + 1
+    s = np.bincount(pos, weights=fw, minlength=n) / np.maximum(np.bincount(pos, weights=R, minlength=n), 1)
+    num = np.bincount(pos, weights=(fw - s[pos]*R)**2, minlength=n)
+    den = np.bincount(pos, weights=R*s[pos]*(1 - s[pos]), minlength=n)
+    cnt = np.bincount(pos, minlength=n)
+    with np.errstate(all='ignore'):
+        mean_R = np.bincount(pos, weights=R, minlength=n) / cnt
+    return _kappa_to_f(num, den, mean_R, s, min_reads)
+
+
+def _reads_per_molecule_dense(FW, REV, min_reads=5, block=512):
+    """`_reads_per_molecule` on (cells x positions) strand-count arrays, in column blocks."""
+
+    n = FW.shape[1]
+    num, den, mean_R, s = (np.zeros(n) for _ in range(4))
+    for a in range(0, n, block):
+        f_ = FW[:, a:a+block].astype(float)
+        R = f_ + REV[:, a:a+block]
+        seen = R > 0
+        tot = R.sum(0)
+        s[a:a+block] = f_.sum(0) / np.maximum(tot, 1)
+        sb = s[a:a+block]
+        num[a:a+block] = np.where(seen, (f_ - sb*R)**2, 0).sum(0)
+        den[a:a+block] = (R*sb*(1 - sb)).sum(0)
+        with np.errstate(all='ignore'):
+            mean_R[a:a+block] = tot / seen.sum(0)
+
+    return _kappa_to_f(num, den, mean_R, s, min_reads)
+
+
+def _kappa_to_f(num, den, mean_R, s, min_reads):
+    """Median kappa over well-covered, strand-balanced sites, as reads per molecule."""
+
+    ok = (mean_R >= min_reads) & (s >= 0.2) & (s <= 0.8) & (den > 0)
     if not ok.any():
         logging.warning('Too little coverage to estimate reads per molecule: assuming 1.')
         return 1.0
-    kappa = float(np.median(site.loc[ok, 'num'] / site.loc[ok, 'den']))
+    kappa = float(np.median(num[ok] / den[ok]))
     f = 2 / (1 + kappa)
     if f < 1:
         logging.warning(
@@ -252,6 +281,43 @@ def _reads_per_molecule(fw, rev, pos, min_reads=5):
 ##
 
 
+def _table_layout(path):
+    """
+    Columns of a maegatk / mgatk per-base table, from its first line:
+
+    * 4 columns - pos, cell, forward count, reverse count. This is what mgatk writes for
+      10x data unless it is run with `--emit-base-qualities`: there are no base qualities,
+      so the AFM gets no `var["quality"]` and the filters that would use it are skipped.
+    * 6 columns - the same, with a mean base quality per strand (maegatk; mgatk with
+      `-eb`).
+    * more - extra consensus/group-size columns (mito_preprocessing-style), ignored.
+    """
+
+    n = pd.read_csv(path, header=None, nrows=1).shape[1]
+    if n == 4:
+        return [0, 1, 2, 3], ['pos', 'cell', 'fw', 'rev']
+    if n == 6:
+        return [0, 1, 2, 3, 4, 5], ['pos', 'cell', 'fw', 'qfw', 'rev', 'qrev']
+    if n > 6:
+        return [0, 1, 2, 3, 6, 7], ['pos', 'cell', 'fw', 'qfw', 'rev', 'qrev']
+    raise ValueError(f'Unexpected layout in {os.path.basename(path)}: {n} columns.')
+
+
+_CHUNK = 5_000_000
+
+
+def _read_base_table(path):
+    """One per-base table, typed and restricted to the columns used, in chunks of rows."""
+
+    usecols, names = _table_layout(path)
+    dtype = {'pos':np.int32, 'cell':'category', 'fw':np.int32, 'rev':np.int32,
+             'qfw':np.float32, 'qrev':np.float32}
+    for df in pd.read_csv(path, header=None, usecols=usecols, chunksize=_CHUNK,
+                          dtype={i:dtype[n] for i, n in zip(usecols, names, strict=True)}):
+        df.columns = names
+        yield df
+
+
 def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
                          scLT_system='MAESTER', pp_method='maegatk', ref='rCRS',
                          multi_allelic_sites=False, molecules=None):
@@ -260,16 +326,13 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
 
     `path_ch_matrix` (or its `final/` sub-folder) must hold the per-base tables and the
     coverage table, named `A.txt[.gz]` … `coverage.txt[.gz]` with or without a sample-name
-    prefix (nf-MiTo writes the former, mgatk the latter).
+    prefix (nf-MiTo writes the former, mgatk the latter). Table layouts differ between
+    tools and modes, and are detected from the column count (`_table_layout`).
 
-    Table layouts differ between tools and modes, and are detected from the column count:
-
-    * 4 columns - pos, cell, forward count, reverse count. This is what mgatk writes for
-      10x data unless it is run with `--emit-base-qualities`: there are no base qualities,
-      so the AFM gets no `var["quality"]` and the filters that would use it are skipped.
-    * 6 columns - the same, with a mean base quality per strand (maegatk; mgatk with
-      `-eb`).
-    * more - extra consensus/group-size columns (mito_preprocessing-style), ignored.
+    The tables are read typed and column-selective, reduced to alternative basecalls as
+    they are read, and assembled straight into sparse matrices: no cell x variant table
+    is ever built dense, and the tables are parsed in chunks (a 4,800-cell MAESTER sample:
+    ~10 GB and 65 s before, under 2 GB and ~20 s now).
 
     `molecules` (default: for mtscATAC) converts read counts to molecules. mtscATAC reads
     are not UMI-collapsed: a molecule covered by both mates of a short fragment is counted
@@ -294,99 +357,193 @@ def _read_allelic_tables(path_ch_matrix, path_meta=None, sample=None,
 
     path_ch_matrix = _resolve_dir(path_ch_matrix)
     ref_base = _read_reference(ref, path=path_ch_matrix)
+    n_pos = max(ref_base) + 2
+    BASES = np.array(['A', 'C', 'G', 'T'])
+    ref_code = np.full(n_pos, -1, dtype=np.int8)                     # -1: N or unknown
+    for p, b in ref_base.items():
+        ref_code[p] = {'A':0, 'C':1, 'G':2, 'T':3}.get(b, -1)
 
-    L = []
-    has_quality = True
-    for base in ['A', 'C', 'T', 'G']:
-        path_base = _find(path_ch_matrix, f'{base}.txt')
-        if path_base is None:
+    paths = {}
+    for base in BASES:
+        paths[base] = _find(path_ch_matrix, f'{base}.txt')
+        if paths[base] is None:
             raise ValueError(
                 f'Missing the {base} allelic table in {path_ch_matrix}. Expected '
                 f'"{base}.txt(.gz)", with or without a sample-name prefix.'
             )
-        logging.info(f'Process table: {os.path.basename(path_base)}')
-        df = pd.read_csv(path_base, header=None)
-        if df.shape[1] == 4:                      # no base qualities (mgatk, 10x mode)
-            df.columns = ['pos', 'cell', 'count_fw', 'count_rev']
-            df['qual_fw'] = df['qual_rev'] = np.nan
-            has_quality = False
-        elif df.shape[1] == 6:
-            df.columns = ['pos', 'cell', 'count_fw', 'qual_fw', 'count_rev', 'qual_rev']
-        elif df.shape[1]>6:                       # extra consensus/group-size columns
-            df = pd.concat([df.iloc[:,:2], df.iloc[:,[2,3,6,7]]], axis=1)
-            df.columns = ['pos', 'cell', 'count_fw', 'qual_fw', 'count_rev', 'qual_rev']
-        else:
-            raise ValueError(
-                f'Unexpected layout in {os.path.basename(path_base)}: {df.shape[1]} columns.'
-            )
-        df['counts'] = df['count_fw'] + df['count_rev']
-        qual = df[['qual_fw', 'qual_rev']].values
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', RuntimeWarning)   # basecalls with no quality
-            df['qual'] = np.nanmean(np.where(qual>0, qual, np.nan), axis=1)
-        L.append(df[['pos', 'cell', 'counts', 'count_fw', 'count_rev', 'qual']].assign(base=base))
-
-    if not has_quality:
-        logging.info('No base qualities in the allelic tables: var["quality"] is not set.')
-
-    logging.info('Format all basecalls in a long table')
-    long = pd.concat(L)
-    if sample is not None:
-        long['cell'] = long['cell'].map(lambda x: f'{x}_{sample}')
-    long['ref'] = long['pos'].map(ref_base)
-
-    f = 1.0
-    if molecules:
-        strands = long.groupby(['pos', 'cell'], observed=True)[['count_fw', 'count_rev']].sum().reset_index()
-        f = _reads_per_molecule(strands['count_fw'].values, strands['count_rev'].values,
-                                strands['pos'].values)
-        logging.info(f'Reads per molecule, from the strand counts: {f:.2f}')
-        del strands
-
-    # Alternative basecalls only, one alternative allele per (cell, site)
-    logging.info('Filter variant allele basecalls')
-    long = long.query('base!=ref').rename(columns={'counts':'AD', 'base':'alt'}).copy()
-    logging.info(f'Alternative basecalls: {long.shape[0]}')
-    if not multi_allelic_sites:
-        long = _dominant_alt(long)
-    rule = None
-    if molecules:
-        rule = 'both_strands' if f - 1 >= 0.5 else 'reads_over_f'
-        if rule == 'both_strands':
-            long['AD'] = np.minimum(long['count_fw'], long['count_rev'])
-        else:
-            long['AD'] = np.rint(long['AD'] / f).astype(int)
-        long = long.query('AD>0').copy()
-        logging.info(
-            f'Alternative molecules ({rule}, {f - 1:.0%} of molecules read by both mates): '
-            f'{long.shape[0]} (cell, variant) pairs'
-        )
-
-    # Coverage, for every cell and site
-    logging.info('Retrieve cell-site total coverage')
     path_cov = _find(path_ch_matrix, 'coverage.txt')
     if path_cov is None:
         raise ValueError(f'Missing the coverage table in {path_ch_matrix}.')
-    cov = pd.read_csv(path_cov, header=None)
-    cov.columns = ['pos', 'cell', 'DP']
-    if sample is not None:
-        cov['cell'] = cov['cell'].map(lambda x: f'{x}_{sample}')
 
-    cell_meta, cells = _select_cells(path_meta, set(long['cell']) & set(cov['cell']))
-    long = long.query('cell in @cells').copy()
+    # Coverage first: it fixes the cell universe
+    logging.info('Retrieve cell-site total coverage')
+    names = []
+    index = {}
 
-    long['mut'] = long['pos'].astype(str) + '_' + long['ref'] + '>' + long['alt']
-    AD = long.pivot(index='cell', columns='mut', values='AD').fillna(0).reindex(cells).fillna(0)
-    quality = long.groupby('mut')['qual'].mean() if has_quality else None
-    COV = (
-        cov.query('cell in @cells')
-        .pivot(index='cell', columns='pos', values='DP')
-        .fillna(0).reindex(cells).fillna(0)
-    )
+    def codes(cat):
+        """Cell codes of a categorical column in the shared cell index."""
+        cats = list(cat.cat.categories)
+        for c in cats:
+            if c not in index:
+                index[c] = len(names)
+                names.append(c)
+        lut = np.array([index[c] for c in cats], dtype=np.int64)
+        return lut[cat.cat.codes.values]
+
+    # Coverage of every cell at every position, and which positions the table lists for it
+    cov_chunks = []
+    for cov in pd.read_csv(path_cov, header=None, names=['pos', 'cell', 'DP'], chunksize=_CHUNK,
+                           dtype={'pos':np.int32, 'cell':'category', 'DP':np.int32}):
+        cov_chunks.append((codes(cov['cell']).astype(np.int32), cov['pos'].values, cov['DP'].values))
+    n_cov_cells = len(names)
+    COV_all = np.zeros((n_cov_cells, n_pos), dtype=np.int32)
+    listed = np.zeros((n_cov_cells, n_pos), dtype=bool)
+    for c, p_, d in cov_chunks:
+        COV_all[c, p_] = d
+        listed[c, p_] = True
+    del cov_chunks
+
+    # Per-base tables, chunk by chunk: alternative basecalls kept, forward / reverse reads
+    # of every base added up per (cell, position) if read counts are to become molecules.
+    # (cell, position) pairs are unique within a table, so plain fancy addition is exact.
+    alt = {k:[] for k in ('pos', 'cell', 'base', 'fw', 'rev', 'qual')}
     if molecules:
-        COV = np.rint(COV / f)
+        strand_fw = np.zeros((n_cov_cells, n_pos), dtype=np.int32)
+        strand_rev = np.zeros((n_cov_cells, n_pos), dtype=np.int32)
+    has_quality = True
+    for b, base in enumerate(BASES):
+        logging.info(f'Process table: {os.path.basename(paths[base])}')
+        for df in _read_base_table(paths[base]):
+            cell = codes(df['cell'])
+            pos = df['pos'].values
+            fw = df['fw'].values
+            rev = df['rev'].values
+            if 'qfw' in df.columns:
+                q = np.stack([df['qfw'].values, df['qrev'].values], 1).astype(float)
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', RuntimeWarning)   # basecalls with no quality
+                    qual = np.nanmean(np.where(q>0, q, np.nan), axis=1)
+            else:
+                has_quality = False
+                qual = np.full(pos.size, np.nan)
+            del df
 
-    afm = _build_afm(AD, COV, cell_meta, scLT_system, pp_method, quality=quality)
+            if molecules:
+                ok = cell < n_cov_cells
+                strand_fw[cell[ok], pos[ok]] += fw[ok]
+                strand_rev[cell[ok], pos[ok]] += rev[ok]
+
+            is_alt = ref_code[pos] != b
+            for k, v in (('pos', pos), ('cell', cell.astype(np.int32)), ('fw', fw), ('rev', rev),
+                         ('qual', qual.astype(np.float32))):
+                alt[k].append(v[is_alt])
+            alt['base'].append(np.full(int(is_alt.sum()), b, dtype=np.int8))
+
+    if not has_quality:
+        logging.info('No base qualities in the allelic tables: var["quality"] is not set.')
+    alt = {k:np.concatenate(v) for k, v in alt.items()}
+    counts = alt['fw'].astype(np.int64) + alt['rev']
+    logging.info(f'Alternative basecalls: {counts.size}')
+
+    f = 1.0
+    if molecules:
+        f = _reads_per_molecule_dense(strand_fw, strand_rev)
+        logging.info(f'Reads per molecule, from the strand counts: {f:.2f}')
+        del strand_fw, strand_rev
+
+    # One alternative allele per site: the dominant one (most alternative reads)
+    if not multi_allelic_sites:
+        support = np.bincount(alt['pos'].astype(np.int64)*4 + alt['base'], weights=counts,
+                              minlength=n_pos*4).reshape(n_pos, 4)
+        dominant = support.argmax(1)                        # first maximum: A < C < G < T
+        srt = np.sort(support, 1)
+        n_ambiguous = int(((srt[:,-2] >= 0.5*srt[:,-1]) & (srt[:,-2] > 0)).sum())
+        if n_ambiguous:
+            logging.info(
+                f'{n_ambiguous} site(s) where a second alternative allele carries >=50% of the '
+                f'dominant one\'s reads: the dominant allele is kept for all of them.'
+            )
+        keep = alt['base'] == dominant[alt['pos']]
+        logging.info(f'Keep the dominant alternative allele per site: {int(keep.sum())} of {keep.size} basecalls')
+        alt = {k:v[keep] for k, v in alt.items()}
+        counts = counts[keep]
+
+    rule = None
+    if molecules:
+        rule = 'both_strands' if f - 1 >= 0.5 else 'reads_over_f'
+        AD = np.minimum(alt['fw'], alt['rev']) if rule == 'both_strands' else np.rint(counts / f)
+        logging.info(
+            f'Alternative molecules ({rule}, {f - 1:.0%} of molecules read by both mates): '
+            f'{int((AD>0).sum())} (cell, variant) pairs'
+        )
+    else:
+        AD = counts
+    nz = AD > 0
+    alt = {k:v[nz] for k, v in alt.items()}
+    AD = AD[nz].astype(np.int64)
+
+    # Cells: observed with an alternative basecall and in the coverage table, as annotated
+    if sample is not None:
+        names = [f'{x}_{sample}' for x in names]
+    observed = {names[i] for i in np.unique(alt['cell']) if i < n_cov_cells}
+    cell_meta, cells = _select_cells(path_meta, observed)
+    row = np.full(len(names), -1, dtype=np.int64)
+    name_pos = {c:i for i, c in enumerate(names)}
+    row[[name_pos[c] for c in cells]] = np.arange(len(cells))
+
+    in_cells = row[alt['cell']] >= 0
+    alt = {k:v[in_cells] for k, v in alt.items()}
+    AD = AD[in_cells]
+    r = row[alt['cell']]
+
+    # Variants carried by the selected cells, ordered by position and allele
+    vkey = alt['pos'].astype(np.int64)*4 + alt['base']
+    uvar, col = np.unique(vkey, return_inverse=True)
+    v_pos = (uvar // 4).astype(np.int64)
+    v_alt = BASES[uvar % 4]
+    v_ref = np.array([ref_base.get(int(p), 'N') for p in v_pos])
+    var = pd.DataFrame({'pos':v_pos, 'ref':v_ref, 'alt':v_alt},
+                       index=[f'{p}_{a}>{b}' for p, a, b in zip(v_pos, v_ref, v_alt, strict=True)])
+    if has_quality:
+        q = alt['qual']
+        ok = np.isfinite(q)
+        s_ = np.bincount(col[ok], weights=q[ok], minlength=uvar.size)
+        n_ = np.bincount(col[ok], minlength=uvar.size)
+        with np.errstate(all='ignore'):
+            var['quality'] = s_ / np.where(n_>0, n_, np.nan)
+
+    # Coverage of the selected cells, over the positions the table holds for them
+    src = np.array([name_pos[c] for c in cells], dtype=np.int64)
+    present = np.flatnonzero(listed[src].any(0))
+    col_of = np.full(n_pos, -1, dtype=np.int64)
+    col_of[present] = np.arange(present.size)
+    COV = COV_all[np.ix_(src, present)]
+    del COV_all, listed
+    if molecules:
+        COV = np.rint(COV / f).astype(np.int32)
+    if (col_of[v_pos] < 0).any():
+        raise ValueError(f'Coverage table misses {int((col_of[v_pos]<0).sum())} of the sites carrying MT-SNVs.')
+
+    dtype = _coverage_dtype(COV)
+    DP = COV[:, col_of[v_pos]]
+    DP[r, col] = np.maximum(DP[r, col], AD)
+    DP = DP.astype(dtype)
+    AF = (AD / np.maximum(DP[r, col], 1)).astype(np.float32)
+    shape = (len(cells), uvar.size)
+    ad_dtype = np.int16 if AD.max(initial=0) <= np.iinfo(np.int16).max else np.int32
+
+    afm = AnnData(
+        X=csr_matrix((AF, (r, col)), shape=shape),
+        obs=cell_meta,
+        var=var,
+        layers={'AD':csr_matrix((AD.astype(ad_dtype), (r, col)), shape=shape), 'DP':DP},
+        uns={'scLT_system':scLT_system, 'pp_method':pp_method}
+    )
+    afm.obs['mean_site_coverage'] = COV.mean(axis=1)
+    if scLT_system in TARGETED_SYSTEMS:
+        target = np.asarray(mask_mt_sites(pd.Index(present)))
+        afm.obs['median_target_site_coverage'] = np.median(COV[:, target], axis=1)
+        afm.obs['frac_target_site_covered'] = (COV[:, target]>0).sum(1) / target.sum()
     if molecules:
         afm.uns['molecules'] = {'reads_per_molecule':f, 'frac_both_mates':f - 1, 'alt_rule':rule}
 

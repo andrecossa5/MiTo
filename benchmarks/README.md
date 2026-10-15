@@ -72,6 +72,8 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `release_check.py mda \| pl1000 \| sims` | 0.5.0 defaults end to end, from the readers | `release_check_*.csv` |
 | `clonality_speed.py real <afm>... \| scaling` | old vs incremental clonality filter: time, peak memory, agreement | `clonality_speed_*.csv` |
 | `support_eval.py pl1000 \| mda` | count-resampling clade support: tree-level precision/recall, support as a clone filter | `support_eval_*.csv` |
+| `reader_check.py` | maegatk/mgatk reader, 0.5.0 vs typed/sparse/chunked: identical AFMs, time and memory | `reader_check.csv` |
+| `timing.py [sample]` | end-to-end time, maegatk tables -> annotated clones | `timing_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
 ### Upstream code mirrored (read, not vendored)

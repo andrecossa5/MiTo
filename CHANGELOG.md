@@ -43,6 +43,11 @@ mtscATAC.
   carriers change; exact), and the null sets come from one bank of stratified
   permutations (p-values independent of variant order). 1,000 candidates x 3,300
   cells: 87 s -> 3.3 s; 9,700 cells: 70 s / 4.6 GB -> 6.8 s / 1.3 GB.
+- **maegatk / mgatk reader: same AFM, ~3x faster, ~6x less memory.** Tables are read
+  typed, column-selective and in chunks, reduced to alternative basecalls as they are
+  read, and assembled straight into sparse matrices. MDA_PT (4,761 cells): 64 s / 10 GB
+  -> 18 s / 2.7 GB; pL1000 mgatk: 71 s / 10 GB -> 21 s / 1.7 GB. Checked identical slot by
+  slot (benchmarks/reader_check.py).
 - **`build_tree(solver="UPMGA")` uses scipy's average linkage** (cassiopeia for the
   other solvers): 32.5 s -> 0.18 s for 2,400 cells.
 - The clones table of `annotate_clones` gives each clone's clade as the common

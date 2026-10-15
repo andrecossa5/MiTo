@@ -18,7 +18,7 @@ keywords = [
     "scLT",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
@@ -84,7 +84,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/andrecossa5/MiTo"
-Documentation = "https://scmito.readthedocs.io/en/latest/index.html"
+Documentation = "https://mito.readthedocs.io/en/v1.0.0/"
 Repository = "https://github.com/andrecossa5/MiTo"
 Issues = "https://github.com/andrecossa5/MiTo/issues"
 

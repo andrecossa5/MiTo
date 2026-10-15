@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-10-15
+First stable release of the original MiTo API (`mt.pp.filter_baseline`, `mt.pp.filter_afm(filtering=...)`,
+`mt.tl.MiToTreeAnnotator`, ...), the one used for the analyses of the MiTo paper. The code is that of 0.2.1; 1.0.0
+adds the matched documentation. 0.2.1 stays published (same code).
+
+A new major version with a redesigned API will ship as 2.0.0: the 0.3.0-0.5.0 development versions were never released.
+
+### Changed
+- Version 1.0.0, classifier "Production/Stable".
+- Documentation links point to `mito.readthedocs.io` (the previous `scmito.readthedocs.io` does not exist), in the
+  README, the package metadata and the tutorial.
+- The tutorial is re-executed with 1.0.0 on current dependencies (numpy 2, pandas 3, scipy 1.18): its results are
+  unchanged. The Moran's I variant filter is a permutation test without a fixed seed, so cell and variant counts can
+  differ by a unit between runs.
+- Docstrings match their signatures: `filter_cells` (`mean_cov_all`, default `cell_filter`), `reduce_dimensions`
+  (`ncores`, return value), `plot_tree` (`vmin`, `vmax`, `x_space`) and `nb_regression` (`df`, and it returns a
+  DataFrame).
+- README: versions note, "Reproducing the paper" section.
+
+### Differences from 0.1.5 (the Nature Communications release), as of 0.2.0
+- `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 returned every other
+  cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances) differ
+  from the published ones.
+- `annotate_vars`: `median_af_in_positives` (a mean over the positive cells, whatever its name) is computed on their
+  allele frequencies; 0.1.5 computed it on a boolean matrix, so it was constant.
+- The `genotype_MiTo_smooth` function and the `"MiTo_smooth"` genotyping option are removed.
+
 ## [0.2.1] - 2026-10-15
 ### Fixed
 - Importable with statsmodels >= 0.15: `multipletests` is imported from

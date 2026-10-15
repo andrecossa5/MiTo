@@ -8,7 +8,8 @@ One pipeline for the three MT-scLT assays: every AFM holds molecule counts, and
 mtscATAC.
 
 0.3.0 was not released on PyPI: from 0.2.0, read the 0.3.0 entry below as well. The
-results of the MiTo paper were obtained with 0.2.0 (`pip install scmito==0.2.0`).
+results of the MiTo paper were obtained with 0.1.5, the Nature Communications release
+(`pip install git+https://github.com/andrecossa5/MiTo.git@v0.1.5`).
 
 **Migrating from 0.2:** `mt.pp.filter_baseline` / `filter_afm(filtering='MiTo')` ->
 `mt.pp.filter_cells` + `mt.pp.filter_afm`; `mt.tl.MiToTreeAnnotator(tree).clonal_inference()`

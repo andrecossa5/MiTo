@@ -100,9 +100,10 @@ pytest
 
 ## Reproducing the paper
 
-The results of the MiTo paper were obtained with **MiTo 0.2.0** (`pip install scmito==0.2.0`)
-and the matching [nf-MiTo](https://github.com/andrecossa5/nf-MiTo) release; the analysis code
-and versions are in [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro).
+The results of the MiTo paper were obtained with **MiTo 0.1.5**, the Nature Communications
+release (`pip install git+https://github.com/andrecossa5/MiTo.git@v0.1.5`), and the matching
+[nf-MiTo](https://github.com/andrecossa5/nf-MiTo) release; the analysis code, environment and
+versions are in [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro).
 MiTo 0.5.0 changes the variant pipeline and the clone annotation (see the CHANGELOG), so
 it does not reproduce those numbers exactly.
 

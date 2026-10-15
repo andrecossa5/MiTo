@@ -13,7 +13,7 @@ from anndata import AnnData
 from joblib import Parallel, delayed, parallel_backend
 from mquad.mquad import Mquad
 from scipy.stats import fisher_exact
-from statsmodels.sandbox.stats.multicomp import multipletests
+from statsmodels.stats.multitest import multipletests
 
 from mito.ut.positions import mask_mt_sites
 from mito.ut.utils import load_common_dbSNP, load_edits_REDIdb

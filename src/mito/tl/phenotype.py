@@ -12,7 +12,7 @@ import statsmodels.formula.api as smf
 from cassiopeia.data import CassiopeiaTree
 from cassiopeia.tools import score_small_parsimony
 from scipy.stats import fisher_exact
-from statsmodels.sandbox.stats.multicomp import multipletests
+from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
 from mito.ut.phylo_utils import get_internal_node_stats

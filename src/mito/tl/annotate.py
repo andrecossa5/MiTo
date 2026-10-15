@@ -14,7 +14,7 @@ from cassiopeia.tools.fitness_estimator._lbi_jungle import LBIJungle
 from joblib import Parallel, cpu_count, delayed, parallel_backend
 from scipy.stats import fisher_exact
 from sklearn.metrics import silhouette_score
-from statsmodels.sandbox.stats.multicomp import multipletests
+from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
 from mito.pp.distances import weighted_jaccard

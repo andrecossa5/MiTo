@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-10-15
+### Fixed
+- Importable with statsmodels >= 0.15: `multipletests` is imported from
+  `statsmodels.stats.multitest` (`statsmodels.sandbox.stats.multicomp` no longer
+  provides it), in `mt.pp`, `mt.tl.annotate` and `mt.tl.phenotype`. No change to any
+  method: results are those of 0.2.0.
+
 ## [0.1.5] - 2026-02-03
 - Nat Comm release
 

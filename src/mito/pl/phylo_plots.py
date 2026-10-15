@@ -239,7 +239,6 @@ def _set_colors(d, meta=None, cov=None, cmap=None, kwargs=None, vmin=None, vmax=
             if isinstance(cmap, str):
                 if pd.api.types.is_numeric_dtype(x):
                     cmap = matplotlib.colormaps[cmap]
-                    cmap = matplotlib.cm.get_cmap(cmap)
                     if vmin is None or vmax is None:
                         vmin = np.percentile(x.values, 10)
                         vmax = np.percentile(x.values, 90)

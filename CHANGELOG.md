@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
   `statsmodels.stats.multitest` (`statsmodels.sandbox.stats.multicomp` no longer
   provides it), in `mt.pp`, `mt.tl.annotate` and `mt.tl.phenotype`. No change to any
   method: results are those of 0.2.0.
+- `mt.pl.plot_tree`: no longer calls `matplotlib.cm.get_cmap` (removed in matplotlib 3.9)
+  on a colormap it had already looked up.
 
 ## [0.1.5] - 2026-02-03
 - Nat Comm release

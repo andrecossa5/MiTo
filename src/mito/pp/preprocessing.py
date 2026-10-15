@@ -60,10 +60,10 @@ def filter_cells(
         Cell filtering strategy. Options are:
         - "filter1": Filter cells based on mean MT-genome coverage (all sites).
         - "filter2": Filter cells based on median target MT-sites coverage and minimum percentage of target sites covered (MAESTER only).
-        Default is None.
+        Default is "filter1".
     nmads : int, optional
         Number of Minimum Absolute Deviations to filter cells with high MT-library UMI counts. Default is 5.
-    mean_coverage : int, optional
+    mean_cov_all : float, optional
         Minimum mean consensus (at least 3-supporting-reads) UMI coverage across the MT-genome per cell. Default is 20.
     median_cov_target : int, optional
         Minimum median UMI coverage at target MT-sites (only for MAESTER data). Default is 25.

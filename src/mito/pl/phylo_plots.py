@@ -369,6 +369,12 @@ def plot_tree(
         Leaf feature to plot. Default is None.
     cmap_leaves : str or dict, optional
         Color map for leaves feature. Default is "tab20".
+    vmin : float, optional
+        Minimum of the color scale of the continuous `features`. Default is None
+        (10th percentile of each feature).
+    vmax : float, optional
+        Maximum of the color scale of the continuous `features`. Default is None
+        (90th percentile of each feature).
     vmin_leaves : float, optional
         Min value for leaves cmap.
     vmax_leaves : float, optional
@@ -401,6 +407,9 @@ def plot_tree(
         Additional internal nodes keyword arguments. Default is {}.
     branch_kwargs : dict, optional
         Additional branch keyword arguments. Default is {}.
+    x_space : float, optional
+        Distance along the x axis between a leaf and its label, when `leaves_labels` is
+        True (only implemented for orient "right"). Default is 1.5.
 
     Returns
     -------

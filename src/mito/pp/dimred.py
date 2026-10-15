@@ -160,12 +160,21 @@ def reduce_dimensions(
         Number of neighbors to use for kNN search. Default is 10.
     n_comps : int, optional
         Number of dimensions of the output embedding. Default is 2.
+    ncores : int, optional
+        Number of cores used to compute cell-cell distances, if they are not already
+        in afm.obsp[distance_key]. Default is 8.
     metric : str, optional
-        Dissimilarity metric to use. Default is "weightde_jaccard".
+        Dissimilarity metric to use. Default is "weighted_jaccard".
     bin_method : str, optional
         Genotyping method. Default is "MiTo".
     binarization_kwargs : dict, optional
         Keyword arguments for binarization. Default is {}.
+
+    Returns
+    -------
+    None
+        The embedding is stored in afm.obsm, as "X_pca", "X_umap" or "X_diffmap"
+        according to `method`.
     """
 
     if binarization_kwargs is None:

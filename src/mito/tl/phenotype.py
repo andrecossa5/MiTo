@@ -120,7 +120,7 @@ def nb_regression(df: pd.DataFrame, features: Iterable[str], predictor: str) -> 
 
     Parameters
     ----------
-    afm : pd.DataFrame (clone/sample x features/covariates)
+    df : pd.DataFrame (clone/sample x features/covariates)
         Input data table. Contains raw counts for all genes, and covariates of interest.
     features : list, str
         List of variables to test the GLM model coefficients on.
@@ -130,8 +130,10 @@ def nb_regression(df: pd.DataFrame, features: Iterable[str], predictor: str) -> 
 
     Returns
     -------
-    AnnData
-        Filtered Allelic Frequency Matrix.
+    pd.DataFrame
+        One row per tested feature and model term other than the intercept, with columns
+        "gene", "param", "coef", "pval" and "-logp10". Features whose model cannot be
+        fitted are skipped.
     """
 
     L = []

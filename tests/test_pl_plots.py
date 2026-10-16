@@ -219,3 +219,16 @@ def test_plot_tree_default_draws_true_lengths_only_when_the_tree_has_them(afm_fi
         _, ax = plt.subplots()
         mt.pl.plot_tree(tree, ax=ax)
         plt.close("all")
+
+
+def test_plot_tree_colors_branches_by_clone(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    _, ax = plt.subplots()
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"], ax=ax,
+                    branches={"annot": "MiTo_clone", "linewidth": 2}, leaf_length=0.05)
+    colors = {tuple(line.get_color()) if not isinstance(line.get_color(), str) else line.get_color()
+              for line in ax.lines}
+    assert len(colors) > 1
+    plt.close("all")

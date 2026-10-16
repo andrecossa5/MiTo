@@ -206,7 +206,7 @@ def _annotation_values(tree, name, layer):
 
 
 def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
-                angled_branches, add_root, width=None, spacing=None):
+                angled_branches, add_root, width=None, spacing=None, leaf_length=0.):
     """
     Coordinates of nodes and branches, plus one colorstrip per annotation.
     """
@@ -217,19 +217,20 @@ def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
     # cassiopeia places nodes by distance from the root, so a zero-length branch (a cell
     # identical to its node, in a tree with collapsed ties) would tie a child with its
     # parent: give such branches a negligible length while placing, then restore them
-    zero = [e for e in tree.edges if tree.get_branch_length(*e) <= 0]
-    if zero:
-        eps = 1e-6 * max(tree.get_branch_length(*e) for e in tree.edges)
-        for e in zero:
-            tree.set_branch_length(*e, eps)
+    original = {e: tree.get_branch_length(*e) for e in tree.edges}
+    eps = 1e-6 * max(original.values())
+    for e, length in original.items():
+        if tree.is_leaf(e[1]):
+            length += leaf_length
+        tree.set_branch_length(*e, length if length > 0 else eps)
     try:
         node_coords, branch_coords = ut.place_tree(
             tree, orient=orient, extend_branches=extend_branches,
             angled_branches=angled_branches, add_root=add_root
         )
     finally:
-        for e in zero:
-            tree.set_branch_length(*e, 0.)
+        for e, length in original.items():
+            tree.set_branch_length(*e, length)
 
     anchor_coords = { k:node_coords[k] for k in node_coords if tree.is_leaf(k) }
     tight_width, tight_height = compute_colorstrip_size(node_coords, anchor_coords, loc)
@@ -298,6 +299,40 @@ def _element_colors(elements, values, cmap, limits):
 ##
 
 
+def _clade_branch_colors(tree, name, annot, layer, cmaps, default):
+    """
+    {branch: color}: the color of annotation `name` for the branches above cells that all
+    share one label (the same color as in its colorstrip), `default` for the others.
+    """
+
+    x, _ = _annotation_values(tree, name, layer)
+    if _is_continuous(x):
+        raise ValueError(f'branches={{"annot": "{name}"}} needs a categorical annotation.')
+    names = [annot] if isinstance(annot, str) else list(annot or [])
+    n_cat = sum(1 for a in names[:names.index(name)] if not _is_continuous(_annotation_values(tree, a, layer)[0])) \
+        if name in names else 0
+    colors, _, _ = _resolve_colors(
+        x, cmap=(cmaps or {}).get(name), default=_categorical_cmaps[n_cat % len(_categorical_cmaps)]
+    )
+
+    label = {}
+    for node in tree.depth_first_traverse_nodes(postorder=True):
+        if tree.is_leaf(node):
+            label[node] = x.loc[node] if pd.notna(x.loc[node]) else None
+        else:
+            kids = {label[c] for c in tree.children(node)}
+            label[node] = kids.pop() if len(kids) == 1 else None
+
+    out = {}
+    for parent, child in tree.edges:
+        lab = label[child]
+        if lab is None or lab == 'unassigned':
+            out[(parent, child)] = default
+        else:
+            out[(parent, child)] = colors[next(iter(tree.leaves_in_subtree(child)))]
+    return out
+
+
 def _draw_branches(ax, branch_coords, spec, style):
     """Tree branches, optionally coloured by a per-branch covariate."""
 
@@ -310,7 +345,7 @@ def _draw_branches(ax, branch_coords, spec, style):
                 f'"meta": <DataFrame with that column>}}.'
             )
         values = meta[spec['feature']]
-    colors = _element_colors(branch_coords, values, spec['cmap'], spec['limits'])
+    colors = spec.get('colors') or _element_colors(branch_coords, values, spec['cmap'], spec['limits'])
 
     for branch, (xs, ys) in branch_coords.items():
         ax.plot(xs, ys, **{**style, 'c':colors.get(branch, spec['color'])})
@@ -448,6 +483,7 @@ def plot_tree(
     leaves: dict[str, Any] = None,
     internal_nodes: dict[str, Any] = None,
     extend_branches: bool = None,
+    leaf_length: float = None,
     angled_branches: bool = True,
     add_root: bool = False,
     **legacy
@@ -497,8 +533,11 @@ def plot_tree(
     colorstrips : dict, optional
         {"width", "spacing", "labels", "label_size", "label_offset"} plus Polygon style.
     branches : dict, optional
-        {"feature", "meta", "cmap", "limits", "color"} plus Line2D style. "meta" is the
-        DataFrame holding the per-branch covariate.
+        {"feature", "meta", "cmap", "limits", "color", "annot"} plus Line2D style. "meta" is the
+        DataFrame holding the per-branch covariate. "annot" names one of the categorical
+        annotations (e.g. "MiTo_clone"): a branch takes the color of that annotation in the
+        colorstrip if all the cells below it share one label, and "color" (black) otherwise,
+        including for the label "unassigned".
     leaves : dict, optional
         {"feature", "cmap", "limits", "labels", "label_size", "label_offset", "color"}
         plus marker style.
@@ -511,6 +550,9 @@ def plot_tree(
         the true branch lengths for an ultrametric tree with varying lengths (UPGMA trees from
         `mito.tl.build_tree`), and equal-length branches otherwise (unit lengths, or trees whose
         leaves are not equidistant from the root, such as neighbor-joining).
+    leaf_length : float, optional
+        Length added to every leaf branch, so that a polytomy is drawn as a fan instead of as a
+        point. Default is None: 4% of the tree depth when drawing true lengths, 0 otherwise.
     angled_branches : bool, optional
         Angled, rather than rounded, branches. Default is True.
     add_root : bool, optional
@@ -542,6 +584,9 @@ def plot_tree(
         extend_branches = not (np.ptp(depths) <= 1e-9*max(depths) and max(depths) > 0 and
                                len({round(tree.get_branch_length(*e), 9) for e in tree.edges}) > 1)
 
+    if leaf_length is None:
+        leaf_length = 0. if extend_branches else .04*max(tree.get_time(leaf) for leaf in tree.leaves)
+
     strip_spec, strip_style = _split_spec(
         colorstrips,
         {'width':None, 'spacing':None, 'labels':True, 'label_size':10, 'label_offset':2},
@@ -549,7 +594,7 @@ def plot_tree(
     )
     branch_spec, branch_style = _split_spec(
         branches,
-        {'feature':None, 'meta':None, 'cmap':'Spectral_r', 'limits':None, 'color':'k'},
+        {'feature':None, 'meta':None, 'cmap':'Spectral_r', 'limits':None, 'color':'k', 'annot':None},
         'branches'
     )
     leaf_spec, leaf_style = _split_spec(
@@ -567,8 +612,12 @@ def plot_tree(
 
     node_coords, branch_coords, strips = _place_tree(
         tree, annot, cmaps, limits, layer, orient, extend_branches, angled_branches,
-        add_root, width=strip_spec['width'], spacing=strip_spec['spacing']
+        add_root, width=strip_spec['width'], spacing=strip_spec['spacing'], leaf_length=leaf_length
     )
+    if branch_spec['annot'] is not None:
+        branch_spec['colors'] = _clade_branch_colors(
+            tree, branch_spec['annot'], annot, layer, cmaps, branch_spec['color']
+        )
 
     _draw_branches(ax, branch_coords, branch_spec, {'linewidth':1, **branch_style})
     _draw_colorstrips(ax, strips, orient, strip_spec, {'linewidth':0, 'alpha':1, **strip_style})

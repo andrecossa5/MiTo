@@ -197,6 +197,11 @@ def format_tuning(path_tuning):
 def extract_kwargs(args, only_tree=False):
     """
     Extract preprocessing parameters from CLI and tuning information.
+
+    The genotyping options are those of the "MiTo" and "vanilla" methods (`t_prob`, `t_vanilla`,
+    `min_AD`, `min_cell_prevalence`). The smoothing options of the removed "MiTo_smooth" method
+    (`k`, `gamma`, `resample`) are no longer returned; command lines or tuning tables that still
+    carry them are accepted and the values ignored.
     """
 
     path_tuning = args.path_tuning if hasattr(args, 'path_tuning') else None
@@ -247,10 +252,7 @@ def extract_kwargs(args, only_tree=False):
                     't_prob' : float(d['t_prob']),
                     't_vanilla' : float(d['t_vanilla']),
                     'min_AD' : int(d['min_AD']),
-                    'min_cell_prevalence' : float(d['min_cell_prevalence']),
-                    'k' : int(d['k']),
-                    'gamma' :  float(d['gamma']),
-                    'resample' : False
+                    'min_cell_prevalence' : float(d['min_cell_prevalence'])
                 }
                 tree_kwargs = {'solver':d['solver'], 'metric':d['metric']}
 
@@ -297,10 +299,7 @@ def extract_kwargs(args, only_tree=False):
                 't_prob' : args.t_prob,
                 't_vanilla' : args.t_vanilla,
                 'min_AD' : args.min_AD,
-                'min_cell_prevalence' : args.min_cell_prevalence,
-                'k' : args.k,
-                'gamma' : args.gamma,
-                'resample' : False
+                'min_cell_prevalence' : args.min_cell_prevalence
             }
             tree_kwargs = {'solver':args.solver, 'metric':args.metric}
 

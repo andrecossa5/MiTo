@@ -214,10 +214,22 @@ def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
     is_polar = isinstance(orient, (float, int))
     loc = 'polar' if is_polar else orient
 
-    node_coords, branch_coords = ut.place_tree(
-        tree, orient=orient, extend_branches=extend_branches,
-        angled_branches=angled_branches, add_root=add_root
-    )
+    # cassiopeia places nodes by distance from the root, so a zero-length branch (a cell
+    # identical to its node, in a tree with collapsed ties) would tie a child with its
+    # parent: give such branches a negligible length while placing, then restore them
+    zero = [e for e in tree.edges if tree.get_branch_length(*e) <= 0]
+    if zero:
+        eps = 1e-6 * max(tree.get_branch_length(*e) for e in tree.edges)
+        for e in zero:
+            tree.set_branch_length(*e, eps)
+    try:
+        node_coords, branch_coords = ut.place_tree(
+            tree, orient=orient, extend_branches=extend_branches,
+            angled_branches=angled_branches, add_root=add_root
+        )
+    finally:
+        for e in zero:
+            tree.set_branch_length(*e, 0.)
 
     anchor_coords = { k:node_coords[k] for k in node_coords if tree.is_leaf(k) }
     tight_width, tight_height = compute_colorstrip_size(node_coords, anchor_coords, loc)

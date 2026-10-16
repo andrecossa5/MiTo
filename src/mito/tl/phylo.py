@@ -116,22 +116,43 @@ def upgma_linkage(D: np.ndarray) -> np.ndarray:
     return linkage(squareform(D, checks=False), method='average')
 
 
-def linkage_to_graph(Z: np.ndarray, names) -> nx.DiGraph:
+def linkage_to_graph(Z: np.ndarray, names, collapse_ties: bool = False) -> tuple[nx.DiGraph, dict]:
     """
-    Rooted binary tree of a linkage matrix, with the leaves named `names`, internal nodes
+    Rooted tree of a linkage matrix, with the leaves named `names`, internal nodes
     "node<i>" and the root "root", as cassiopeia's solvers name them.
+
+    Returns the tree and the height of every node (0 for the leaves). With `collapse_ties`
+    an internal node merged at the same height as its parent is contracted into it: cells
+    at distance 0 (same genotype), or merges tied at one distance, become a polytomy
+    instead of a chain of arbitrarily ordered binary merges.
     """
 
     n = len(names)
     label = list(names) + [f'node{i}' for i in range(n, 2*n-1)]
     label[-1] = 'root'
-    G = nx.DiGraph()
-    for i, (a, b, _, _) in enumerate(Z):
-        parent = label[n+i]
-        G.add_edge(parent, label[int(a)])
-        G.add_edge(parent, label[int(b)])
+    height = {x: 0. for x in names}
+    children = {}
+    for i, (a, b, h, _) in enumerate(Z):
+        height[label[n+i]] = float(h)
+        children[label[n+i]] = [label[int(a)], label[int(b)]]
 
-    return G
+    G = nx.DiGraph()
+    def attach(parent, node):
+        # a child tied with its parent is replaced by its own children, recursively
+        if collapse_ties and node in children and np.isclose(height[node], height[parent], rtol=1e-9, atol=1e-12):
+            for c in children[node]:
+                attach(parent, c)
+        else:
+            G.add_edge(parent, node)
+
+    for i in range(n-2, -1, -1):                       # top-down, so each parent is attached once
+        parent = label[n+i]
+        if parent != 'root' and not G.has_node(parent):
+            continue                                    # contracted into an ancestor
+        for c in children[parent]:
+            attach(parent, c)
+
+    return G, height
 
 
 ##
@@ -147,6 +168,7 @@ def build_tree(
     filter_muts: bool = False,
     max_frac_positive: float = .95,
     solver_kwargs: dict[str,Any] = None,
+    collapse_ties: bool = True,
     ) -> CassiopeiaTree:
     """
     Wrapper around cassiopeia lineage solvers. MW Jones et al., 2020.
@@ -174,11 +196,17 @@ def build_tree(
         Maximum fraction of positive cells allowed. Default is 0.95.
     solver_kwargs : dict, optional
         Additional keyword arguments for the solver. Default is {}.
+    collapse_ties : bool, optional
+        "UPMGA" only. Cells at distance 0 (same genotype) are merged one by one, in an
+        arbitrary order, by average linkage: with `collapse_ties` such tied merges are
+        contracted into polytomies, so the tree shows only the structure the data support.
+        The topology is otherwise the UPGMA one. Default is True; False keeps the binary tree.
 
     Returns
     -------
     CassiopeiaTree
-        Solved single-cell phylogeny.
+        Solved single-cell phylogeny. For "UPMGA" its branch lengths are the UPGMA ones
+        (half the difference of the linkage heights); the other solvers set none (all 1).
     """
 
     # Cell-cell distances: reuse them if `mito.pp.filter_afm` (or the user) already
@@ -202,8 +230,12 @@ def build_tree(
     logging.info(f'Build tree: metric={metric}, solver={solver}')
     np.random.seed(1234)
     if solver == 'UPMGA' and not solver_kwargs:
-        G = linkage_to_graph(upgma_linkage(D.loc[M.index, M.index].values), list(M.index))
+        G, height = linkage_to_graph(
+            upgma_linkage(D.loc[M.index, M.index].values), list(M.index), collapse_ties=collapse_ties
+        )
         tree = cs.data.CassiopeiaTree(tree=G, character_matrix=M, dissimilarity_map=D, cell_meta=afm.obs)
+        for u, v in tree.edges:
+            tree.set_branch_length(u, v, (height[u] - height[v]) / 2)
     else:
         tree = cs.data.CassiopeiaTree(character_matrix=M, dissimilarity_map=D, cell_meta=afm.obs)
         _solver = solver_d[solver]

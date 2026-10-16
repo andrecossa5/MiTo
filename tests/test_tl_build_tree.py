@@ -70,3 +70,33 @@ def test_is_deterministic(afm_filtered):
 def test_filter_muts_drops_uninformative_characters(afm_filtered):
     tree = mt.tl.build_tree(afm_filtered, filter_muts=True, min_n_positive_cells=5)
     assert tree.layers["transformed"].shape[1] <= afm_filtered.shape[1]
+
+
+def _clades(tree):
+    return {frozenset(tree.leaves_in_subtree(n)) for n in tree.internal_nodes}
+
+
+def test_collapsing_ties_keeps_the_upgma_clades(afm_filtered):
+    binary = mt.tl.build_tree(afm_filtered.copy(), collapse_ties=False)
+    collapsed = mt.tl.build_tree(afm_filtered.copy())
+    assert set(collapsed.leaves) == set(binary.leaves)
+    assert _clades(collapsed) <= _clades(binary)
+    assert len(collapsed.internal_nodes) <= len(binary.internal_nodes)
+
+
+def test_collapsed_tree_has_upgma_branch_lengths(afm_filtered):
+    tree = mt.tl.build_tree(afm_filtered)
+    lengths = [tree.get_branch_length(u, v) for u, v in tree.edges]
+    assert min(lengths) >= 0 and max(lengths) > 0
+    # ultrametric: every leaf at the same distance from the root
+    depths = [tree.get_time(leaf) for leaf in tree.leaves]
+    assert np.allclose(depths, depths[0])
+
+
+def test_clones_do_not_depend_on_collapsing_ties(afm_filtered):
+    labels = []
+    for collapse in (False, True):
+        afm = afm_filtered.copy()
+        mt.tl.annotate_clones(mt.tl.build_tree(afm, collapse_ties=collapse), afm, support=False)
+        labels.append(afm.obs["MiTo_clone"].astype(str))
+    assert (labels[0] == labels[1]).all()

@@ -79,7 +79,9 @@ model and no fixed allele-frequency threshold.
 ------------
 
 :func:`mito.tl.build_tree` builds a UPGMA tree from the weighted-Jaccard distances between the
-genotypes (a Cassiopeia tree). The cell kNN graph (:func:`mito.pp.kNN_graph`) and the embeddings
+genotypes (a Cassiopeia tree). Cells with the same genotype are at distance 0, and average linkage would merge them
+one by one in an arbitrary order: such tied merges are collapsed into polytomies (``collapse_ties=True``), and the
+branches carry the UPGMA lengths. The cell kNN graph (:func:`mito.pp.kNN_graph`) and the embeddings
 (:func:`mito.pp.reduce_dimensions`) use the same distances.
 
 4. Clones

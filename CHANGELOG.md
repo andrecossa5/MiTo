@@ -59,6 +59,9 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
   same cells) notebooks.
 
 ### Changed
+- `tl.build_tree(solver="UPMGA")` collapses tied merges into polytomies (`collapse_ties=True`; `False` keeps the
+  binary tree) and sets UPGMA branch lengths. Cells with the same genotype were merged one by one in an arbitrary order,
+  which drew long ladders; the clades and the clones are unchanged. `pl.plot_tree` accepts zero-length branches.
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
   leave-one-out kNN graphs are updated incrementally (only the held-out variant's
   carriers change; exact), and the null sets come from one bank of stratified

@@ -199,3 +199,12 @@ def test_all_plotting_functions_are_exported_and_callable(embedded, coverage_tab
     mt.pl.packed_circle_plot(afm.obs["MiTo_clone"].astype(str).value_counts())
     mt.pl.MT_coverage_polar(coverage_table)
     mt.pl.MT_coverage_by_gene_polar(coverage_table, sample="s")
+
+
+def test_plot_tree_handles_zero_length_branches(afm_filtered):
+    import matplotlib
+    matplotlib.use("Agg")
+    tree = mt.tl.build_tree(afm_filtered)
+    assert min(tree.get_branch_length(u, v) for u, v in tree.edges) == 0
+    mt.pl.plot_tree(tree)
+    assert min(tree.get_branch_length(u, v) for u, v in tree.edges) == 0   # restored

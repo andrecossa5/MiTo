@@ -104,6 +104,10 @@ branches carry the UPGMA lengths. The cell kNN graph (:func:`mito.pp.kNN_graph`)
 
 Labels are written to ``afm.obs['MiTo_clone']``, and the support of each clone is reported with them.
 
+:func:`mito.tl.collapse_clones` returns the clone-level tree: one tip per clone, on the same branch lengths, with the
+cells, size and clade support of each clone in its ``cell_meta``. :func:`mito.pl.plot_tree` (``collapse_clones=``) and
+:func:`mito.pl.plot_clone_tree` draw it.
+
 Clade support
 ~~~~~~~~~~~~~
 

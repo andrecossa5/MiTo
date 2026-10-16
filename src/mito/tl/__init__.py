@@ -1,3 +1,4 @@
+from .collapse import collapse_clones
 from .annotate import annotate_clones, clone_support, rescue_unassigned, small_clone_pass
 from .clustering import leiden_clustering
 from .cutting import evidence_cut
@@ -9,5 +10,5 @@ __all__ = [
     "build_tree", "coarse_grained_tree", "AFM_to_seqs",
     "annotate_clones", "evidence_cut", "clone_support", "rescue_unassigned", "small_clone_pass",
     "compute_clonal_fate_bias", "compute_scPlasticity", "compute_fitness", "compute_expansions",
-    "clade_support", "leiden_clustering"
+    "clade_support", "leiden_clustering", "collapse_clones"
 ]

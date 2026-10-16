@@ -19,6 +19,7 @@ from cassiopeia.plotting.local import compute_colorstrip_size, create_continuous
 from cassiopeia.plotting.local import utilities as ut
 from matplotlib.patches import Polygon
 
+from mito.tl.collapse import collapse_clones
 from mito.ut.phylo_utils import get_internal_node_feature
 
 ##
@@ -375,6 +376,12 @@ def _collapse_clones(tree, name, layer):
         collapsed.set_branch_length(*edge, length)
     for key in tree.layers:
         collapsed.layers[key] = tree.layers[key]
+    for node in collapsed.nodes:                          # node attributes (e.g. clade support) travel too
+        if node in tree.nodes:
+            try:
+                collapsed.set_attribute(node, 'support', float(tree.get_attribute(node, 'support')))
+            except Exception:  # noqa: BLE001
+                pass
 
     return collapsed, clone_nodes
 
@@ -832,6 +839,14 @@ def plot_tree(
 ##
 
 
+def _clone_color(flat, tip):
+    """Color of a tip of a clone-level tree: the default palette, in order of the tips."""
+
+    clones = list(dict.fromkeys(flat.cell_meta['clone'].dropna()))
+    colors = _categorical_palette(pd.Series(clones), default=_categorical_cmaps[0])
+    return colors[flat.cell_meta.loc[tip, 'clone']]
+
+
 def plot_clone_tree(
     tree: CassiopeiaTree,
     annot: str = 'MiTo_clone',
@@ -858,11 +873,12 @@ def plot_clone_tree(
     ----------
     tree : CassiopeiaTree
         Phylogeny (ultrametric, e.g. from `mito.tl.build_tree`), with the clone labels in
-        tree.cell_meta[`annot`].
+        tree.cell_meta[`annot`]; or a clone-level tree from `mito.tl.collapse_clones`.
     annot : str, optional
         Categorical annotation naming the clones. Default is "MiTo_clone".
     color_by : str or pd.Series, optional
-        Column of tree.cell_meta (mean per clone if numeric, most common value otherwise) or
+        Column of tree.cell_meta (mean per clone if numeric, most common value otherwise; for
+        a clone-level tree also its "support" or "n_cells") or
         a Series of values per clone, indexed by clone label. Default is None: the colors of
         `annot` in `plot_tree`.
     cmap : str or dict, optional
@@ -889,53 +905,20 @@ def plot_clone_tree(
     matplotlib.axes.Axes
     """
 
-    x, _ = _annotation_values(tree, annot, 'raw')
-    label = {}
-    for node in tree.depth_first_traverse_nodes(postorder=True):
-        if tree.is_leaf(node):
-            lab = x.loc[node] if pd.notna(x.loc[node]) else 'unassigned'
-            label[node] = None if lab == 'unassigned' else lab
-        else:
-            kids = {label[c] for c in tree.children(node)}
-            label[node] = kids.pop() if len(kids) == 1 else None
-    depth = max(tree.get_time(leaf) for leaf in tree.leaves)
-
-    # clone-level tree: a clone's clade is one tip; unassigned cells are tips or dropped
-    graph, length, tip = nx.DiGraph(), {}, {}
-    stack = [tree.root]
-    while stack:
-        node = stack.pop()
-        for child in tree.children(node):
-            if label[child] is not None:                  # a clone: one tip, at the cells' depth
-                graph.add_edge(node, child)
-                length[(node, child)] = tree.get_branch_length(node, child) + depth - tree.get_time(child)
-                tip[child] = (label[child], list(tree.leaves_in_subtree(child)) if not tree.is_leaf(child) else [child])
-            elif tree.is_leaf(child):                     # an unassigned cell
-                if show_unassigned:
-                    graph.add_edge(node, child)
-                    length[(node, child)] = tree.get_branch_length(node, child)
-                    tip[child] = (None, [child])
-            else:
-                graph.add_edge(node, child)
-                length[(node, child)] = tree.get_branch_length(node, child)
-                stack.append(child)
-    # drop clades left without tips, then merge chains with a single child
-    for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root) if graph.out_degree(n) == 0 and n not in tip]:
-        graph.remove_node(node)
-    for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root) if n in graph and graph.out_degree(n) == 1 and n != tree.root]:
-        (child,) = graph.successors(node)
-        (parent,) = graph.predecessors(node)
-        graph.add_edge(parent, child)
-        length[(parent, child)] = length[(parent, node)] + length[(node, child)]
-        graph.remove_node(node)
-    flat = CassiopeiaTree(tree=graph)
-    for edge in graph.edges:
-        flat.set_branch_length(*edge, length.get(edge, 0.) if edge in length else 0.)
+    already = {'clone', 'n_cells', 'cells'} <= set(tree.cell_meta.columns)
+    flat = tree if already else collapse_clones(tree, annot, show_unassigned=show_unassigned)
+    depth = max(flat.get_time(leaf) for leaf in flat.leaves)
+    tip = {t: (flat.cell_meta.loc[t, 'clone'] if pd.notna(flat.cell_meta.loc[t, 'clone']) else None,
+               list(flat.cell_meta.loc[t, 'cells'])) for t in flat.leaves}
 
     zero = [e for e in flat.edges if flat.get_branch_length(*e) <= 0]
     for e in zero:
         flat.set_branch_length(*e, 1e-6 * depth)
-    node_coords, branch_coords = ut.place_tree(flat, orient=orient, extend_branches=False, angled_branches=True)
+    try:
+        node_coords, branch_coords = ut.place_tree(flat, orient=orient, extend_branches=False, angled_branches=True)
+    finally:
+        for e in zero:
+            flat.set_branch_length(*e, 0.)
 
     # angular slots proportional to the circle sizes
     n_cells = {t: len(tip[t][1]) for t in tip}
@@ -964,14 +947,16 @@ def plot_clone_tree(
     per_clone = isinstance(color_by, pd.Series)
     clone_of = {t: tip[t][0] for t in tip}
     if color_by is None:
-        palette = _label_colors(tree, annot, [annot], 'raw', None)
-        face = {t: palette[tip[t][1][0]] if clone_of[t] is not None else '#bdbdbd' for t in tip}
+        palette = _label_colors(tree, annot, [annot], 'raw', None) if not already else None
+        face = {t: (palette[tip[t][1][0]] if palette is not None else _clone_color(flat, t)) if clone_of[t] is not None else '#bdbdbd' for t in tip}
         norm = colormap = None
     else:
-        values = color_by if per_clone else tree.cell_meta[color_by]
+        per_tip = isinstance(color_by, str) and color_by in flat.cell_meta.columns and color_by != 'cells'
+        values = color_by if per_clone else (flat.cell_meta[color_by] if per_tip else tree.cell_meta[color_by])
         numeric = pd.api.types.is_numeric_dtype(values) and not isinstance(values.dtype, pd.CategoricalDtype)
         if numeric:
-            stat = {t: (values.get(clone_of[t], np.nan) if per_clone else values.loc[tip[t][1]].mean())
+            stat = {t: (values.get(clone_of[t], np.nan) if per_clone else
+                        values.loc[t] if per_tip else values.loc[tip[t][1]].mean())
                     for t in tip if clone_of[t] is not None}
             vals = pd.Series(stat)
             lo, hi = limits if limits is not None else (np.nanpercentile(vals, 5), np.nanpercentile(vals, 95))
@@ -979,7 +964,8 @@ def plot_clone_tree(
             norm = plt.Normalize(lo, hi)
             face = {t: colormap(norm(stat[t])) if t in stat else '#bdbdbd' for t in tip}
         else:
-            mode = {t: (values.get(clone_of[t]) if per_clone else values.loc[tip[t][1]].mode().iloc[0])
+            mode = {t: (values.get(clone_of[t]) if per_clone else
+                        values.loc[t] if per_tip else values.loc[tip[t][1]].mode().iloc[0])
                     for t in tip if clone_of[t] is not None}
             palette = cmap if isinstance(cmap, dict) else _categorical_palette(values, default=_categorical_cmaps[0])
             face = {t: palette.get(mode[t], _NA_COLOR) if t in mode else '#bdbdbd' for t in tip}

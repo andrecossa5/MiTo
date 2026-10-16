@@ -71,6 +71,8 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
   covariate. Clone-level view of a phylogeny with hundreds of clones.
 - New `pl.plot_clone_tree`: one tip per clone, a circle whose area is its cells, on the tree with its true branch lengths;
   colored by clone or by a per-clone value.
+- New `tl.collapse_clones`: the clone-level tree as an object, one tip per clone with its cells, size and clade support (also
+  what `plot_clone_tree` draws; pass it to `plot_clone_tree(color_by="support")`).
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
   leave-one-out kNN graphs are updated incrementally (only the held-out variant's
   carriers change; exact), and the null sets come from one bank of stratified

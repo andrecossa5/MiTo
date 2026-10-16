@@ -87,14 +87,14 @@ def heatmap_distances(
 def heatmap_variants(
     afm: AnnData,
     tree: CassiopeiaTree = None,
-    label: str = 'Allelic Frequency',
+    label: str = None,
     annot: str = None,
     annot_cmap: dict[str,Any] = None,
     layer: str = None,
     ax: matplotlib.axes.Axes = None,
     cmap: str = 'afmhot_r',
     vmin: float = 0,
-    vmax: float = .1,
+    vmax: float = None,
     kwargs: dict[str, Any] = None
     ) -> matplotlib.axes.Axes:
     """
@@ -107,21 +107,23 @@ def heatmap_variants(
     tree : CassiopeiaTree, optional
         Tree from which cell ordering can be retrieved. Default is None.
     label : str, optional
-        Label for layer colorbar. Default is "Allelic Frequency".
+        Label for layer colorbar. Default is None: "Allelic Frequency" for the allele frequencies
+        in afm.X, "Genotype" for the "bin" layer, and the name of any other layer.
     annot : str, optional
         afm.obs column to annotate. Default is None.
     annot_cmap : dict, optional
         Color mapping for afm.obs[annot]. Default is None.
     layer : str, optional
-        Layer to plot. Default is None.
+        Layer to plot. Default is None: the allele frequencies in afm.X.
     ax : matplotlib.axes.Axes, optional
         Axes object to draw on. Default is False.
     cmap : str, optional
         Color map for layer. Default is "afmhot_r".
     vmin : float, optional
-        Minimum value for the colorbar. Default is 0.25.
+        Minimum value for the colorbar. Default is 0.
     vmax : float, optional
-        Maximum value for the colorbar. Default is 0.95.
+        Maximum value for the colorbar. Default is None: 1 for the genotypes, otherwise the 99th
+        percentile of the non-zero values, so that a few high frequencies do not wash out the rest.
     kwargs: dict, optional
         Optional kwargs to plu.plot_heatmap. Default is {}. The variant labels are sized to fit
         the width of the axes, and left out when they would be smaller than 2.5 points, unless
@@ -158,6 +160,12 @@ def heatmap_variants(
         X = X.toarray() if hasattr(X, 'toarray') else np.asarray(X)   # AD/bin sparse, DP dense
     else:
         raise KeyError(f'Layer {layer} not present in afm.layers')
+
+    if label is None:
+        label = 'Allelic Frequency' if layer is None else ('Genotype' if layer == 'bin' else layer)
+    if vmax is None:
+        positive = X[X > 0]
+        vmax = 1. if layer == 'bin' or positive.size == 0 else float(np.round(np.quantile(positive, .99), 2)) or 1.
 
     # Prep ordered df
     df_ = (

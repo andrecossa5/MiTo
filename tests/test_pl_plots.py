@@ -321,3 +321,17 @@ def test_clone_packing_without_enclosures_draws_only_clones(annotated_tree):
     assert len(ax.patches) == n_clones
     assert all(p.get_fill() for p in ax.patches)
     plt.close("all")
+
+
+def test_heatmap_variants_labels_the_layer_it_plots(embedded):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    afm, tree = embedded
+    labels = {}
+    for layer in (None, "bin"):
+        fig, ax = plt.subplots()
+        mt.pl.heatmap_variants(afm, tree=tree, layer=layer, ax=ax)
+        labels[layer] = fig.axes[-1].get_ylabel()
+        plt.close(fig)
+    assert labels == {None: "Allelic Frequency", "bin": "Genotype"}

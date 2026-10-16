@@ -122,8 +122,7 @@ def heatmap_variants(
     vmin : float, optional
         Minimum value for the colorbar. Default is 0.
     vmax : float, optional
-        Maximum value for the colorbar. Default is None: 1 for the genotypes, otherwise the 99th
-        percentile of the non-zero values, so that a few high frequencies do not wash out the rest.
+        Maximum value for the colorbar. Default is None: 1 for the genotypes, 0.1 otherwise.
     kwargs: dict, optional
         Optional kwargs to plu.plot_heatmap. Default is {}. The variant labels are sized to fit
         the width of the axes, and left out when they would be smaller than 2.5 points, unless
@@ -164,8 +163,7 @@ def heatmap_variants(
     if label is None:
         label = 'Allelic Frequency' if layer is None else ('Genotype' if layer == 'bin' else layer)
     if vmax is None:
-        positive = X[X > 0]
-        vmax = 1. if layer == 'bin' or positive.size == 0 else float(np.round(np.quantile(positive, .99), 2)) or 1.
+        vmax = 1. if layer == 'bin' else .1
 
     # Prep ordered df
     df_ = (

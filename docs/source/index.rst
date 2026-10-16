@@ -35,6 +35,12 @@ defaults for the three assays.
 
       The AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
 
+   .. grid-item-card:: How MiTo works
+      :link: pipeline
+      :link-type: doc
+
+      The stages from the AFM to annotated clones, and the choices that depend on the data.
+
    .. grid-item-card:: Benchmark
       :link: benchmark
       :link-type: doc
@@ -108,6 +114,7 @@ At a glance
    installation
    getting_started
    loading_data
+   pipeline
    benchmark
    migrating
    biological_example

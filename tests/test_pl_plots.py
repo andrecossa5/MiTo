@@ -246,7 +246,7 @@ def test_plot_tree_collapse_clones_leaves_the_tree_untouched(annotated_tree):
     plt.close("all")
 
 
-@pytest.mark.parametrize("orient,style", [(90, "wedge"), ("down", "wedge"), (90, "fan")])
+@pytest.mark.parametrize("orient,style", [(90, "wedge"), ("down", "wedge"), (90, "fan"), ("down", "fan"), (90, "full")])
 def test_plot_tree_draws_collapsed_clones_as_wedges(annotated_tree, orient, style):
     import matplotlib
     matplotlib.use("Agg")
@@ -254,4 +254,5 @@ def test_plot_tree_draws_collapsed_clones_as_wedges(annotated_tree, orient, styl
     _, ax = plt.subplots()
     mt.pl.plot_tree(annotated_tree, ax=ax, orient=orient, collapse_clones="MiTo_clone", clone_style=style)
     assert (len(ax.patches) > 0) == (style == "wedge")
+    assert len(ax.lines) > 0
     plt.close("all")

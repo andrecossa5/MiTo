@@ -362,10 +362,11 @@ def _label_colors(tree, name, annot, layer, cmaps):
     return colors
 
 
-def _draw_wedges(ax, tree, clone_nodes, raw_nodes, colors, orient, height, style):
+def _draw_wedges(ax, tree, clone_nodes, raw_nodes, colors, orient, height, style, filled, colored):
     """
-    Collapsed clones as triangles: a stem from the clone's MRCA, and a filled wedge over the
-    last `height` of the tree depth whose width is that of its cells.
+    Collapsed clones as short fans or wedges: a stem from the clone's MRCA to where, over the
+    last `height` of the tree depth, an arc and one spoke per cell (or a filled triangle) as
+    wide as its cells.
     """
 
     leaves = [n for n in raw_nodes if n in tree.nodes and tree.is_leaf(n)]
@@ -385,16 +386,31 @@ def _draw_wedges(ax, tree, clone_nodes, raw_nodes, colors, orient, height, style
         pos, depth = raw_nodes[node]
         depth = abs(depth) if not polar else depth
         apex = max(depth, rim - reach)
+        color = colors[cells[0]] if colored else 'k'
         if polar:
             thetas = list(np.linspace(pos_lo, pos_hi, max(int(abs(pos_hi - pos_lo)), 2)))
-            xs, ys = ut.polars_to_cartesians([pos] + thetas, [apex] + [rim]*len(thetas))
             sx, sy = ut.polars_to_cartesians([pos, pos], [depth, apex])
         else:
-            xs, ys = [pos, pos_lo, pos_hi], [-apex, -rim, -rim]
             sx, sy = [pos, pos], [-depth, -apex]
         ax.plot(sx, sy, **{**style, 'c':'k'})
-        ax.add_patch(Polygon(xy=list(zip(xs, ys, strict=True)), closed=True,
-                             **{'facecolor':colors[cells[0]], 'edgecolor':'k', 'linewidth':.3, 'alpha':.9}))
+        if filled:
+            if polar:
+                xs, ys = ut.polars_to_cartesians([pos] + thetas, [apex] + [rim]*len(thetas))
+            else:
+                xs, ys = [pos, pos_lo, pos_hi], [-apex, -rim, -rim]
+            ax.add_patch(Polygon(xy=list(zip(xs, ys, strict=True)), closed=True,
+                                 **{'facecolor':colors[cells[0]], 'edgecolor':'k', 'linewidth':.3, 'alpha':.9}))
+            continue
+        pos_cells = [raw_nodes[c][0] for c in cells]
+        if polar:
+            arc = np.linspace(min(pos_cells), max(pos_cells), max(int(abs(max(pos_cells) - min(pos_cells))), 2))
+            ax.plot(*ut.polars_to_cartesians(list(arc), [apex]*len(arc)), **{**style, 'c':color})
+            for theta, cell in zip(pos_cells, cells, strict=True):
+                ax.plot(*ut.polars_to_cartesians([theta, theta], [apex, raw_nodes[cell][1]]), **{**style, 'c':color})
+        else:
+            ax.plot([min(pos_cells), max(pos_cells)], [-apex, -apex], **{**style, 'c':color})
+            for theta, cell in zip(pos_cells, cells, strict=True):
+                ax.plot([theta, theta], [-apex, raw_nodes[cell][1]], **{**style, 'c':color})
 
 
 ##
@@ -586,7 +602,7 @@ def plot_tree(
     extend_branches: bool = None,
     leaf_length: float = None,
     collapse_clones: str = None,
-    clone_style: str = 'wedge',
+    clone_style: str = 'fan',
     wedge_height: float = .15,
     angled_branches: bool = True,
     add_root: bool = False,
@@ -666,11 +682,13 @@ def plot_tree(
         the clone no longer looks like a separate lineage. The tree itself is not modified.
         Default is None.
     clone_style : str, optional
-        How a collapsed clone is drawn: "wedge" (default), a stem from the MRCA and a filled
-        triangle over the last `wedge_height` of the depth, as wide as its cells (polar and
-        `orient="down"` layouts), or "fan", every cell on its own line from the MRCA.
+        How a collapsed clone is drawn. "fan" (default): a stem from the MRCA to a short fan, an
+        arc and one spoke per cell over the last `wedge_height` of the depth, black or in the
+        clone's color if `branches` has an "annot". "wedge": the same extent as a filled triangle.
+        Both are for the polar and `orient="down"` layouts. "full": every cell on its own line
+        from the MRCA, which is dense when the MRCAs are close to the root.
     wedge_height : float, optional
-        Fraction of the tree depth the wedges span. Default is 0.15.
+        Fraction of the tree depth the short fans and wedges span. Default is 0.15.
     angled_branches : bool, optional
         Angled, rather than rounded, branches. Default is True.
     add_root : bool, optional
@@ -696,7 +714,7 @@ def plot_tree(
     clone_nodes = {}
     if collapse_clones is not None:
         tree, clone_nodes = _collapse_clones(tree, collapse_clones, layer)
-    wedges = bool(clone_nodes) and clone_style == 'wedge' and (isinstance(orient, (float, int)) or orient == 'down')
+    wedges = bool(clone_nodes) and clone_style in ('fan', 'wedge') and (isinstance(orient, (float, int)) or orient == 'down')
     if ax is None:
         _, ax = plt.subplots(figsize=(5, 5))
     ax.axis('off')
@@ -746,7 +764,8 @@ def plot_tree(
         branch_coords = {b: c for b, c in branch_coords.items() if b[0] not in clone_nodes}
         _draw_wedges(
             ax, tree, clone_nodes, raw_nodes, _label_colors(tree, collapse_clones, annot, layer, cmaps),
-            orient, wedge_height, {'linewidth':1, **branch_style}
+            orient, wedge_height, {'linewidth':1, **branch_style}, clone_style == 'wedge',
+            branch_spec['annot'] is not None
         )
     _draw_branches(ax, branch_coords, branch_spec, {'linewidth':1, **branch_style})
     _draw_colorstrips(ax, strips, orient, strip_spec, {'linewidth':0, 'alpha':1, **strip_style})

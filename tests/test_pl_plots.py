@@ -208,3 +208,14 @@ def test_plot_tree_handles_zero_length_branches(afm_filtered):
     assert min(tree.get_branch_length(u, v) for u, v in tree.edges) == 0
     mt.pl.plot_tree(tree)
     assert min(tree.get_branch_length(u, v) for u, v in tree.edges) == 0   # restored
+
+
+def test_plot_tree_default_draws_true_lengths_only_when_the_tree_has_them(afm_filtered):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    for solver in ("UPMGA", "NJ"):
+        tree = mt.tl.build_tree(afm_filtered, solver=solver)
+        _, ax = plt.subplots()
+        mt.pl.plot_tree(tree, ax=ax)
+        plt.close("all")

@@ -206,7 +206,7 @@ def build_tree(
     -------
     CassiopeiaTree
         Solved single-cell phylogeny. For "UPMGA" its branch lengths are the UPGMA ones
-        (half the difference of the linkage heights); the other solvers set none (all 1).
+        (half the difference of the linkage heights); the other solvers' are those of cassiopeia.
     """
 
     # Cell-cell distances: reuse them if `mito.pp.filter_afm` (or the user) already

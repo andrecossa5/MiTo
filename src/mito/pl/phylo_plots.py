@@ -233,6 +233,10 @@ def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
 
     anchor_coords = { k:node_coords[k] for k in node_coords if tree.is_leaf(k) }
     tight_width, tight_height = compute_colorstrip_size(node_coords, anchor_coords, loc)
+    if not extend_branches and width is None:
+        # true lengths: scale the strips to the tree, whose depth is small and unit-free
+        depth = max(tree.get_time(leaf) for leaf in tree.leaves)
+        width, spacing = .16*depth, (.025*depth if spacing is None else spacing)
     width = width or tight_width
     spacing = spacing if spacing is not None else tight_width/2
 
@@ -443,7 +447,7 @@ def plot_tree(
     branches: dict[str, Any] = None,
     leaves: dict[str, Any] = None,
     internal_nodes: dict[str, Any] = None,
-    extend_branches: bool = True,
+    extend_branches: bool = None,
     angled_branches: bool = True,
     add_root: bool = False,
     **legacy
@@ -503,7 +507,10 @@ def plot_tree(
         plus marker style. "feature" is a node attribute (see `mito.tl.compute_fitness`,
         `mito.tl.compute_expansions`).
     extend_branches : bool, optional
-        Equal-length branches from leaves to root. Default is True.
+        True draws equal-length branches from leaves to root (topology only). Default is None:
+        the true branch lengths for an ultrametric tree with varying lengths (UPGMA trees from
+        `mito.tl.build_tree`), and equal-length branches otherwise (unit lengths, or trees whose
+        leaves are not equidistant from the root, such as neighbor-joining).
     angled_branches : bool, optional
         Angled, rather than rounded, branches. Default is True.
     add_root : bool, optional
@@ -529,6 +536,11 @@ def plot_tree(
     if ax is None:
         _, ax = plt.subplots(figsize=(5, 5))
     ax.axis('off')
+
+    if extend_branches is None:
+        depths = [tree.get_time(leaf) for leaf in tree.leaves]
+        extend_branches = not (np.ptp(depths) <= 1e-9*max(depths) and max(depths) > 0 and
+                               len({round(tree.get_branch_length(*e), 9) for e in tree.edges}) > 1)
 
     strip_spec, strip_style = _split_spec(
         colorstrips,

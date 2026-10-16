@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2026-10-16
+Last release of the original MiTo API (the "legacy" line). It supports the analyses of the MiTo paper
+([MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro)) and the
+[nf-MiTo](https://github.com/andrecossa5/nf-MiTo) pipeline. 1.0.1 was not published.
+
+### Fixed
+- `mt.ut.extract_kwargs` no longer returns `k`, `gamma` and `resample`, the options of the `MiTo_smooth` genotyping
+  method removed in 0.2.0. `filter_afm(**extract_kwargs(args))`, the call the nf-MiTo scripts make, failed with
+  `call_genotypes() got an unexpected keyword argument 'k'`. Command lines and tuning tables that still carry
+  those options are accepted, and the values ignored.
+
+### Changed
+- Documentation and README for 1.0.2: versions and links; the tutorial is re-executed.
+
 ## [1.0.0] - 2026-10-16
 First stable release of the original MiTo API (`mt.pp.filter_baseline`, `mt.pp.filter_afm(filtering=...)`,
 `mt.tl.MiToTreeAnnotator`, ...), the one used for the analyses of the MiTo paper. The code is that of 0.2.1; 1.0.0
@@ -24,7 +38,7 @@ MiTo 2.x has a redesigned API. The 0.3.0-0.5.0 development versions were never r
   breaking release of the core stack cannot break new installs of this version. Raised once a newer release is verified.
 
 ### Differences from 0.1.5 (the Nature Communications release), as of 0.2.0
-- `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 returned every other
+- `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 had a bug returning every other
   cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances) differ
   from the published ones.
 - `annotate_vars`: `median_af_in_positives` (a mean over the positive cells, whatever its name) is computed on their

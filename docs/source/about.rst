@@ -11,13 +11,9 @@ What it does
 1. **Assembles Allele Frequency Matrices** from MT-scLT assays — MAESTER,
    ReDeeM, scmtATAC-seq — into :class:`~anndata.AnnData` objects, with
    alternative-allele and depth counts kept as layers.
-2. **Selects informative MT-SNVs** with a choice of strategies
-   (``MiTo``, ``MQuad``, ``weng2024``, ``miller2022``, ``CV``, ``baseline``,
-   ``GT_enriched``).
-3. **Calls single-cell genotypes**, either by hard thresholding (``vanilla``)
-   or from binomial-mixture posteriors (``MiTo``).
-4. **Reconstructs phylogenies** in mtDNA mutational space, using
-   distance-based solvers (``UPMGA``, ``NJ``, ``spectral``, ``greedy``).
+2. **Selects informative MT-SNVs** 
+3. **Calls single-cell genotypes**
+4. **Reconstructs phylogenies** in mtDNA mutational space
 5. **Annotates trees** with a bespoke algorithm that resolves discrete clonal
    populations, and quantifies agreement against ground truth where available.
 

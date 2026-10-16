@@ -9,19 +9,17 @@
 [![PyPI](https://img.shields.io/pypi/v/scmito.svg)](https://pypi.org/project/scmito/)
 [![Python](https://img.shields.io/pypi/pyversions/scmito.svg)](https://pypi.org/project/scmito/)
 [![Tests](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml/badge.svg)](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml)
-[![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/v1.0.0/)
+[![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/v1.0.2/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **MiTo** infers clonal ancestries in single-cell data from natural mtDNA variation.
 
-The framework provides the infrastructure to convert MAESTER, scmtATAC-seq and RedeeM pre-processing outputs
-into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and
-infer mitochondrial phylogenies and clones for downstream multi-omic analysis.
+The framework provides the infrastructure to convert MAESTER pre-processing outputs into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and infer mitochondrial phylogenies and clones for downstream multi-omic analysis.
 
-> **Versions.** This README documents MiTo 1.0.0, the stable release of the original MiTo API, the one used for
-> the analyses of the MiTo paper. MiTo 2.x has a redesigned API and one pipeline for MAESTER, ReDeeM and mtscATAC:
+> **Versions.** This README documents MiTo 1.0.2, the stable release of the original MiTo API, the one used for
+> the analyses of the MiTo paper [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro) and by nf-MiTo pipeline [nf-MiTo](https://github.com/andrecossa5/nf-MiTo). MiTo 2.x has a redesigned API and one pipeline allowing processing MAESTER, ReDeeM and mtscATAC:
 > see the [current documentation](https://mito.readthedocs.io/en/stable/). To stay on this release, use
-> `pip install "scmito<2"`. See [CHANGELOG.md](CHANGELOG.md).
+> `pip install "scmito<2"`. See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 ## Installation
 
@@ -58,7 +56,7 @@ annotator.clonal_inference()
 mt.pl.plot_tree(tree, features=['MiTo clone'])
 ```
 
-See [getting-started tutorial](https://mito.readthedocs.io/en/v1.0.0/getting_started_tutorial.html) for 
+See [getting-started tutorial](https://mito.readthedocs.io/en/v1.0.2/getting_started_tutorial.html) for 
 the full vignette.
 
 ## API
@@ -73,21 +71,15 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 | `pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
 | `ut` | Metrics, helpers |
 
-**Supported platforms:** scRNA-seq (MAESTER), scmtATAC-seq and 10x MultiOme (RedeeM).
+**Supported platforms:** scRNA-seq (MAESTER).
 
-Full reference: [MiTo docs](https://mito.readthedocs.io/en/v1.0.0/).
+Full reference: [MiTo docs](https://mito.readthedocs.io/en/v1.0.2/).
 
 ## Reproducing the paper
 
-The paper analyses run with MiTo 1.0.0, using the conda recipe in
+The paper analyses run with MiTo 1.0.2, using the conda recipe in
 [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro) (`envs/environment.yml`, which
-installs `scmito==1.0.0` and the additional libraries the scripts need).
-
-The Nature Communications release is 0.1.5. 1.0.0 differs from it in one way that matters for these analyses:
-`mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours, where 0.1.5 returned every other
-cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances)
-therefore differ from the published ones. In the comparison we ran against the deposited tuning table,
-distance- and tree-based metrics (AUPRC, ARI, NMI) were identical. See [CHANGELOG.md](CHANGELOG.md).
+installs `scmito==1.0.2` and the additional libraries the scripts need).
 
 ## Development
 

@@ -18,7 +18,7 @@ different API):
 
 .. code-block:: bash
 
-   pip install "scmito<2"      # or: pip install scmito==1.0.0
+   pip install "scmito<2"      # or: pip install scmito==1.0.2
 
 Requirements
 ------------

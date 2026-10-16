@@ -256,3 +256,14 @@ def test_plot_tree_draws_collapsed_clones_as_wedges(annotated_tree, orient, styl
     assert (len(ax.patches) > 0) == (style == "wedge")
     assert len(ax.lines) > 0
     plt.close("all")
+
+
+@pytest.mark.parametrize("orient", [90, "down"])
+def test_plot_tree_gap_between_clones_keeps_every_cell(annotated_tree, orient):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    _, ax = plt.subplots()
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"], ax=ax, orient=orient,
+                    collapse_clones="MiTo_clone", clone_style="full", gap_by="MiTo_clone", gap=4)
+    plt.close("all")

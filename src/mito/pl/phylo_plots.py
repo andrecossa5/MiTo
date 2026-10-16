@@ -206,8 +206,40 @@ def _annotation_values(tree, name, layer):
 ##
 
 
+def _open_gaps(tree, node_coords, branch_coords, name, layer, gap, polar, orient):
+    """
+    Space between neighbouring groups of cells: `gap` leaf widths wherever the label of
+    annotation `name` changes along the leaves (a run of unlabelled or "unassigned" cells is
+    one group). The leaf axis is stretched piecewise, so nodes and branches follow.
+    """
+
+    x, _ = _annotation_values(tree, name, layer)
+    group = x.astype(object).where(x.notna(), 'unassigned')
+    leaves = sorted((n for n in node_coords if n in tree.nodes and tree.is_leaf(n)), key=lambda n: node_coords[n][0])
+    old = np.array([node_coords[n][0] for n in leaves], dtype=float)
+    change = np.array([0] + [int(group.loc[a] != group.loc[b]) for a, b in zip(leaves[:-1], leaves[1:], strict=True)])
+    shift = np.cumsum(change) * gap
+    step = np.min(np.diff(old)) if len(old) > 1 else 1.
+    new = old + shift * step
+    if polar:
+        # keep the full circle: rescale about the first leaf
+        total = (new[-1] - new[0]) + step
+        new = old[0] + (new - new[0]) * (old[-1] - old[0] + step) / total
+
+    def move(v):
+        return np.interp(v, old, new)
+
+    node_coords = {k: (float(move(c[0])), c[1]) for k, c in node_coords.items()}
+    branch_coords = {k: ([float(v) for v in move(np.asarray(xs))], ys) for k, (xs, ys) in branch_coords.items()}
+
+    return node_coords, branch_coords
+
+
+##
+
+
 def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
-                angled_branches, add_root, width=None, spacing=None, leaf_length=0.):
+                angled_branches, add_root, width=None, spacing=None, leaf_length=0., gap_by=None, gap=0.):
     """
     Coordinates of nodes and branches, plus one colorstrip per annotation.
     """
@@ -232,6 +264,9 @@ def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
     finally:
         for e, length in original.items():
             tree.set_branch_length(*e, length)
+
+    if gap_by is not None and gap > 0:
+        node_coords, branch_coords = _open_gaps(tree, node_coords, branch_coords, gap_by, layer, gap, is_polar, orient)
 
     anchor_coords = { k:node_coords[k] for k in node_coords if tree.is_leaf(k) }
     tight_width, tight_height = compute_colorstrip_size(node_coords, anchor_coords, loc)
@@ -373,10 +408,10 @@ def _draw_wedges(ax, tree, clone_nodes, raw_nodes, colors, orient, height, style
     polar = isinstance(orient, (float, int))
     if polar:
         rim = max(raw_nodes[n][1] for n in leaves)
-        step = 360 / (len(leaves) + 1)
+        step = float(np.min(np.diff(sorted(raw_nodes[n][0] for n in leaves)))) if len(leaves) > 1 else 1.
     else:
         rim = max(abs(raw_nodes[n][1]) for n in leaves)
-        step = 1.
+        step = float(np.min(np.diff(sorted(raw_nodes[n][0] for n in leaves)))) if len(leaves) > 1 else 1.
     reach = height * rim
     order = {n: i for i, n in enumerate(tree.depth_first_traverse_nodes())}
 
@@ -603,6 +638,8 @@ def plot_tree(
     leaf_length: float = None,
     collapse_clones: str = None,
     clone_style: str = 'fan',
+    gap_by: str = None,
+    gap: float = 3.,
     wedge_height: float = .15,
     angled_branches: bool = True,
     add_root: bool = False,
@@ -687,6 +724,11 @@ def plot_tree(
         clone's color if `branches` has an "annot". "wedge": the same extent as a filled triangle.
         Both are for the polar and `orient="down"` layouts. "full": every cell on its own line
         from the MRCA, which is dense when the MRCAs are close to the root.
+    gap_by : str, optional
+        Name of a categorical annotation (e.g. "MiTo_clone"): neighbouring groups of cells with a
+        different label are separated by `gap`. Default is None (no gaps).
+    gap : float, optional
+        Space between groups, in cell widths. Default is 3.
     wedge_height : float, optional
         Fraction of the tree depth the short fans and wedges span. Default is 0.15.
     angled_branches : bool, optional
@@ -752,7 +794,8 @@ def plot_tree(
 
     node_coords, branch_coords, strips, raw_nodes = _place_tree(
         tree, annot, cmaps, limits, layer, orient, extend_branches, angled_branches,
-        add_root, width=strip_spec['width'], spacing=strip_spec['spacing'], leaf_length=leaf_length
+        add_root, width=strip_spec['width'], spacing=strip_spec['spacing'], leaf_length=leaf_length,
+        gap_by=gap_by, gap=gap
     )
     if branch_spec['annot'] is not None:
         branch_spec['colors'] = _clade_branch_colors(

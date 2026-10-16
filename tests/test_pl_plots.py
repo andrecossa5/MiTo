@@ -278,3 +278,13 @@ def test_clone_packing_draws_every_clone(annotated_tree):
     filled = [p for p in ax.patches if p.get_facecolor()[3] > 0]
     assert len(filled) == n_clones
     plt.close("all")
+
+
+def test_clone_packing_accepts_a_value_per_clone(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    clones = annotated_tree.cell_meta["MiTo_clone"].astype(str).unique()
+    values = pd.Series(range(len(clones)), index=clones, name="n")
+    mt.pl.clone_packing(annotated_tree, color_by=values, max_levels=1)
+    plt.close("all")

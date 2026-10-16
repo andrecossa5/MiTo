@@ -107,7 +107,7 @@ def packed_circle_plot(
 def clone_packing(
     tree: CassiopeiaTree,
     annot: str = 'MiTo_clone',
-    color_by: str = None,
+    color_by: str|pd.Series = None,
     cmap: Any = None,
     limits: tuple[float,float] = None,
     max_levels: int = 3,
@@ -131,9 +131,9 @@ def clone_packing(
         Phylogeny, with the clone labels in tree.cell_meta[`annot`].
     annot : str, optional
         Categorical annotation naming the clones. Default is "MiTo_clone".
-    color_by : str, optional
+    color_by : str or pd.Series, optional
         Column of tree.cell_meta to color the clones by: its mean per clone if numeric, its
-        most common value if categorical. Default is None: the colors of `annot` in `plot_tree`.
+        most common value if categorical. Or a Series of values per clone, indexed by clone label. Default is None: the colors of `annot` in `plot_tree`.
     cmap : str or dict, optional
         Colormap name for a numeric `color_by`, or {category: color} for a categorical one.
         Default is "Spectral_r".
@@ -186,14 +186,15 @@ def clone_packing(
         else:                                            # a chain with one thing below it: skipped
             items[node] = merged
 
-    top = items[tree.root]
+    top = _merge_pieces(items[tree.root])
     if len(top) == 1 and 'children' in top[0]:
         top = top[0]['children']
     data = [d for d in _limit_levels(top, max_levels) if d['datum'] > 0]
 
     meta = tree.cell_meta
+    per_clone = isinstance(color_by, pd.Series)
     if color_by is not None:
-        values = meta[color_by]
+        values = color_by if per_clone else meta[color_by]
         numeric = pd.api.types.is_numeric_dtype(values) and not isinstance(values.dtype, pd.CategoricalDtype)
     leaves = {}
     _collect_leaves(data, leaves)
@@ -201,14 +202,16 @@ def clone_packing(
         colors = _label_colors(tree, annot, [annot], 'raw', None)
         facecolor = {k: colors[v['cells'][0]] if v['clone'] is not None else '#bdbdbd' for k, v in leaves.items()}
     elif numeric:
-        stat = {k: values.loc[v['cells']].mean() for k, v in leaves.items() if v['clone'] is not None}
+        stat = {k: (values.get(v['clone'], np.nan) if per_clone else values.loc[v['cells']].mean())
+                for k, v in leaves.items() if v['clone'] is not None}
         vals = pd.Series(stat)
         lo, hi = limits if limits is not None else (np.nanpercentile(vals, 5), np.nanpercentile(vals, 95))
         colormap = matplotlib.colormaps[cmap if isinstance(cmap, str) else 'Spectral_r']
         norm = plt.Normalize(lo, hi)
         facecolor = {k: colormap(norm(stat[k])) if k in stat else '#bdbdbd' for k in leaves}
     else:
-        mode = {k: values.loc[v['cells']].mode().iloc[0] for k, v in leaves.items() if v['clone'] is not None}
+        mode = {k: (values.get(v['clone']) if per_clone else values.loc[v['cells']].mode().iloc[0])
+                for k, v in leaves.items() if v['clone'] is not None}
         palette = cmap if isinstance(cmap, dict) else _categorical_palette(values, default=_categorical_cmaps[0])
         facecolor = {k: palette.get(mode[k], _NA_COLOR) if k in mode else '#bdbdbd' for k in leaves}
 
@@ -225,9 +228,45 @@ def clone_packing(
     ax.set_xlim(-1.02, 1.02); ax.set_ylim(-1.02, 1.02); ax.set_aspect('equal'); ax.axis('off')
     if color_by is not None and numeric:
         sm = plt.cm.ScalarMappable(norm=norm, cmap=colormap)
-        ax.figure.colorbar(sm, ax=ax, shrink=.35, label=color_by)
+        ax.figure.colorbar(sm, ax=ax, shrink=.35, label=color_by.name if per_clone else color_by)
 
     return ax
+
+
+def _merge_pieces(items):
+    """
+    One circle per clone: a label whose cells are not a single clade of the tree (several
+    pieces) is drawn once, where its largest piece is, with all its cells.
+    """
+
+    pieces = {}
+    stack = list(items)
+    while stack:
+        it = stack.pop()
+        if 'children' in it:
+            stack.extend(it['children'])
+        elif it['clone'] is not None:
+            pieces.setdefault(it['clone'], []).append(it)
+    keep = {}
+    for clone, group in pieces.items():
+        group.sort(key=lambda it: -it['datum'])
+        main = group[0]
+        main['cells'] = [c for it in group for c in it['cells']]
+        main['datum'] = len(main['cells'])
+        keep[clone] = id(main)
+
+    def prune(its):
+        out = []
+        for it in its:
+            if 'children' in it:
+                children = prune(it['children'])
+                if children:
+                    out.append({**it, 'children': children, 'datum': sum(c['datum'] for c in children)})
+            elif it['clone'] is None or keep[it['clone']] == id(it):
+                out.append(it)
+        return out
+
+    return prune(items)
 
 
 def _limit_levels(items, max_levels, level=1):

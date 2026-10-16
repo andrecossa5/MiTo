@@ -53,6 +53,33 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
+  legacy:
+    # The 1.x maintenance branch, on the weekly canary only: scheduled workflows run
+    # on the default branch, so this is how a dependency release that breaks 1.0.0
+    # surfaces.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v1
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+
+      - name: Run tests
+        run: |
+          mkdir -p /tmp/mito-tests
+          cp -r tests /tmp/mito-tests/
+          cd /tmp/mito-tests && pytest tests -v
+
   build:
     runs-on: ubuntu-latest
     steps:

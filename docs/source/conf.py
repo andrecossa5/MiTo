@@ -16,7 +16,7 @@ copyright = f"2025, {author}"
 try:
     release = _version("scmito")
 except Exception:  # noqa: BLE001  -- docs must build from a bare checkout too
-    release = "0.2.0"
+    release = "2.0.0"
 version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------

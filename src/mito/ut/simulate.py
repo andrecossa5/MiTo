@@ -437,6 +437,14 @@ def simulate_afm(
         as they are in real data. Requires `af_beta`. Leaving it at None makes
         noise exactly as strong as signal, which is a deliberate worst case rather
         than a realistic one. Default is None.
+    af_beta_min : float, optional
+        Lower truncation, in [0, 1), of the Beta draws of `af_beta`: no clonal variant draws a
+        positive rate below it, and it is also a floor on the final clonal rate after
+        `af_depth_decay`. Noisy variants are not floored. Default is 0.0 (no truncation).
+    af_depth_decay : float, optional
+        Factor in (0, 1]: a clonal variant at tree depth d has its positive rate multiplied by
+        ``af_depth_decay ** (d - 1)``, so recent (deeper) variants are weaker and drop out more.
+        Default is 1.0 (no decay).
     af_negative_frac : float, optional
         Background rate expressed as a fraction of each variant's own positive rate,
         replacing the fixed `af_negative` floor. A strong variant then leaks

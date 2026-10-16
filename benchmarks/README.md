@@ -1,17 +1,17 @@
 # MiTo benchmarks — status and how to resume
 
-Last updated: 2026-10-14. Branch `scverse`. **MiTo 0.5.0** is implemented (one pipeline for MAESTER, ReDeeM and mtscATAC). Its release check is `release_check.py`; results are below.
+Last updated: 2026-10-14. Branch `scverse`. **MiTo 2.0.0** is implemented (one pipeline for MAESTER, ReDeeM and mtscATAC). Its release check is `release_check.py`; results are below.
 Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md`; user notes in `PLAN.md` (repo root, untracked).
 
-**API note:** the scripts before `release_check.py` were written against the development API. That API still had the read-threshold candidate stage (`candidates=`, `cand_min_*`, `min_snr`), which 0.5.0 removes.
+**API note:** the scripts before `release_check.py` were written against the development API. That API still had the read-threshold candidate stage (`candidates=`, `cand_min_*`, `min_snr`), which 2.0.0 removes.
 - They reproduce at commit `373cbb3` (`git checkout 373cbb3 -- src` in a scratch worktree).
-- `release_check.py`, `final_compare.py` and `mgatk_pairs.py` run on 0.5.0.
+- `release_check.py`, `final_compare.py` and `mgatk_pairs.py` run on 2.0.0.
 
-## Release check (0.5.0, package defaults only, from the readers)
+## Release check (2.0.0, package defaults only, from the readers)
 
 `python benchmarks/release_check.py mda|pl1000|sims`. Values are ARI / ARI_all.
 
-| Dataset | 0.5.0 | + `min_support=0.5` | 0.3.0 | Time: filter_afm / tree / 100 support replicates |
+| Dataset | 2.0.0 | + `min_support=0.5` | 0.3.0 | Time: filter_afm / tree / 100 support replicates |
 |---|---|---|---|---|
 | MDA_clones | .895 / .758 | .938 / .756 | .929 / .647 | 1.0 / 0.0 / 0.3 s |
 | MDA_lung | .960 / .905 | .961 / .905 | .960 / .896 | 3.1 / 0.0 / 2.7 s |
@@ -25,7 +25,7 @@ Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md`; user
 - **Clonality filter** (`clonality_speed.py`):
   - 10–26× faster: 1,000 candidates × 3,300 cells, 87 s → 3.3 s; 9,700 cells, 70 s / 4.6 GB → 6.8 s / 1.3 GB.
   - Fixes a self-confirmation bug (float32 Gram downdate).
-  - Kept variants vs the 0.5.0 code: Jaccard .95–.97. Against the bug-fixed old code, .965–.995, which is Monte Carlo level.
+  - Kept variants vs the 2.0.0 code: Jaccard .95–.97. Against the bug-fixed old code, .965–.995, which is Monte Carlo level.
   - Bit-identical across re-runs.
 - **Clade support** (`support_eval.py`), transfer support from count resampling, tree clade precision at support ≥ .5: ReDeeM .49 → .81 (recall .65 → .59), MDA_lung .21 → .69, mtscATAC .45 → .81.
 - **UPGMA** is now SciPy (32.5 s → 0.18 s at 2,400 cells). It breaks ties between identical cells differently from Cassiopeia, so trees are not identical to before (ReDeeM: 72% of clades shared); the metrics above are equal or better.
@@ -33,7 +33,7 @@ Approved plan: `~/.claude/plans/process-plan-md-take-your-parallel-fox.md`; user
 ## Resume in 3 commands
 
 ```bash
-conda activate mito-docs                       # mito 0.5.0 editable; numpy 2.4.6, pandas 3.0.5, scanpy 1.12.3,
+conda activate mito-docs                       # mito 2.0.0 editable; numpy 2.4.6, pandas 3.0.5, scanpy 1.12.3,
 pip install pyreadr                            # sklearn 1.9.0, scipy 1.18.0, statsmodels 0.14.6, ete3 3.1.3
 python benchmarks/fetch_pl1000.py              # -> data_test/bench/pL1000 (5.6 GB, md5-checked, skips intact files)
 python benchmarks/run.py mitodrift             # gate: must print recall .7539 / precision .7728 / ARI_gt1pct .9184
@@ -67,12 +67,12 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
 | `ablation.py mda \| redeem \| sims` | package `filter_afm` with one downstream stage off at a time (artefacts, provisional calls, clonality, SNR, four-gamete, all), vs 0.3.0 thresholds; D2 off/on | `ablation_*.csv` |
 | `mgatk_unified.py [--f F]` | mgatk through the unified pipeline with a duplication factor (thresholds / raw / scaled) | `mgatk_unified*.csv` |
 | `mgatk_dupfactor.py` | reads per molecule from strand variance (1.66), checked against ReDeeM molecules (1.73) | `mgatk_dupfactor.csv` |
-| `mgatk_pairs.py` | mgatk as both-strand molecules (= the 0.5.0 reader) | `mgatk_pairs.csv` |
+| `mgatk_pairs.py` | mgatk as both-strand molecules (= the 2.0.0 reader) | `mgatk_pairs.csv` |
 | `final_compare.py` | ReDeeM vs mtscATAC vs MitoDrift, same cells and LARRY barcodes, per-clone recovery | `final_compare*.csv` |
-| `release_check.py mda \| pl1000 \| sims` | 0.5.0 defaults end to end, from the readers | `release_check_*.csv` |
+| `release_check.py mda \| pl1000 \| sims` | 2.0.0 defaults end to end, from the readers | `release_check_*.csv` |
 | `clonality_speed.py real <afm>... \| scaling` | old vs incremental clonality filter: time, peak memory, agreement | `clonality_speed_*.csv` |
 | `support_eval.py pl1000 \| mda` | count-resampling clade support: tree-level precision/recall, support as a clone filter | `support_eval_*.csv` |
-| `reader_check.py` | maegatk/mgatk reader, 0.5.0 vs typed/sparse/chunked: identical AFMs, time and memory | `reader_check.csv` |
+| `reader_check.py` | maegatk/mgatk reader, 2.0.0 vs typed/sparse/chunked: identical AFMs, time and memory | `reader_check.csv` |
 | `timing.py [sample]` | end-to-end time, maegatk tables -> annotated clones | `timing_*.csv` |
 | `small_clones.py [--ceiling]` | where small LARRY clones are lost; D1 (size-aware tau) and D2 (small-clone pass); ceiling and tree-clade recall | `small_clones_*.csv` |
 
@@ -198,7 +198,7 @@ python benchmarks/run.py mitodrift             # gate: must print recall .7539 /
   - `multi_allelic_sites` option, redeemV `edge_trim=9`, `filter_cells(mean_cov_all=10)` (implemented).
 - Next: mtscATAC.
 
-## Open (after 0.5.0)
+## Open (after 2.0.0)
 
 - **Clade confidence** (bootstrap support on the tree): the remaining gap to MitoDrift is tree precision (.46 vs .90) and small-clone recall.
 - **mtscATAC cell coverage:** 36% of barcoded cells carry no called variant (ReDeeM 22%). The user's lighter alternative is still untested: weighted cosine distances on allele frequencies, with calls used for annotation only.

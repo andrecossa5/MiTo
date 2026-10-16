@@ -14,6 +14,12 @@ defaults for the three assays.
 
    pip install scmito
 
+.. note::
+
+   This is the documentation of **MiTo 2.x**. The original API (1.0.0), used for the analyses of the
+   MiTo paper, stays available: ``pip install "scmito<2"`` and its
+   `documentation <https://mito.readthedocs.io/en/v1.0.0/>`_. See :doc:`migrating` to move between them.
+
 .. grid:: 2
    :gutter: 3
 
@@ -103,6 +109,7 @@ At a glance
    getting_started
    loading_data
    benchmark
+   migrating
    biological_example
 
 .. toctree::

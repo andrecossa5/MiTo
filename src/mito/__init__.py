@@ -1,4 +1,4 @@
-__version__ = "0.5.0"
+__version__ = "2.0.0"
 
 from . import io, pl, pp, tl, ut
 

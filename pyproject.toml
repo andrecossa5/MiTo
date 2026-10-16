@@ -33,20 +33,22 @@ classifiers = [
 dependencies = [
 
     # core scientific stack
-    "numpy>=1.26",
-    "scipy>=1.11",
-    "pandas>=2.2",
-    "statsmodels>=0.14",
-    "scikit-learn>=1.4",
+    # Ceilings: the next major version (statsmodels, a 0.x package: the next minor), raised once a newer
+    # release is verified, so a breaking release of the core stack cannot break new installs of this version.
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+    "pandas>=2.2,<4",
+    "statsmodels>=0.14,<0.16",
+    "scikit-learn>=1.4,<2",
     "joblib>=1.3",
     "tqdm>=4.60",
 
     # scverse
     "anndata>=0.10",
-    "scanpy>=1.10",
+    "scanpy>=1.10,<2",
 
     # plotting
-    "matplotlib>=3.8",
+    "matplotlib>=3.8,<4",
     "seaborn>=0.13",
     "ac-plotting-ut>=0.2.1",
     "circlify>=0.15",
@@ -74,7 +76,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/andrecossa5/MiTo"
-Documentation = "https://mito.readthedocs.io/en/latest/index.html"
+Documentation = "https://mito.readthedocs.io/en/v2.0.0/"
 Repository = "https://github.com/andrecossa5/MiTo"
 Issues = "https://github.com/andrecossa5/MiTo/issues"
 

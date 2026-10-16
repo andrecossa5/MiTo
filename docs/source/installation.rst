@@ -13,6 +13,15 @@ Quick install
 That is all that is required: every dependency, including the phylogenetics
 back-end, is resolved automatically.
 
+The original MiTo API (1.0.0), used for the analyses of the MiTo paper, is a different
+major version:
+
+.. code-block:: bash
+
+   pip install "scmito<2"
+
+See :doc:`migrating`.
+
 Requirements
 ------------
 

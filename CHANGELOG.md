@@ -2,19 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0] - 2026-10-15
+## [2.0.0] - 2026-10-16
 One pipeline for the three MT-scLT assays: every AFM holds molecule counts, and
 `filter_afm` runs the same stages with the same defaults on MAESTER, ReDeeM and
-mtscATAC.
+mtscATAC. 2.0.0 is a redesign with a new API; the original API stays available as 1.0.0
+(`pip install "scmito<2"`).
 
-0.3.0 was not released on PyPI: from 0.2.0, read the 0.3.0 entry below as well. The
-results of the MiTo paper were obtained with 0.1.5, the Nature Communications release
-(`pip install git+https://github.com/andrecossa5/MiTo.git@v0.1.5`).
+The 0.3.0-0.5.0 development versions were never released: this entry, with "The redesign
+(developed as 0.3.0)" below, describes everything that changed since 1.0.0. The results of
+the MiTo paper were obtained with the original API (1.0.0; the Nature Communications release
+is 0.1.5, see the 1.0.0 entry for the differences): see
+[MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro).
 
-**Migrating from 0.2:** `mt.pp.filter_baseline` / `filter_afm(filtering='MiTo')` ->
+**Migrating from 1.0.0:** see the migration guide in the documentation.
+`mt.pp.filter_baseline` / `filter_afm(filtering='MiTo')` ->
 `mt.pp.filter_cells` + `mt.pp.filter_afm`; `mt.tl.MiToTreeAnnotator(tree).clonal_inference()`
 -> `mt.tl.annotate_clones(tree, afm)` (labels in `afm.obs['MiTo_clone']`);
-`mt.tl.bootstrap_MiTo` / `bootstrap_bin` -> `mt.tl.clade_support`; AFMs written by 0.2 ->
+`mt.tl.bootstrap_MiTo` / `bootstrap_bin` -> `mt.tl.clade_support`; AFMs written by 1.x ->
 `mt.io.migrate_afm`.
 
 ### Added
@@ -98,8 +102,8 @@ results of the MiTo paper were obtained with 0.1.5, the Nature Communications re
   builder (the reader decides, `multi_allelic_sites`).
 - Unused helpers `mt.ut.ji`, `mt.ut.flatten_dict`, `mt.ut.update_params`.
 
-## [0.3.0] - 2026-09-21
-### Changed
+### The redesign (developed as 0.3.0, 2026-09-21)
+#### Changed
 - **MT-only scope.** MiTo now covers MAESTER, mtscATAC and ReDeeM data
   (`pp_method`: `maegatk`, `mgatk`, `redeem-v`); the Cas9, scWGS and EPI-clone
   readers and their metrics are gone. Functions dispatch on what an AFM carries
@@ -126,7 +130,7 @@ results of the MiTo paper were obtained with 0.1.5, the Nature Communications re
   `sc.pp.neighbors`; provenance lives in one `.uns['mito']` namespace, one
   record per public function.
 
-### Added
+#### Added
 - `mt.pp.call_genotypes` (per-cell binomial test against the variant's own,
   iteratively estimated error rate), `filter_non_clonal_variants` (join count /
   exclusivity on the leave-one-out kNN graph), `filter_low_signal_variants`,
@@ -137,7 +141,7 @@ results of the MiTo paper were obtained with 0.1.5, the Nature Communications re
   contract. Genotyping refuses to run on an unconverted object rather than use a
   masked coverage layer as its denominator.
 
-### Removed
+#### Removed
 - Feature-selection strategies superseded by the clonality QC: `MQuad`,
   `weng2024`, `miller2022`, `CV`, and the Moran's I filter (it included the
   variant under test in the distances, so 96% of scattered noise passed).
@@ -145,13 +149,13 @@ results of the MiTo paper were obtained with 0.1.5, the Nature Communications re
   `mt.tl._classification`, `mt.ut.de_utils`, `mt.ut.stats_utils` and unused
   helpers; dependencies `mquad`, `bbmix`, `lightgbm`, `shap`, `gseapy`.
 
-### Maintenance
+#### Maintenance
 - CI actions and pre-commit hooks updated (`download-artifact`,
   `action-gh-release`, `pyproject-fmt`, `ruff-pre-commit`).
 - Tutorials re-executed against the new API; the suite is 347 tests and needs no
   external data.
 
-### Fixed
+#### Fixed
 - `multipletests` is imported from `statsmodels.stats.multitest`; the
   `statsmodels.sandbox` path it used was removed in statsmodels 0.15, which had
   been breaking every CI run since 31 Aug 2026 on unchanged code.
@@ -166,10 +170,43 @@ results of the MiTo paper were obtained with 0.1.5, the Nature Communications re
   `heatmap_variants`, `matplotlib.cm.get_cmap` (removed in matplotlib 3.9),
   axes creation when `ax` is not given.
 
-## [0.2.1] - 2026-08-06
+## [1.0.0] - 2026-10-16
+First stable release of the original MiTo API (`mt.pp.filter_baseline`, `mt.pp.filter_afm(filtering=...)`,
+`mt.tl.MiToTreeAnnotator`, ...), the one used for the analyses of the MiTo paper. The code is that of 0.2.1; 1.0.0
+adds the matched documentation. 0.2.1 stays published (same code).
+
+MiTo 2.x has a redesigned API. The 0.3.0-0.5.0 development versions were never released: the redesign ships as 2.0.0.
+
+### Changed
+- Version 1.0.0, classifier "Production/Stable".
+- Documentation links point to `mito.readthedocs.io` (the previous `scmito.readthedocs.io` does not exist), in the
+  README, the package metadata and the tutorial.
+- The tutorial is re-executed with 1.0.0 on current dependencies (numpy 2, pandas 3, scipy 1.18): its results are
+  unchanged. The Moran's I variant filter is a permutation test without a fixed seed, so cell and variant counts can
+  differ by a unit between runs.
+- Docstrings match their signatures: `filter_cells` (`mean_cov_all`, default `cell_filter`), `reduce_dimensions`
+  (`ncores`, return value), `plot_tree` (`vmin`, `vmax`, `x_space`) and `nb_regression` (`df`, and it returns a
+  DataFrame).
+- README: versions note, "Reproducing the paper" section.
+- Dependency ceilings: numpy<3, scipy<2, pandas<4, scikit-learn<2, matplotlib<4, scanpy<2 and statsmodels<0.16, so a
+  breaking release of the core stack cannot break new installs of this version. Raised once a newer release is verified.
+
+### Differences from 0.1.5 (the Nature Communications release), as of 0.2.0
+- `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 returned every other
+  cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances) differ
+  from the published ones.
+- `annotate_vars`: `median_af_in_positives` (a mean over the positive cells, whatever its name) is computed on their
+  allele frequencies; 0.1.5 computed it on a boolean matrix, so it was constant.
+- The `genotype_MiTo_smooth` function and the `"MiTo_smooth"` genotyping option are removed.
+
+## [0.2.1] - 2026-10-15
 ### Fixed
-- Documentation URL in the package metadata pointed at a Read the Docs slug
-  that does not exist yet, so the "Documentation" link on PyPI was dead.
+- Importable with statsmodels >= 0.15: `multipletests` is imported from
+  `statsmodels.stats.multitest` (`statsmodels.sandbox.stats.multicomp` no longer
+  provides it), in `mt.pp`, `mt.tl.annotate` and `mt.tl.phenotype`. No change to any
+  method: results are those of 0.2.0.
+- `mt.pl.plot_tree`: no longer calls `matplotlib.cm.get_cmap` (removed in matplotlib 3.9)
+  on a colormap it had already looked up.
 
 ## [0.2.0] - 2026-08-05
 ### Added

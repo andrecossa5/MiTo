@@ -19,6 +19,10 @@ Frequency Matrices ([AnnData](https://anndata.readthedocs.io/) objects), selects
 variants that mark lineages, genotypes individual cells, and infers mitochondrial
 phylogenies and clones for downstream multi-omic analysis.
 
+> **Versions.** This README documents MiTo 2.x. The original API (1.0.0), used for the analyses of the MiTo
+> paper, stays available: `pip install "scmito<2"` and its
+> [documentation](https://mito.readthedocs.io/en/v1.0.0/).
+
 ## Installation
 
 ```bash
@@ -67,11 +71,11 @@ variant's own error rate.
 
 Tutorials:
 
-* [Getting started](https://mito.readthedocs.io/en/latest/getting_started.html): the pipeline on simulated clones.
-* [Loading data](https://mito.readthedocs.io/en/latest/loading_data.html): the AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
-* [Benchmark](https://mito.readthedocs.io/en/latest/benchmark.html): simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells, against ground-truth lineage barcodes.
+* [Getting started](https://mito.readthedocs.io/en/stable/getting_started.html): the pipeline on simulated clones.
+* [Loading data](https://mito.readthedocs.io/en/stable/loading_data.html): the AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
+* [Benchmark](https://mito.readthedocs.io/en/stable/benchmark.html): simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells, against ground-truth lineage barcodes.
 
-What changed in 0.5.0, and how to move from 0.2: [CHANGELOG.md](CHANGELOG.md).
+Moving from MiTo 1.0.0: see the [migration guide](https://mito.readthedocs.io/en/stable/migrating.html) and [CHANGELOG.md](CHANGELOG.md).
 
 ## API
 
@@ -87,7 +91,7 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 
 Pre-processing is done by [nf-MiTo](https://github.com/andrecossa5/nf-MiTo).
 
-Full reference: [MiTo docs](https://mito.readthedocs.io/en/latest/index.html).
+Full reference: [MiTo docs](https://mito.readthedocs.io/en/stable/).
 
 ## Development
 
@@ -100,12 +104,12 @@ pytest
 
 ## Reproducing the paper
 
-The results of the MiTo paper were obtained with **MiTo 0.1.5**, the Nature Communications
-release (`pip install git+https://github.com/andrecossa5/MiTo.git@v0.1.5`), and the matching
-[nf-MiTo](https://github.com/andrecossa5/nf-MiTo) release; the analysis code, environment and
-versions are in [MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro).
-MiTo 0.5.0 changes the variant pipeline and the clone annotation (see the CHANGELOG), so
-it does not reproduce those numbers exactly.
+The analyses of the MiTo paper run with **MiTo 1.0.0**, the original API (`pip install "scmito<2"`,
+[documentation](https://mito.readthedocs.io/en/v1.0.0/)), and the matching
+[nf-MiTo](https://github.com/andrecossa5/nf-MiTo) release; the analysis code and the conda recipe are in
+[MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro). MiTo 2.x changes the variant
+pipeline and the clone annotation (see the migration guide and the CHANGELOG), so it does not reproduce
+those numbers exactly.
 
 ## Citation
 

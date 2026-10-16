@@ -67,6 +67,8 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
 - `pl.plot_tree`: `leaf_length` (fans for polytomies), `branches={"annot": ...}` colors the leaf branches by clone, and
   `collapse_clones="MiTo_clone"` draws each single-label clade as a short fan (`clone_style="fan"`; `"wedge"` for a
   filled triangle, `"full"` for a fan from the MRCA), which keeps large trees readable. `gap_by="MiTo_clone"` (with `gap`, in cell widths) opens space between neighbouring clones.
+- `pl.heatmap_variants`: default palette `afmhot_r`, and the variant labels are sized to the width of the axes (left out when
+  they would be unreadable).
 - New `pl.clone_packing`: clones as circles (area = cells) packed inside the clades of the tree that hold them, colored by a
   covariate. Clone-level view of a phylogeny with hundreds of clones.
 - New `pl.plot_clone_tree`: one tip per clone, a circle whose area is its cells, on the tree with its true branch lengths;

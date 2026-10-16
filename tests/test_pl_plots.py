@@ -299,3 +299,14 @@ def test_plot_clone_tree_draws_one_circle_per_clone(annotated_tree):
     circles = [p for p in ax.patches if p.zorder == 5]
     assert len(circles) == n_clones
     plt.close("all")
+
+
+def test_heatmap_variants_hides_labels_that_cannot_be_read(embedded):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    afm, tree = embedded
+    _, ax = plt.subplots(figsize=(0.3, 3))        # far too narrow for the variant names
+    mt.pl.heatmap_variants(afm, tree=tree, ax=ax)
+    assert len(ax.get_xticklabels()) == 0
+    plt.close("all")

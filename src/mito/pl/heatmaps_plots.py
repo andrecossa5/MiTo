@@ -92,7 +92,7 @@ def heatmap_variants(
     annot_cmap: dict[str,Any] = None,
     layer: str = None,
     ax: matplotlib.axes.Axes = None,
-    cmap: str = 'mako',
+    cmap: str = 'afmhot_r',
     vmin: float = 0,
     vmax: float = .1,
     kwargs: dict[str, Any] = None
@@ -117,13 +117,15 @@ def heatmap_variants(
     ax : matplotlib.axes.Axes, optional
         Axes object to draw on. Default is False.
     cmap : str, optional
-        Color map for layer. Default is "mako".
+        Color map for layer. Default is "afmhot_r".
     vmin : float, optional
         Minimum value for the colorbar. Default is 0.25.
     vmax : float, optional
         Maximum value for the colorbar. Default is 0.95.
     kwargs: dict, optional
-        Optional kwargs to plu.plot_heatmap. Default is {}.
+        Optional kwargs to plu.plot_heatmap. Default is {}. The variant labels are sized to fit
+        the width of the axes, and left out when they would be smaller than 2.5 points, unless
+        `x_names` or `x_names_size` are given.
 
     Returns
     -------
@@ -191,6 +193,12 @@ def heatmap_variants(
 
     else:
         raise KeyError(f'{annot} not in afm.obs. Check annotation...')
+
+    # Variant labels: as large as the columns allow, none if unreadable
+    if 'x_names' not in kwargs and 'x_names_size' not in kwargs:
+        width = ax.get_position().width * ax.figure.get_figwidth() * 72        # points
+        size = min(7., .9 * width / df_.shape[1])
+        kwargs = {**kwargs, 'x_names': bool(size >= 2.5), 'x_names_size': float(size)}
 
     # Plot heatmap
     plu.plot_heatmap(

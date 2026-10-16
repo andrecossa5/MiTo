@@ -18,9 +18,10 @@ The framework provides the infrastructure to convert MAESTER, scmtATAC-seq and R
 into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and
 infer mitochondrial phylogenies and clones for downstream multi-omic analysis.
 
-> **Versions.** MiTo 1.0.0 is the stable release of the original MiTo API, the one used for the analyses of
-> the MiTo paper. A new major version (2.0.0), with a redesigned API and one pipeline for MAESTER, ReDeeM and
-> mtscATAC, is in development on the `develop` branch. See [CHANGELOG.md](CHANGELOG.md).
+> **Versions.** This README documents MiTo 1.0.0, the stable release of the original MiTo API, the one used for
+> the analyses of the MiTo paper. MiTo 2.x has a redesigned API and one pipeline for MAESTER, ReDeeM and mtscATAC:
+> see the [current documentation](https://mito.readthedocs.io/en/stable/). To stay on this release, use
+> `pip install "scmito<2"`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation
 

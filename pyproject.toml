@@ -32,21 +32,23 @@ classifiers = [
 
 dependencies = [
 
-    # core scientific stack
-    "numpy>=1.26",
-    "scipy>=1.11",
-    "pandas>=2.2",
-    "statsmodels>=0.14",
-    "scikit-learn>=1.4",
+    # Core scientific stack. Ceilings: the next major version (statsmodels, a 0.x package: the
+    # next minor), raised once a newer release is verified. Unbounded, a breaking release of one
+    # of these breaks a pinned install of this version (statsmodels 0.15 did that to 0.2.0).
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+    "pandas>=2.2,<4",
+    "statsmodels>=0.14,<0.16",
+    "scikit-learn>=1.4,<2",
     "joblib>=1.3",
     "tqdm>=4.60",
 
     # scverse
     "anndata>=0.10",
-    "scanpy>=1.10",
+    "scanpy>=1.10,<2",
 
     # plotting
-    "matplotlib>=3.8",
+    "matplotlib>=3.8,<4",
     "seaborn>=0.13",
     "ac-plotting-ut>=0.2.1",
     "circlify>=0.15",

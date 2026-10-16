@@ -13,11 +13,12 @@ Quick install
 That is all that is required: every dependency, including the phylogenetics
 back-end, is resolved automatically.
 
-To pin this release, which the analyses of the MiTo paper use:
+To stay on this release, which the analyses of the MiTo paper use (MiTo 2.x has a
+different API):
 
 .. code-block:: bash
 
-   pip install scmito==1.0.0
+   pip install "scmito<2"      # or: pip install scmito==1.0.0
 
 Requirements
 ------------

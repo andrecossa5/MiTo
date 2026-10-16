@@ -16,9 +16,9 @@ clonal trees.
 .. note::
 
    This is the documentation of **MiTo 1.0.0**, the stable release of the original MiTo API, used
-   for the analyses of the MiTo paper. A new major version (2.0.0), with a redesigned API, is in
-   development: see the `repository <https://github.com/andrecossa5/MiTo>`_ and its
-   `CHANGELOG <https://github.com/andrecossa5/MiTo/blob/master/CHANGELOG.md>`_.
+   for the analyses of the MiTo paper. MiTo 2.x has a redesigned API: see the
+   `current documentation <https://mito.readthedocs.io/en/stable/>`_. To stay on this release, use
+   ``pip install "scmito<2"``.
 
 .. grid:: 2
    :gutter: 3

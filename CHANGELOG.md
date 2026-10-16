@@ -7,7 +7,7 @@ First stable release of the original MiTo API (`mt.pp.filter_baseline`, `mt.pp.f
 `mt.tl.MiToTreeAnnotator`, ...), the one used for the analyses of the MiTo paper. The code is that of 0.2.1; 1.0.0
 adds the matched documentation. 0.2.1 stays published (same code).
 
-A new major version with a redesigned API will ship as 2.0.0: the 0.3.0-0.5.0 development versions were never released.
+MiTo 2.x has a redesigned API. The 0.3.0-0.5.0 development versions were never released: the redesign ships as 2.0.0.
 
 ### Changed
 - Version 1.0.0, classifier "Production/Stable".
@@ -20,6 +20,8 @@ A new major version with a redesigned API will ship as 2.0.0: the 0.3.0-0.5.0 de
   (`ncores`, return value), `plot_tree` (`vmin`, `vmax`, `x_space`) and `nb_regression` (`df`, and it returns a
   DataFrame).
 - README: versions note, "Reproducing the paper" section.
+- Dependency ceilings: numpy<3, scipy<2, pandas<4, scikit-learn<2, matplotlib<4, scanpy<2 and statsmodels<0.16, so a
+  breaking release of the core stack cannot break new installs of this version. Raised once a newer release is verified.
 
 ### Differences from 0.1.5 (the Nature Communications release), as of 0.2.0
 - `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 returned every other

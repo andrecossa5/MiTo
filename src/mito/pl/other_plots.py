@@ -111,6 +111,7 @@ def clone_packing(
     cmap: Any = None,
     limits: tuple[float,float] = None,
     max_levels: int = 3,
+    enclosures: bool = True,
     show_unassigned: bool = False,
     dominant: float = .85,
     alpha: float = .85,
@@ -141,6 +142,9 @@ def clone_packing(
         Color range of a numeric `color_by`. Default is its 5th to 95th percentile.
     max_levels : int, optional
         Number of nested levels of enclosing clades. Default is 3.
+    enclosures : bool, optional
+        Draw the clades as open circles around their clones. With False the clones are packed
+        in one flat group, without the tree's grouping. Default is True.
     show_unassigned : bool, optional
         Draw the unassigned cells, grey, as one circle each. Default is False.
     dominant : float, optional
@@ -189,7 +193,12 @@ def clone_packing(
     top = _merge_pieces(items[tree.root])
     if len(top) == 1 and 'children' in top[0]:
         top = top[0]['children']
-    data = [d for d in _limit_levels(top, max_levels) if d['datum'] > 0]
+    if enclosures:
+        data = [d for d in _limit_levels(top, max_levels) if d['datum'] > 0]
+    else:
+        data = []
+        _collect_leaf_items(top, data)
+        data = sorted((d for d in data if d['datum'] > 0), key=lambda d: -d['datum'])
 
     meta = tree.cell_meta
     per_clone = isinstance(color_by, pd.Series)

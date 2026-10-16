@@ -310,3 +310,14 @@ def test_heatmap_variants_hides_labels_that_cannot_be_read(embedded):
     mt.pl.heatmap_variants(afm, tree=tree, ax=ax)
     assert len(ax.get_xticklabels()) == 0
     plt.close("all")
+
+
+def test_clone_packing_without_enclosures_draws_only_clones(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    ax = mt.pl.clone_packing(annotated_tree, enclosures=False)
+    n_clones = annotated_tree.cell_meta["MiTo_clone"].astype(str).drop_duplicates().ne("unassigned").sum()
+    assert len(ax.patches) == n_clones
+    assert all(p.get_fill() for p in ax.patches)
+    plt.close("all")

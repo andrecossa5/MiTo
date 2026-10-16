@@ -9,6 +9,7 @@ from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import plotting_utils as plu
@@ -299,6 +300,50 @@ def _element_colors(elements, values, cmap, limits):
 ##
 
 
+def _collapse_clones(tree, name, layer):
+    """
+    Copy of the tree in which each clade with a single label (other than "unassigned") is a
+    polytomy: its cells are attached to the clade's MRCA, at the distance they had from it.
+    """
+
+    x, _ = _annotation_values(tree, name, layer)
+    label = {}
+    for node in tree.depth_first_traverse_nodes(postorder=True):
+        if tree.is_leaf(node):
+            label[node] = x.loc[node] if pd.notna(x.loc[node]) else None
+        else:
+            kids = {label[c] for c in tree.children(node)}
+            label[node] = kids.pop() if len(kids) == 1 else None
+
+    graph = nx.DiGraph()
+    lengths = {}
+    stack = [tree.root]
+    while stack:
+        node = stack.pop()
+        for child in tree.children(node):
+            if label[child] not in (None, 'unassigned') and not tree.is_leaf(child):
+                graph.add_edge(node, child)
+                lengths[(node, child)] = tree.get_branch_length(node, child)
+                for leaf in tree.leaves_in_subtree(child):
+                    graph.add_edge(child, leaf)
+                    lengths[(child, leaf)] = tree.get_time(leaf) - tree.get_time(child)
+            else:
+                graph.add_edge(node, child)
+                lengths[(node, child)] = tree.get_branch_length(node, child)
+                stack.append(child)
+
+    collapsed = CassiopeiaTree(tree=graph, cell_meta=tree.cell_meta)
+    for edge, length in lengths.items():
+        collapsed.set_branch_length(*edge, length)
+    for key in tree.layers:
+        collapsed.layers[key] = tree.layers[key]
+
+    return collapsed
+
+
+##
+
+
 def _clade_branch_colors(tree, name, annot, layer, cmaps, default, leaves_only=True):
     """
     {branch: color}: the color of annotation `name` for the branches above cells that all
@@ -484,6 +529,7 @@ def plot_tree(
     internal_nodes: dict[str, Any] = None,
     extend_branches: bool = None,
     leaf_length: float = None,
+    collapse_clones: str = None,
     angled_branches: bool = True,
     add_root: bool = False,
     **legacy
@@ -555,6 +601,12 @@ def plot_tree(
     leaf_length : float, optional
         Length added to every leaf branch, so that a polytomy is drawn as a fan instead of as a
         point. Default is None: 4% of the tree depth when drawing true lengths, 0 otherwise.
+    collapse_clones : str, optional
+        Name of a categorical annotation (e.g. "MiTo_clone"). Every clade whose cells all share one
+        label, other than "unassigned", is drawn as a single fan: its cells hang from the clade's MRCA
+        by equal-length branches, which centers the MRCA on them, and an outgroup cell or subclade of
+        the clone no longer looks like a separate lineage. The tree itself is not modified.
+        Default is None.
     angled_branches : bool, optional
         Angled, rather than rounded, branches. Default is True.
     add_root : bool, optional
@@ -577,6 +629,8 @@ def plot_tree(
         raise TypeError(msg)
 
     annot = [] if annot is None else ([annot] if isinstance(annot, str) else list(annot))
+    if collapse_clones is not None:
+        tree = _collapse_clones(tree, collapse_clones, layer)
     if ax is None:
         _, ax = plt.subplots(figsize=(5, 5))
     ax.axis('off')

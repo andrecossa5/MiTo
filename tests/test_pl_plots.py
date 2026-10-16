@@ -232,3 +232,15 @@ def test_plot_tree_colors_branches_by_clone(annotated_tree):
               for line in ax.lines}
     assert len(colors) > 1
     plt.close("all")
+
+
+def test_plot_tree_collapse_clones_leaves_the_tree_untouched(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    n_nodes, edges = len(annotated_tree.nodes), set(annotated_tree.edges)
+    _, ax = plt.subplots()
+    mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"], ax=ax, collapse_clones="MiTo_clone",
+                    branches={"annot": "MiTo_clone"})
+    assert len(annotated_tree.nodes) == n_nodes and set(annotated_tree.edges) == edges
+    plt.close("all")

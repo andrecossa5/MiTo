@@ -9,15 +9,19 @@
 [![PyPI](https://img.shields.io/pypi/v/scmito.svg)](https://pypi.org/project/scmito/)
 [![Python](https://img.shields.io/pypi/pyversions/scmito.svg)](https://pypi.org/project/scmito/)
 [![Tests](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml/badge.svg)](https://github.com/andrecossa5/MiTo/actions/workflows/test.yml)
-[![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/latest/index.html)
+[![Documentation](https://readthedocs.org/projects/mito/badge/?version=latest)](https://mito.readthedocs.io/en/v1.0.0/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **MiTo** infers clonal ancestries in single-cell data from natural mtDNA variation.
 
-The framework converts MAESTER, scmtATAC-seq and ReDeeM pre-processing output into Allele
-Frequency Matrices ([AnnData](https://anndata.readthedocs.io/) objects), selects the mtDNA
-variants that mark lineages, genotypes individual cells, and infers mitochondrial
-phylogenies and clones for downstream multi-omic analysis.
+The framework provides the infrastructure to convert MAESTER, scmtATAC-seq and RedeeM pre-processing outputs
+into Allele Frequency Matrices (i.e., [AnnData](https://anndata.readthedocs.io/) objects), filter informative mtDNA variants, genotype individual cells, and
+infer mitochondrial phylogenies and clones for downstream multi-omic analysis.
+
+> **Versions.** This README documents MiTo 1.0.0, the stable release of the original MiTo API, the one used for
+> the analyses of the MiTo paper. MiTo 2.x has a redesigned API and one pipeline for MAESTER, ReDeeM and mtscATAC:
+> see the [current documentation](https://mito.readthedocs.io/en/stable/). To stay on this release, use
+> `pip install "scmito<2"`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation
 
@@ -54,9 +58,8 @@ annotator.clonal_inference()
 mt.pl.plot_tree(tree, features=['MiTo clone'])
 ```
 
-See the [getting started tutorial](https://mito.readthedocs.io/en/latest/getting_started.html)
-for the full vignette, and the [ground truth benchmark](https://mito.readthedocs.io/en/latest/benchmark.html)
-for a worked example on real MAESTER data.
+See [getting-started tutorial](https://mito.readthedocs.io/en/v1.0.0/getting_started_tutorial.html) for 
+the full vignette.
 
 ## API
 
@@ -64,17 +67,27 @@ MiTo follows the `scverse` layout, composing with `scanpy` and `anndata`:
 
 | Module | Purpose |
 | --- | --- |
-| `io` | Build AFMs from pre-processing output, read/write Newick trees |
+| `io` | Build AFMs from pre-processing outputs, read/write Newick tree objects |
 | `pp` | Cell and variant filtering, genotyping, distances, kNN graphs, embeddings |
-| `tl` | Tree building, clonal annotation, fate bias, bootstrapping |
+| `tl` | Tree building, clonal inference, clustering, fate bias |
 | `pl` | Trees, heatmaps, embeddings, coverage and variant-spectrum plots |
-| `ut` | Metrics, MT annotations, simulation, helpers |
+| `ut` | Metrics, helpers |
 
-**Supported assays** (`scLT_system`, `pp_method`): MAESTER (`maegatk`, `mgatk`),
-scmtATAC-seq (`mgatk`) and ReDeeM (`redeem-v`). Pre-processing is done by
-[nf-MiTo](https://github.com/andrecossa5/nf-MiTo).
+**Supported platforms:** scRNA-seq (MAESTER), scmtATAC-seq and 10x MultiOme (RedeeM).
 
-Full reference: [MiTo docs](https://mito.readthedocs.io/en/latest/index.html).
+Full reference: [MiTo docs](https://mito.readthedocs.io/en/v1.0.0/).
+
+## Reproducing the paper
+
+The paper analyses run with MiTo 1.0.0, using the conda recipe in
+[MiTo_benchmark_repro](https://github.com/andrecossa5/MiTo_benchmark_repro) (`envs/environment.yml`, which
+installs `scmito==1.0.0` and the additional libraries the scripts need).
+
+The Nature Communications release is 0.1.5. 1.0.0 differs from it in one way that matters for these analyses:
+`mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours, where 0.1.5 returned every other
+cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances)
+therefore differ from the published ones. In the comparison we ran against the deposited tuning table,
+distance- and tree-based metrics (AUPRC, ARI, NMI) were identical. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 

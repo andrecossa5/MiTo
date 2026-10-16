@@ -63,12 +63,13 @@ def mask_mt_sites(site_list):
     mask = []
     for pos in site_list:
         pos = int(pos)
-        mask.append(any(pos>=start and pos<=end for _, start, end in MAESTER_genes_positions))
+        t = [ pos>=start and pos<=end for _, start, end in MAESTER_genes_positions ]
+        if any(t):
+            mask.append(True)
+        else:
+            mask.append(False)
 
-    # NB: dtype matters. An empty list becomes a float array, which AnnData rejects as an
-    # indexer, so an AFM whose variants have all been filtered would raise there instead
-    # of at the check that explains what happened.
-    return np.array(mask, dtype=bool)
+    return np.array(mask)
 
 
 ##

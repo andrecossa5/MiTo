@@ -13,6 +13,13 @@ clonal trees.
 
    pip install scmito
 
+.. note::
+
+   This is the documentation of **MiTo 1.0.0**, the stable release of the original MiTo API, used
+   for the analyses of the MiTo paper. MiTo 2.x has a redesigned API: see the
+   `current documentation <https://mito.readthedocs.io/en/stable/>`_. To stay on this release, use
+   ``pip install "scmito<2"``.
+
 .. grid:: 2
    :gutter: 3
 
@@ -22,11 +29,11 @@ clonal trees.
 
       Set up MiTo and its dependencies.
 
-   .. grid-item-card:: Tutorials
-      :link: tutorials
+   .. grid-item-card:: Tutorial
+      :link: getting_started
       :link-type: doc
 
-      A walkthrough of the main workflow, and a ground truth benchmark.
+      A full walkthrough, from raw AFM to an annotated phylogeny.
 
    .. grid-item-card:: API reference
       :link: api
@@ -73,13 +80,14 @@ At a glance
 
    afm = sc.read('afm_unfiltered.h5ad')
 
-   mt.pp.filter_cells(afm, cell_filter='filter2')
-   mt.pp.filter_afm(afm)
+   afm = mt.pp.filter_cells(afm, cell_filter='filter2')
+   afm = mt.pp.filter_afm(afm, filtering='MiTo')
 
-   tree = mt.tl.build_tree(afm, solver='UPMGA')
-   mt.tl.annotate_clones(tree, afm)
+   tree = mt.tl.build_tree(afm, precomputed=True, solver='UPMGA')
+   annotator = mt.tl.MiToTreeAnnotator(tree)
+   annotator.clonal_inference()
 
-   mt.pl.plot_tree(tree, annot='MiTo_clone')
+   mt.pl.plot_tree(tree, features=['MiTo clone'])
 
 .. toctree::
    :hidden:
@@ -87,7 +95,7 @@ At a glance
    :caption: Getting started
 
    installation
-   tutorials
+   getting_started
 
 .. toctree::
    :hidden:

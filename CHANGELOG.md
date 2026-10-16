@@ -2,78 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0] - 2026-09-21
+## [1.0.0] - 2026-10-16
+First stable release of the original MiTo API (`mt.pp.filter_baseline`, `mt.pp.filter_afm(filtering=...)`,
+`mt.tl.MiToTreeAnnotator`, ...), the one used for the analyses of the MiTo paper. The code is that of 0.2.1; 1.0.0
+adds the matched documentation. 0.2.1 stays published (same code).
+
+MiTo 2.x has a redesigned API. The 0.3.0-0.5.0 development versions were never released: the redesign ships as 2.0.0.
+
 ### Changed
-- **MT-only scope.** MiTo now covers MAESTER, mtscATAC and ReDeeM data
-  (`pp_method`: `maegatk`, `mgatk`, `redeem-v`); the Cas9, scWGS and EPI-clone
-  readers and their metrics are gone. Functions dispatch on what an AFM carries
-  rather than on `uns['scLT_system']`, so a new pre-processing pipeline only has
-  to produce the object contract.
-- **AFM contract.** One dense integer `DP` layer holds the coverage of each
-  variant's site, defined for every cell; `site_coverage` and the `qual` layer
-  are gone (base quality is a `.var` column). An unfiltered MAESTER AFM shrank
-  from 123 MB to ~24 MB.
-- **`filter_afm` implements the new variant pipeline**: candidate MT-SNVs ->
-  read-level genotyping against each variant's own error rate -> clonality QC on
-  the cell kNN graph -> signal over background -> optional dropout imputation ->
-  prevalence / four-gamete characters -> distances. 16 documented parameters,
-  keyword-only, in pipeline order.
-- **`mt.tl.annotate_clones`** replaces `MiToTreeAnnotator.clonal_inference`: the
-  tree is cut where the characters pay for the split, and cells whose calls their
-  neighbourhood does not corroborate are left `unassigned`.
-- **`mt.pl.plot_tree` rewritten**: annotations are named once in `annot`
-  (metadata column or character), coloured through `cmaps` / `limits`, and each
-  tree element is configured by one dictionary. 44 parameters -> 14, with
-  renamed arguments reported by name.
-- **scverse conventions**: `mt.pp` / `mt.tl` functions modify the AnnData in
-  place and take `copy=`; `mt.pp.kNN_graph` writes `.obsp` / `.uns` like
-  `sc.pp.neighbors`; provenance lives in one `.uns['mito']` namespace, one
-  record per public function.
+- Version 1.0.0, classifier "Production/Stable".
+- Documentation links point to `mito.readthedocs.io` (the previous `scmito.readthedocs.io` does not exist), in the
+  README, the package metadata and the tutorial.
+- The tutorial is re-executed with 1.0.0 on current dependencies (numpy 2, pandas 3, scipy 1.18): its results are
+  unchanged. The Moran's I variant filter is a permutation test without a fixed seed, so cell and variant counts can
+  differ by a unit between runs.
+- Docstrings match their signatures: `filter_cells` (`mean_cov_all`, default `cell_filter`), `reduce_dimensions`
+  (`ncores`, return value), `plot_tree` (`vmin`, `vmax`, `x_space`) and `nb_regression` (`df`, and it returns a
+  DataFrame).
+- README: versions note, "Reproducing the paper" section.
+- Dependency ceilings: numpy<3, scipy<2, pandas<4, scikit-learn<2, matplotlib<4, scanpy<2 and statsmodels<0.16, so a
+  breaking release of the core stack cannot break new installs of this version. Raised once a newer release is verified.
 
-### Added
-- `mt.pp.call_genotypes` (per-cell binomial test against the variant's own,
-  iteratively estimated error rate), `filter_non_clonal_variants` (join count /
-  exclusivity on the leave-one-out kNN graph), `filter_low_signal_variants`,
-  `impute_dropouts`, `filter_incompatible_variants`.
-- `mt.tl.evidence_cut`, `clone_support`, `rescue_unassigned`, `compute_fitness`,
-  `compute_expansions`; `mt.ut.dataset_metrics`.
-- `mt.io.migrate_afm`, which converts an AFM written by MiTo < 0.3 to the current
-  contract. Genotyping refuses to run on an unconverted object rather than use a
-  masked coverage layer as its denominator.
+### Differences from 0.1.5 (the Nature Communications release), as of 0.2.0
+- `mt.pp.kNN_graph(from_distances=True)` returns the `k` nearest neighbours of each cell; 0.1.5 returned every other
+  cell. kNN-based quantities (kNN purity, entropy and kBET, UMAP embeddings, Leiden clustering on distances) differ
+  from the published ones.
+- `annotate_vars`: `median_af_in_positives` (a mean over the positive cells, whatever its name) is computed on their
+  allele frequencies; 0.1.5 computed it on a boolean matrix, so it was constant.
+- The `genotype_MiTo_smooth` function and the `"MiTo_smooth"` genotyping option are removed.
 
-### Removed
-- Feature-selection strategies superseded by the clonality QC: `MQuad`,
-  `weng2024`, `miller2022`, `CV`, and the Moran's I filter (it included the
-  variant under test in the distances, so 96% of scattered noise passed).
-- The binomial-mixture genotyper (it called cells with zero alternative reads),
-  `mt.tl._classification`, `mt.ut.de_utils`, `mt.ut.stats_utils` and unused
-  helpers; dependencies `mquad`, `bbmix`, `lightgbm`, `shap`, `gseapy`.
-
-### Maintenance
-- CI actions and pre-commit hooks updated (`download-artifact`,
-  `action-gh-release`, `pyproject-fmt`, `ruff-pre-commit`).
-- Tutorials re-executed against the new API; the suite is 347 tests and needs no
-  external data.
-
+## [0.2.1] - 2026-10-15
 ### Fixed
-- `multipletests` is imported from `statsmodels.stats.multitest`; the
-  `statsmodels.sandbox` path it used was removed in statsmodels 0.15, which had
-  been breaking every CI run since 31 Aug 2026 on unchanged code.
-- One character without a positive allele frequency made *every* cell-cell
-  distance NaN; weights are now taken over called cells, with a fallback.
-- The four-gamete filter resolved conflicts by count alone, deleting prevalent
-  real markers in favour of sparse noise (613 of 1272 genotyped cells lost their
-  only character on one dataset); it now drops the variant with the least signal.
-- Bootstrap replicates dropped the genotypes, so `compute_distances` failed on
-  them; they are now seeded and carry every layer.
-- Plotting: categorical legends in `draw_embedding`, every `layer=` in
-  `heatmap_variants`, `matplotlib.cm.get_cmap` (removed in matplotlib 3.9),
-  axes creation when `ax` is not given.
-
-## [0.2.1] - 2026-08-06
-### Fixed
-- Documentation URL in the package metadata pointed at a Read the Docs slug
-  that does not exist yet, so the "Documentation" link on PyPI was dead.
+- Importable with statsmodels >= 0.15: `multipletests` is imported from
+  `statsmodels.stats.multitest` (`statsmodels.sandbox.stats.multicomp` no longer
+  provides it), in `mt.pp`, `mt.tl.annotate` and `mt.tl.phenotype`. No change to any
+  method: results are those of 0.2.0.
+- `mt.pl.plot_tree`: no longer calls `matplotlib.cm.get_cmap` (removed in matplotlib 3.9)
+  on a colormap it had already looked up.
 
 ## [0.2.0] - 2026-08-05
 ### Added

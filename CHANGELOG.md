@@ -69,6 +69,8 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
   filled triangle, `"full"` for a fan from the MRCA), which keeps large trees readable. `gap_by="MiTo_clone"` (with `gap`, in cell widths) opens space between neighbouring clones.
 - New `pl.clone_packing`: clones as circles (area = cells) packed inside the clades of the tree that hold them, colored by a
   covariate. Clone-level view of a phylogeny with hundreds of clones.
+- New `pl.plot_clone_tree`: one tip per clone, a circle whose area is its cells, on the tree with its true branch lengths;
+  colored by clone or by a per-clone value.
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
   leave-one-out kNN graphs are updated incrementally (only the held-out variant's
   carriers change; exact), and the null sets come from one bank of stratified

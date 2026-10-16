@@ -827,3 +827,185 @@ def plot_tree(
 
 
 ##
+
+
+##
+
+
+def plot_clone_tree(
+    tree: CassiopeiaTree,
+    annot: str = 'MiTo_clone',
+    color_by: str|pd.Series = None,
+    cmap: Any = None,
+    limits: tuple[float,float] = None,
+    show_unassigned: bool = False,
+    orient: float = 90,
+    pad: float = .12,
+    linewidth: float = None,
+    alpha: float = .9,
+    max_radius: float = .09,
+    ax: matplotlib.axes.Axes = None,
+    ) -> matplotlib.axes.Axes:
+    """
+    Clone-level phylogeny: one tip per clone, a circle whose area is its number of cells.
+
+    Every clade of the tree whose cells share one label of `annot` (e.g. "MiTo_clone") is
+    replaced by a single tip at the same depth as its cells, so the branches keep their
+    true lengths; the clades above are drawn as in `plot_tree`. The angular space of a tip
+    grows with its circle, so circles never overlap.
+
+    Parameters
+    ----------
+    tree : CassiopeiaTree
+        Phylogeny (ultrametric, e.g. from `mito.tl.build_tree`), with the clone labels in
+        tree.cell_meta[`annot`].
+    annot : str, optional
+        Categorical annotation naming the clones. Default is "MiTo_clone".
+    color_by : str or pd.Series, optional
+        Column of tree.cell_meta (mean per clone if numeric, most common value otherwise) or
+        a Series of values per clone, indexed by clone label. Default is None: the colors of
+        `annot` in `plot_tree`.
+    cmap : str or dict, optional
+        Colormap name for a numeric `color_by`, or {category: color}. Default is "Spectral_r".
+    limits : tuple[float, float], optional
+        Color range of a numeric `color_by`. Default is its 5th to 95th percentile.
+    show_unassigned : bool, optional
+        Draw each unassigned cell as a small grey tip. Default is False: they are left out.
+    orient : float, optional
+        Angle offset of the circular layout. Default is 90.
+    pad : float, optional
+        Free angular space around a tip, relative to the largest circle. Default is 0.12.
+    linewidth : float, optional
+        Branch width. Default is None: 0.8, or 0.3 when there are more than 60 tips.
+    alpha : float, optional
+        Opacity of the circles. Default is 0.9.
+    max_radius : float, optional
+        Largest circle radius, as a fraction of the radius of the tree. Default is 0.09.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. Default is None (new figure).
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+
+    x, _ = _annotation_values(tree, annot, 'raw')
+    label = {}
+    for node in tree.depth_first_traverse_nodes(postorder=True):
+        if tree.is_leaf(node):
+            lab = x.loc[node] if pd.notna(x.loc[node]) else 'unassigned'
+            label[node] = None if lab == 'unassigned' else lab
+        else:
+            kids = {label[c] for c in tree.children(node)}
+            label[node] = kids.pop() if len(kids) == 1 else None
+    depth = max(tree.get_time(leaf) for leaf in tree.leaves)
+
+    # clone-level tree: a clone's clade is one tip; unassigned cells are tips or dropped
+    graph, length, tip = nx.DiGraph(), {}, {}
+    stack = [tree.root]
+    while stack:
+        node = stack.pop()
+        for child in tree.children(node):
+            if label[child] is not None:                  # a clone: one tip, at the cells' depth
+                graph.add_edge(node, child)
+                length[(node, child)] = tree.get_branch_length(node, child) + depth - tree.get_time(child)
+                tip[child] = (label[child], list(tree.leaves_in_subtree(child)) if not tree.is_leaf(child) else [child])
+            elif tree.is_leaf(child):                     # an unassigned cell
+                if show_unassigned:
+                    graph.add_edge(node, child)
+                    length[(node, child)] = tree.get_branch_length(node, child)
+                    tip[child] = (None, [child])
+            else:
+                graph.add_edge(node, child)
+                length[(node, child)] = tree.get_branch_length(node, child)
+                stack.append(child)
+    # drop clades left without tips, then merge chains with a single child
+    for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root) if graph.out_degree(n) == 0 and n not in tip]:
+        graph.remove_node(node)
+    for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root) if n in graph and graph.out_degree(n) == 1 and n != tree.root]:
+        (child,) = graph.successors(node)
+        (parent,) = graph.predecessors(node)
+        graph.add_edge(parent, child)
+        length[(parent, child)] = length[(parent, node)] + length[(node, child)]
+        graph.remove_node(node)
+    flat = CassiopeiaTree(tree=graph)
+    for edge in graph.edges:
+        flat.set_branch_length(*edge, length.get(edge, 0.) if edge in length else 0.)
+
+    zero = [e for e in flat.edges if flat.get_branch_length(*e) <= 0]
+    for e in zero:
+        flat.set_branch_length(*e, 1e-6 * depth)
+    node_coords, branch_coords = ut.place_tree(flat, orient=orient, extend_branches=False, angled_branches=True)
+
+    # angular slots proportional to the circle sizes
+    n_cells = {t: len(tip[t][1]) for t in tip}
+    top = max(n_cells.values())
+    size = {t: np.sqrt(n_cells[t] / top) for t in tip}
+    if show_unassigned:
+        size = {t: (size[t] if tip[t][0] is not None else .15 * 0 + .04) for t in tip}
+    order = sorted(tip, key=lambda t: node_coords[t][0])
+    widths = np.array([size[t] + pad for t in order])
+    old = np.array([node_coords[t][0] for t in order], dtype=float)
+    span = old[-1] - old[0] + (old[1] - old[0] if len(old) > 1 else 1.)
+    edges = np.concatenate([[0], np.cumsum(widths)])
+    new = old[0] + span * (edges[:-1] + widths / 2) / edges[-1]
+    node_coords = {k: (float(np.interp(c[0], old, new)), c[1]) for k, c in node_coords.items()}
+    branch_coords = {k: ([float(v) for v in np.interp(np.asarray(xs), old, new)], ys) for k, (xs, ys) in branch_coords.items()}
+    rim = max(node_coords[t][1] for t in tip)
+    unit = 2 * np.pi * rim * span / 360 / edges[-1]          # arc length of one unit of size
+    unit = min(unit, 2 * max_radius * rim)                 # circles never outgrow their slot or the tree
+    radius = {t: size[t] * unit / 2 for t in tip}
+    linewidth = linewidth if linewidth is not None else (.8 if len(tip) <= 60 else .3)
+
+    node_xy = _to_polar_coords(node_coords)
+    branch_xy = _to_polar_coords(branch_coords)
+
+    # colors
+    per_clone = isinstance(color_by, pd.Series)
+    clone_of = {t: tip[t][0] for t in tip}
+    if color_by is None:
+        palette = _label_colors(tree, annot, [annot], 'raw', None)
+        face = {t: palette[tip[t][1][0]] if clone_of[t] is not None else '#bdbdbd' for t in tip}
+        norm = colormap = None
+    else:
+        values = color_by if per_clone else tree.cell_meta[color_by]
+        numeric = pd.api.types.is_numeric_dtype(values) and not isinstance(values.dtype, pd.CategoricalDtype)
+        if numeric:
+            stat = {t: (values.get(clone_of[t], np.nan) if per_clone else values.loc[tip[t][1]].mean())
+                    for t in tip if clone_of[t] is not None}
+            vals = pd.Series(stat)
+            lo, hi = limits if limits is not None else (np.nanpercentile(vals, 5), np.nanpercentile(vals, 95))
+            colormap = matplotlib.colormaps[cmap if isinstance(cmap, str) else 'Spectral_r']
+            norm = plt.Normalize(lo, hi)
+            face = {t: colormap(norm(stat[t])) if t in stat else '#bdbdbd' for t in tip}
+        else:
+            mode = {t: (values.get(clone_of[t]) if per_clone else values.loc[tip[t][1]].mode().iloc[0])
+                    for t in tip if clone_of[t] is not None}
+            palette = cmap if isinstance(cmap, dict) else _categorical_palette(values, default=_categorical_cmaps[0])
+            face = {t: palette.get(mode[t], _NA_COLOR) if t in mode else '#bdbdbd' for t in tip}
+            norm = colormap = None
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7, 7))
+    for xs, ys in branch_xy.values():
+        ax.plot(xs, ys, color='k', linewidth=linewidth, solid_capstyle='round')
+    for t in tip:
+        cx, cy = node_xy[t]
+        ax.add_patch(plt.Circle((cx, cy), radius[t], facecolor=face[t], edgecolor='k', linewidth=.3, alpha=alpha, zorder=5))
+
+    # size legend: circles of round numbers of cells
+    refs = [r for r in (10, 100, 1000, 10000) if r <= top] or [top]
+    refs = refs[-3:]
+    lim = (rim + max(radius.values())) * 1.08
+    x0, y0 = lim * .62, -lim * .92
+    for i, r in enumerate(refs):
+        rr = np.sqrt(r / top) * unit / 2
+        ax.add_patch(plt.Circle((x0 + i * lim * .14, y0 + rr), rr, facecolor='none', edgecolor='k', linewidth=.5))
+        ax.text(x0 + i * lim * .14, y0 - lim * .01, str(r), ha='center', va='top', fontsize=7)
+    ax.text(x0 - lim * .06, y0 + lim * .02, 'cells', ha='right', va='center', fontsize=7)
+    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect('equal'); ax.axis('off')
+    if norm is not None:
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=colormap)
+        ax.figure.colorbar(sm, ax=ax, shrink=.35, label=color_by.name if per_clone else color_by)
+
+    return ax

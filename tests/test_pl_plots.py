@@ -187,7 +187,7 @@ def test_all_plotting_functions_are_exported_and_callable(embedded, coverage_tab
     assert set(mt.pl.__all__) == {
         "vars_AF_spectrum", "MT_coverage_by_gene_polar", "MT_coverage_polar", "mut_profile",
         "plot_ncells_nAD", "draw_embedding", "heatmap_distances", "heatmap_variants",
-        "plot_tree", "packed_circle_plot", "clone_packing",
+        "plot_tree", "packed_circle_plot", "clone_packing", "plot_clone_tree",
     }
     mt.pl.plot_tree(tree)
     mt.pl.draw_embedding(afm, feature="MiTo_clone")
@@ -287,4 +287,15 @@ def test_clone_packing_accepts_a_value_per_clone(annotated_tree):
     clones = annotated_tree.cell_meta["MiTo_clone"].astype(str).unique()
     values = pd.Series(range(len(clones)), index=clones, name="n")
     mt.pl.clone_packing(annotated_tree, color_by=values, max_levels=1)
+    plt.close("all")
+
+
+def test_plot_clone_tree_draws_one_circle_per_clone(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    ax = mt.pl.plot_clone_tree(annotated_tree)
+    n_clones = annotated_tree.cell_meta["MiTo_clone"].astype(str).drop_duplicates().ne("unassigned").sum()
+    circles = [p for p in ax.patches if p.zorder == 5]
+    assert len(circles) == n_clones
     plt.close("all")

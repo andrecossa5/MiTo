@@ -67,6 +67,8 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
 - `pl.plot_tree`: `leaf_length` (fans for polytomies), `branches={"annot": ...}` colors the leaf branches by clone, and
   `collapse_clones="MiTo_clone"` draws each single-label clade as a short fan (`clone_style="fan"`; `"wedge"` for a
   filled triangle, `"full"` for a fan from the MRCA), which keeps large trees readable. `gap_by="MiTo_clone"` (with `gap`, in cell widths) opens space between neighbouring clones.
+- New `pl.clone_packing`: clones as circles (area = cells) packed inside the clades of the tree that hold them, colored by a
+  covariate. Clone-level view of a phylogeny with hundreds of clones.
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
   leave-one-out kNN graphs are updated incrementally (only the held-out variant's
   carriers change; exact), and the null sets come from one bank of stratified

@@ -187,7 +187,7 @@ def test_all_plotting_functions_are_exported_and_callable(embedded, coverage_tab
     assert set(mt.pl.__all__) == {
         "vars_AF_spectrum", "MT_coverage_by_gene_polar", "MT_coverage_polar", "mut_profile",
         "plot_ncells_nAD", "draw_embedding", "heatmap_distances", "heatmap_variants",
-        "plot_tree", "packed_circle_plot",
+        "plot_tree", "packed_circle_plot", "clone_packing",
     }
     mt.pl.plot_tree(tree)
     mt.pl.draw_embedding(afm, feature="MiTo_clone")
@@ -266,4 +266,15 @@ def test_plot_tree_gap_between_clones_keeps_every_cell(annotated_tree, orient):
     _, ax = plt.subplots()
     mt.pl.plot_tree(annotated_tree, annot=["MiTo_clone"], ax=ax, orient=orient,
                     collapse_clones="MiTo_clone", clone_style="full", gap_by="MiTo_clone", gap=4)
+    plt.close("all")
+
+
+def test_clone_packing_draws_every_clone(annotated_tree):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    ax = mt.pl.clone_packing(annotated_tree, annot="MiTo_clone", max_levels=2)
+    n_clones = annotated_tree.cell_meta["MiTo_clone"].astype(str).drop_duplicates().ne("unassigned").sum()
+    filled = [p for p in ax.patches if p.get_facecolor()[3] > 0]
+    assert len(filled) == n_clones
     plt.close("all")

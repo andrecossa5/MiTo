@@ -59,3 +59,8 @@ def test_plot_clone_tree_accepts_a_collapsed_tree_colored_by_support(annotated_t
     flat = mt.tl.collapse_clones(annotated_tree)
     mt.pl.plot_clone_tree(flat, color_by="support")
     plt.close("all")
+
+
+def test_every_leaf_of_the_clone_tree_is_a_clone(annotated_tree):
+    flat = mt.tl.collapse_clones(annotated_tree)
+    assert set(flat.leaves) == set(flat.cell_meta.index)

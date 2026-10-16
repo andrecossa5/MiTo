@@ -80,8 +80,11 @@ def collapse_clones(
                 length[(node, child)] = tree.get_branch_length(node, child)
                 stack.append(child)
 
-    for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root) if graph.out_degree(n) == 0 and n not in tip]:
-        graph.remove_node(node)                               # clades left without tips
+    dangling = [n for n in graph if graph.out_degree(n) == 0 and n not in tip]
+    while dangling:                                           # clades left without tips, and their parents
+        for node in dangling:
+            graph.remove_node(node)
+        dangling = [n for n in graph if graph.out_degree(n) == 0 and n not in tip]
     for node in [n for n in nx.dfs_postorder_nodes(graph, tree.root)
                  if n in graph and graph.out_degree(n) == 1 and n != tree.root]:
         (child,) = graph.successors(node)

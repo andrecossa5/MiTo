@@ -64,6 +64,9 @@ is 0.1.5, see the 1.0.0 entry for the differences): see
   which drew long ladders; the clades and the clones are unchanged.
 - `pl.plot_tree` draws the true branch lengths by default for ultrametric trees with varying lengths (UPGMA), with colorstrips
   scaled to the tree (`extend_branches=None`; `True` restores equal-length branches), and accepts zero-length branches.
+- `pl.plot_tree`: `leaf_length` (fans for polytomies), `branches={"annot": ...}` colors the leaf branches by clone, and
+  `collapse_clones="MiTo_clone"` draws each single-label clade as a triangle (`clone_style="wedge"`, or a centred fan),
+  which keeps large trees readable.
 - **Clonality filter 10-26x faster, in less memory** (and imputation with it): the
   leave-one-out kNN graphs are updated incrementally (only the held-out variant's
   carriers change; exact), and the null sets come from one bank of stratified

@@ -244,3 +244,14 @@ def test_plot_tree_collapse_clones_leaves_the_tree_untouched(annotated_tree):
                     branches={"annot": "MiTo_clone"})
     assert len(annotated_tree.nodes) == n_nodes and set(annotated_tree.edges) == edges
     plt.close("all")
+
+
+@pytest.mark.parametrize("orient,style", [(90, "wedge"), ("down", "wedge"), (90, "fan")])
+def test_plot_tree_draws_collapsed_clones_as_wedges(annotated_tree, orient, style):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    _, ax = plt.subplots()
+    mt.pl.plot_tree(annotated_tree, ax=ax, orient=orient, collapse_clones="MiTo_clone", clone_style=style)
+    assert (len(ax.patches) > 0) == (style == "wedge")
+    plt.close("all")

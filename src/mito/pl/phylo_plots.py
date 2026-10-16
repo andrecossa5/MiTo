@@ -273,12 +273,13 @@ def _place_tree(tree, annot, cmaps, limits, layer, orient, extend_branches,
 
         colorstrips.append(colorstrip)
 
+    raw_nodes = dict(node_coords)
     if is_polar:
         branch_coords = _to_polar_coords(branch_coords)
         node_coords = _to_polar_coords(node_coords)
         colorstrips = _to_polar_colorstrips(colorstrips)
 
-    return node_coords, branch_coords, list(zip(colorstrips, annot, strict=True))
+    return node_coords, branch_coords, list(zip(colorstrips, annot, strict=True)), raw_nodes
 
 
 ##
@@ -317,6 +318,7 @@ def _collapse_clones(tree, name, layer):
 
     graph = nx.DiGraph()
     lengths = {}
+    clone_nodes = {}
     stack = [tree.root]
     while stack:
         node = stack.pop()
@@ -324,6 +326,7 @@ def _collapse_clones(tree, name, layer):
             if label[child] not in (None, 'unassigned') and not tree.is_leaf(child):
                 graph.add_edge(node, child)
                 lengths[(node, child)] = tree.get_branch_length(node, child)
+                clone_nodes[child] = list(tree.leaves_in_subtree(child))
                 for leaf in tree.leaves_in_subtree(child):
                     graph.add_edge(child, leaf)
                     lengths[(child, leaf)] = tree.get_time(leaf) - tree.get_time(child)
@@ -338,7 +341,60 @@ def _collapse_clones(tree, name, layer):
     for key in tree.layers:
         collapsed.layers[key] = tree.layers[key]
 
-    return collapsed
+    return collapsed, clone_nodes
+
+
+##
+
+
+def _label_colors(tree, name, annot, layer, cmaps):
+    """{cell: color} of a categorical annotation, the colors of its colorstrip."""
+
+    x, _ = _annotation_values(tree, name, layer)
+    if _is_continuous(x):
+        raise ValueError(f'"{name}" must be a categorical annotation.')
+    names = [annot] if isinstance(annot, str) else list(annot or [])
+    n_cat = sum(1 for a in names[:names.index(name)] if not _is_continuous(_annotation_values(tree, a, layer)[0])) \
+        if name in names else 0
+    colors, _, _ = _resolve_colors(
+        x, cmap=(cmaps or {}).get(name), default=_categorical_cmaps[n_cat % len(_categorical_cmaps)]
+    )
+    return colors
+
+
+def _draw_wedges(ax, tree, clone_nodes, raw_nodes, colors, orient, height, style):
+    """
+    Collapsed clones as triangles: a stem from the clone's MRCA, and a filled wedge over the
+    last `height` of the tree depth whose width is that of its cells.
+    """
+
+    leaves = [n for n in raw_nodes if n in tree.nodes and tree.is_leaf(n)]
+    polar = isinstance(orient, (float, int))
+    if polar:
+        rim = max(raw_nodes[n][1] for n in leaves)
+        step = 360 / (len(leaves) + 1)
+    else:
+        rim = max(abs(raw_nodes[n][1]) for n in leaves)
+        step = 1.
+    reach = height * rim
+    order = {n: i for i, n in enumerate(tree.depth_first_traverse_nodes())}
+
+    for node, cells in clone_nodes.items():
+        cells = sorted(cells, key=order.get)
+        pos_lo, pos_hi = raw_nodes[cells[0]][0] - step/2, raw_nodes[cells[-1]][0] + step/2
+        pos, depth = raw_nodes[node]
+        depth = abs(depth) if not polar else depth
+        apex = max(depth, rim - reach)
+        if polar:
+            thetas = list(np.linspace(pos_lo, pos_hi, max(int(abs(pos_hi - pos_lo)), 2)))
+            xs, ys = ut.polars_to_cartesians([pos] + thetas, [apex] + [rim]*len(thetas))
+            sx, sy = ut.polars_to_cartesians([pos, pos], [depth, apex])
+        else:
+            xs, ys = [pos, pos_lo, pos_hi], [-apex, -rim, -rim]
+            sx, sy = [pos, pos], [-depth, -apex]
+        ax.plot(sx, sy, **{**style, 'c':'k'})
+        ax.add_patch(Polygon(xy=list(zip(xs, ys, strict=True)), closed=True,
+                             **{'facecolor':colors[cells[0]], 'edgecolor':'k', 'linewidth':.3, 'alpha':.9}))
 
 
 ##
@@ -530,6 +586,8 @@ def plot_tree(
     extend_branches: bool = None,
     leaf_length: float = None,
     collapse_clones: str = None,
+    clone_style: str = 'wedge',
+    wedge_height: float = .15,
     angled_branches: bool = True,
     add_root: bool = False,
     **legacy
@@ -607,6 +665,12 @@ def plot_tree(
         by equal-length branches, which centers the MRCA on them, and an outgroup cell or subclade of
         the clone no longer looks like a separate lineage. The tree itself is not modified.
         Default is None.
+    clone_style : str, optional
+        How a collapsed clone is drawn: "wedge" (default), a stem from the MRCA and a filled
+        triangle over the last `wedge_height` of the depth, as wide as its cells (polar and
+        `orient="down"` layouts), or "fan", every cell on its own line from the MRCA.
+    wedge_height : float, optional
+        Fraction of the tree depth the wedges span. Default is 0.15.
     angled_branches : bool, optional
         Angled, rather than rounded, branches. Default is True.
     add_root : bool, optional
@@ -629,8 +693,10 @@ def plot_tree(
         raise TypeError(msg)
 
     annot = [] if annot is None else ([annot] if isinstance(annot, str) else list(annot))
+    clone_nodes = {}
     if collapse_clones is not None:
-        tree = _collapse_clones(tree, collapse_clones, layer)
+        tree, clone_nodes = _collapse_clones(tree, collapse_clones, layer)
+    wedges = bool(clone_nodes) and clone_style == 'wedge' and (isinstance(orient, (float, int)) or orient == 'down')
     if ax is None:
         _, ax = plt.subplots(figsize=(5, 5))
     ax.axis('off')
@@ -666,7 +732,7 @@ def plot_tree(
         'internal_nodes'
     )
 
-    node_coords, branch_coords, strips = _place_tree(
+    node_coords, branch_coords, strips, raw_nodes = _place_tree(
         tree, annot, cmaps, limits, layer, orient, extend_branches, angled_branches,
         add_root, width=strip_spec['width'], spacing=strip_spec['spacing'], leaf_length=leaf_length
     )
@@ -676,6 +742,12 @@ def plot_tree(
             leaves_only=branch_spec['where'] == 'leaves'
         )
 
+    if wedges:
+        branch_coords = {b: c for b, c in branch_coords.items() if b[0] not in clone_nodes}
+        _draw_wedges(
+            ax, tree, clone_nodes, raw_nodes, _label_colors(tree, collapse_clones, annot, layer, cmaps),
+            orient, wedge_height, {'linewidth':1, **branch_style}
+        )
     _draw_branches(ax, branch_coords, branch_spec, {'linewidth':1, **branch_style})
     _draw_colorstrips(ax, strips, orient, strip_spec, {'linewidth':0, 'alpha':1, **strip_style})
     _draw_leaves(

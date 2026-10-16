@@ -299,7 +299,7 @@ def _element_colors(elements, values, cmap, limits):
 ##
 
 
-def _clade_branch_colors(tree, name, annot, layer, cmaps, default):
+def _clade_branch_colors(tree, name, annot, layer, cmaps, default, leaves_only=True):
     """
     {branch: color}: the color of annotation `name` for the branches above cells that all
     share one label (the same color as in its colorstrip), `default` for the others.
@@ -326,7 +326,7 @@ def _clade_branch_colors(tree, name, annot, layer, cmaps, default):
     out = {}
     for parent, child in tree.edges:
         lab = label[child]
-        if lab is None or lab == 'unassigned':
+        if lab is None or lab == 'unassigned' or (leaves_only and not tree.is_leaf(child)):
             out[(parent, child)] = default
         else:
             out[(parent, child)] = colors[next(iter(tree.leaves_in_subtree(child)))]
@@ -533,11 +533,13 @@ def plot_tree(
     colorstrips : dict, optional
         {"width", "spacing", "labels", "label_size", "label_offset"} plus Polygon style.
     branches : dict, optional
-        {"feature", "meta", "cmap", "limits", "color", "annot"} plus Line2D style. "meta" is the
+        {"feature", "meta", "cmap", "limits", "color", "annot", "where"} plus Line2D style. "meta" is the
         DataFrame holding the per-branch covariate. "annot" names one of the categorical
         annotations (e.g. "MiTo_clone"): a branch takes the color of that annotation in the
         colorstrip if all the cells below it share one label, and "color" (black) otherwise,
-        including for the label "unassigned".
+        including for the label "unassigned". With "where" = "leaves" (default) only the leaf
+        branches are colored, so that the clones read as fans over a black tree; "all" colors every
+        branch above a single-label clade.
     leaves : dict, optional
         {"feature", "cmap", "limits", "labels", "label_size", "label_offset", "color"}
         plus marker style.
@@ -594,7 +596,7 @@ def plot_tree(
     )
     branch_spec, branch_style = _split_spec(
         branches,
-        {'feature':None, 'meta':None, 'cmap':'Spectral_r', 'limits':None, 'color':'k', 'annot':None},
+        {'feature':None, 'meta':None, 'cmap':'Spectral_r', 'limits':None, 'color':'k', 'annot':None, 'where':'leaves'},
         'branches'
     )
     leaf_spec, leaf_style = _split_spec(
@@ -616,7 +618,8 @@ def plot_tree(
     )
     if branch_spec['annot'] is not None:
         branch_spec['colors'] = _clade_branch_colors(
-            tree, branch_spec['annot'], annot, layer, cmaps, branch_spec['color']
+            tree, branch_spec['annot'], annot, layer, cmaps, branch_spec['color'],
+            leaves_only=branch_spec['where'] == 'leaves'
         )
 
     _draw_branches(ax, branch_coords, branch_spec, {'linewidth':1, **branch_style})

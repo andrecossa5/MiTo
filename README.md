@@ -74,6 +74,7 @@ Tutorials:
 * [Getting started](https://mito.readthedocs.io/en/stable/getting_started.html): the pipeline on simulated clones.
 * [Loading data](https://mito.readthedocs.io/en/stable/loading_data.html): the AFM, and how to build it from maegatk, mgatk, RedeemV or counts tables.
 * [Benchmark](https://mito.readthedocs.io/en/stable/benchmark.html): simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells, against ground-truth lineage barcodes.
+* [Biological example](https://mito.readthedocs.io/en/stable/biological_example.html): clones of lung tumor, normal tissue and blood from mtscATAC-seq (Liu et al., 2026), with cell types annotated by SnapATAC2 and the clones enriched in each cell type.
 
 Moving from MiTo 1.0.0: see the [migration guide](https://mito.readthedocs.io/en/stable/migrating.html) and [CHANGELOG.md](CHANGELOG.md).
 

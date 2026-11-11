@@ -115,8 +115,8 @@ those numbers exactly.
 
 If MiTo is useful in your work, please cite:
 
-> Cossa, A. Dalmasso A. et al. *MiTo: mitochondrial lineage tracing and single-cell multi-omics.*
-> Nat Comm (2026). [https://doi.org/10.1038/s41467-026-71607-5](https://www.nature.com/articles/s41467-026-71607-5)
+> Cossa, A., Dalmasso, A. et al. *MiTo: tracing the phenotypic evolution of somatic cell lineages via mitochondrial single-cell multi-omics.*
+> Nat Commun 17, 6794 (2026). [https://doi.org/10.1038/s41467-026-71607-5](https://www.nature.com/articles/s41467-026-71607-5)
 
 MiTo builds on the [Cassiopeia](https://github.com/YosefLab/Cassiopeia) package for phylogeny reconstruction and data infrastructure. Please, cite it as well.
 

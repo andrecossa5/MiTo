@@ -47,6 +47,12 @@ defaults for the three assays.
 
       Simulated data, MAESTER, and ReDeeM vs mtscATAC on the same cells.
 
+   .. grid-item-card:: Biological example
+      :link: biological_example
+      :link-type: doc
+
+      Clones of lung tumor, normal tissue and blood from mtscATAC-seq, annotated with SnapATAC2.
+
    .. grid-item-card:: Installation
       :link: installation
       :link-type: doc

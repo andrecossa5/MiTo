@@ -76,7 +76,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/andrecossa5/MiTo"
-Documentation = "https://mito.readthedocs.io/en/v2.0.0/"
+Documentation = "https://mito.readthedocs.io/en/v2.0.1/"
 Repository = "https://github.com/andrecossa5/MiTo"
 Issues = "https://github.com/andrecossa5/MiTo/issues"
 

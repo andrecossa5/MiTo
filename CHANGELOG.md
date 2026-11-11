@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-11-02
+Documentation release: no change to the code of the package.
+
+### Added
+- **Biological example** tutorial (`docs/source/biological_example.ipynb`): mtscATAC-seq of one donor of
+  Liu et al. 2026 (GSE302113, 7 samples, 30,807 annotated cells). The cells are annotated with SnapATAC2,
+  the clones are inferred with MiTo, and the two are joined to find the clones enriched in specific cell types
+  (one-sided Fisher's exact test, Benjamini-Hochberg). The data are on Zenodo ([10.5281/zenodo.23912759](https://doi.org/10.5281/zenodo.23912759), one 2.9 GB archive that the notebook downloads), and the environment is in
+  `docs/source/liu2026_environment.yml`. The scripts that prepare the data and generate the notebook are in
+  `benchmarks/liu_2026/`.
+
+### Fixed
+- The citation of the MiTo paper (title, volume and article number) in the README and the documentation.
+
 ## [2.0.0] - 2026-10-16
 One pipeline for the three MT-scLT assays: every AFM holds molecule counts, and
 `filter_afm` runs the same stages with the same defaults on MAESTER, ReDeeM and

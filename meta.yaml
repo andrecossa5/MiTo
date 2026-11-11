@@ -1,34 +1,29 @@
-# Submission entry for https://github.com/scverse/ecosystem-packages
-# Copy this to packages/MiTo/meta.yaml in a fork of that repository and open a PR,
-# completing the checklist from its README in the PR description.
+# Entry for https://github.com/scverse/ecosystem-packages (schema: scripts/src/ecosystem_scripts/schema.json).
+# Submit as packages/MiTo/meta.yaml together with logo.png (the 512 px MiTo logo in image/), with the
+# checklist of that repository's README filled in the PR description.
 name: MiTo
 description: |
-  MiTo is a toolkit for mitochondrial single-cell lineage tracing (MT-scLT) data analysis.
-  It assembles Allele Frequency Matrices from MT-scLT assays (e.g., MAESTER, scmtATAC-seq, ReDeeM)
-  into AnnData objects, selects informative MT-SNVs, calls single-cell genotypes, 
-  reconstructs distance-based phylogenies in mtDNA mutational space, and 
-  annotates these with a bespoke algorithm to find discrete clonal populations.
-  Interoperability with other scverse frameworks allows mapping additional data modalities 
-  (e.g., gene expression, chromatin accessibility, protein abundance) to inferred phylogenies and clones
-  to investigate biological processes of interest.
+  MiTo infers clonal ancestries in single-cell data from natural mitochondrial DNA variation:
+  it reads MAESTER, mtscATAC-seq and ReDeeM output into an AnnData allele-frequency matrix,
+  selects informative MT-SNVs, calls genotypes, reconstructs the cell phylogeny and annotates its clones.
 project_home: https://github.com/andrecossa5/MiTo
-documentation_home: https://mito.readthedocs.io/en/stable/
-tutorials_home: https://mito.readthedocs.io/en/stable/getting_started.html
+documentation_home: https://mito.readthedocs.io/
+tutorials_home: https://mito.readthedocs.io/page/getting_started.html
 publications:
   - 10.1038/s41467-026-71607-5
 install:
   pypi: scmito
+primary_category: scRNA-seq
 tags:
-  - single-cell
-  - multi-omics
-  - lineage-tracing
-  - mtDNA
-  - phylogenetics
-  - clonal-inference
+  - lineage tracing
+  - multimodal
+  - ATAC-seq
+  - preprocessing
+  - visualization
 license: MIT
-version: v2.0.1
+language: Python
 contact:
   - andrecossa5
-test_command: |
-  pip install ".[test]" && pytest
+logo: logo.png
+test_command: pip install ".[test]" && pytest
 category: ecosystem
